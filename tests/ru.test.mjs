@@ -195,3 +195,38 @@ test("check-reel passes a correctly encoded reel and fails an untagged one", { t
   const failed = b.results.filter((x) => x.status === "FAIL").map((x) => x.item);
   for (const item of ["pix_fmt yuv420p", "faststart (moov before mdat)"]) assert.ok(failed.includes(item), `${item} should fail: ${failed}`);
 });
+
+// ---------- OpenAI whisper-1 provider ----------
+
+test("normalizeTranscript reads OpenAI verbose_json and re-attaches punctuation from segments", () => {
+  const raw = {
+    _provider: "openai", language: "russian", duration: 4.2,
+    text: "Агенты экономят время. Стоп, ещё раз.",
+    segments: [{ text: " Агенты экономят время." }, { text: " Стоп, ещё раз." }],
+    words: [
+      { word: "Агенты", start: 0.1, end: 0.6 }, { word: "экономят", start: 0.65, end: 1.2 }, { word: "время", start: 1.25, end: 1.7 },
+      { word: "Стоп", start: 2.3, end: 2.6 }, { word: "ещё", start: 2.7, end: 2.9 }, { word: "раз", start: 2.95, end: 3.2 },
+    ],
+  };
+  const t = normalizeTranscript(raw, { duration: 4.2 });
+  assert.equal(t.provider, "openai");
+  assert.equal(t.language_code, "russian");
+  assert.deepEqual(t.words.map((w) => w.text), ["Агенты", "экономят", "время.", "Стоп,", "ещё", "раз."]);
+  assert.equal(t.words[2].key, "время");
+});
+
+test("scripts/ru/transcribe.mjs serves an OpenAI cache hit without a key", async () => {
+  const { cacheKey, sha256File, RU_PROMPT, OPENAI_MODEL } = await import("../scripts/ru/transcribe.mjs");
+  const dir = tmp();
+  const media = join(dir, "clip.wav");
+  writeFileSync(media, Buffer.from("hashed only"));
+  const sha = await sha256File(media);
+  const cacheDir = join(dir, "cache");
+  mkdirSync(cacheDir);
+  writeFileSync(join(cacheDir, `${cacheKey({ sha, provider: "openai", model: OPENAI_MODEL, language: "ru", prompt: RU_PROMPT })}.json`), JSON.stringify({ _provider: "openai", words: [] }));
+  const out = join(dir, "raw.json");
+  const r = node(["scripts/ru/transcribe.mjs", media, "--out", out, "--provider", "openai", "--cache-dir", cacheDir], { env: { ...process.env, OPENAI_API_KEY: "" } });
+  assert.equal(r.status, 0, r.stderr);
+  assert.match(r.stdout, /cached \(no API call\)/);
+  assert.equal(JSON.parse(readFileSync(out, "utf8"))._provider, "openai");
+});

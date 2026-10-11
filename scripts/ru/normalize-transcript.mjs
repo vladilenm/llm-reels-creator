@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// ElevenLabs Scribe response -> chassis word transcript.
+// ElevenLabs Scribe or OpenAI whisper-1 (verbose_json) response -> chassis word transcript.
 //
 //   { text, language_code, audio_duration_secs, words: [{ text, start, end, type: "word", key }] }
 //
@@ -24,13 +24,32 @@ export function probeDuration(media) {
   return d;
 }
 
+// OpenAI whisper-1 verbose_json: words are bare ({ word, start, end }); the
+// punctuation lives in segments[].text. Re-attach it by walking the segment
+// tokens in order and matching comparison keys.
+export function punctuateFromSegments(words, segments) {
+  const tokens = (segments ?? []).flatMap((s) => String(s.text ?? "").trim().split(/\s+/).filter(Boolean));
+  const out = words.map((w) => ({ ...w }));
+  let j = 0;
+  for (const w of out) {
+    const k = normKey(w.word ?? w.text);
+    if (!k) continue;
+    for (let look = j; look < Math.min(tokens.length, j + 4); look++) {
+      if (normKey(tokens[look]) === k) { w.text = tokens[look]; j = look + 1; break; }
+    }
+  }
+  return out;
+}
+
 export function normalizeTranscript(raw, { duration } = {}) {
   if (!raw || !Array.isArray(raw.words)) throw new Error("transcript has no words[]");
+  const isOpenAI = raw._provider === "openai" || (raw.words[0] && "word" in raw.words[0] && !("text" in raw.words[0]));
+  const source = isOpenAI ? punctuateFromSegments(raw.words, raw.segments) : raw.words;
   const words = [];
   let lastEnd = 0;
-  for (const w of raw.words) {
+  for (const w of source) {
     if (w.type && w.type !== "word") continue; // spacing, audio_event
-    const text = String(w.text ?? "").trim();
+    const text = String(w.text ?? w.word ?? "").trim();
     if (!text) continue;
     const key = normKey(text);
     if (!key) continue; // punctuation-only token
@@ -45,10 +64,11 @@ export function normalizeTranscript(raw, { duration } = {}) {
     words.push(out);
     lastEnd = end;
   }
-  const audio = Number.isFinite(duration) ? duration : Number(raw.audio_duration_secs);
+  const audio = Number.isFinite(duration) ? duration : Number(raw.audio_duration_secs ?? raw.duration);
   return {
     text: words.map((w) => w.text).join(" "),
-    language_code: raw.language_code ?? null,
+    provider: raw._provider ?? (isOpenAI ? "openai" : "elevenlabs"),
+    language_code: raw.language_code ?? raw.language ?? null,
     language_probability: raw.language_probability ?? null,
     audio_duration_secs: Number.isFinite(audio) ? round(audio) : round(words.at(-1)?.end ?? 0),
     cyrillic_share: round(cyrillicShare(words)),

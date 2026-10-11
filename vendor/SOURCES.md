@@ -75,7 +75,12 @@ Copyright notices: Nate Herk (2026), Bart (2026), HeyGen (Apache-2.0, see
   `elevenlabs.io/docs` and `api.elevenlabs.io` answered 302 to the
   "restricted countries" help page. Transcription needs a network route ElevenLabs
   accepts. The fixture therefore ships an exact synthetic transcript so S2 is
-  testable without the API.
+  testable without the API. **Decision (2026-10-11, with the customer): the default
+  S1 provider is OpenAI `whisper-1`** (reachable from this network; the only OpenAI
+  model with word timestamps), via `scripts/ru/transcribe.mjs`. ElevenLabs stays
+  available with `--provider elevenlabs`. Whisper tends to clean up disfluencies, so
+  the request carries a disfluent Russian prompt; a dropped «э-э» still leaves a gap
+  between words that the silence pass removes.
 - **Inter is Latin-only everywhere it is bundled**: HyperFrames' own font cache
   (`~/.cache/hyperframes/fonts/inter`), `talking-head-recut/assets/fonts/Inter-*-latin`
   and `embedded-captions/.../inter-latin-*`. Rendering Cyrillic with them falls back
