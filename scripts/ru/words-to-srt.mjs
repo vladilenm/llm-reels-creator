@@ -37,26 +37,35 @@ export function buildCues(transcript, { mode = "captions", maxChars = 22, maxLin
   const words = timedWords(transcript);
   if (mode === "words") return words.map((w) => ({ start: w.start, end: w.end, lines: [w.text] }));
 
-  const cues = [];
+  // Group words into cues, then rebalance, then wrap into lines.
+  const groups = [];
   let cur = [];
-  const flush = () => {
-    if (!cur.length) return;
-    const lines = wrapLines(cur.map((w) => w.text), { maxChars, maxLines }) ?? [cur.map((w) => w.text).join(" ")];
-    cues.push({ start: cur[0].start, end: cur.at(-1).end, lines });
-    cur = [];
-  };
   for (const w of words) {
     if (cur.length) {
       const prev = cur.at(-1);
       const tooLong = w.end - cur[0].start > maxCue;
       const pause = w.start - prev.end > gap;
       const fits = wrapLines([...cur, w].map((x) => x.text), { maxChars, maxLines });
-      if (pause || tooLong || !fits) flush();
+      if (pause || tooLong || !fits) { groups.push(cur); cur = []; }
     }
     cur.push(w);
-    if (/[.!?…]$/.test(w.text)) flush();
+    if (/[.!?…]$/.test(w.text)) { groups.push(cur); cur = []; }
   }
-  flush();
+  if (cur.length) groups.push(cur);
+  // A lone word that continues the previous cue's sentence («…каждую | неделю.»)
+  // reads as an orphan: pull the previous cue's last word over when it still fits.
+  for (let i = 1; i < groups.length; i++) {
+    const g = groups[i], p = groups[i - 1];
+    const continues = !/[.!?…]$/.test(p.at(-1).text) && g[0].start - p.at(-1).end <= gap;
+    if (g.length === 1 && p.length >= 3 && continues && wrapLines([p.at(-1), ...g].map((x) => x.text), { maxChars, maxLines })) {
+      g.unshift(p.pop());
+    }
+  }
+  const cues = groups.map((g) => ({
+    start: g[0].start,
+    end: g.at(-1).end,
+    lines: wrapLines(g.map((w) => w.text), { maxChars, maxLines }) ?? [g.map((w) => w.text).join(" ")],
+  }));
   // No overlaps: a cue ends no later than the next one starts.
   for (let i = 0; i < cues.length - 1; i++) cues[i].end = Math.min(cues[i].end, cues[i + 1].start);
   return cues;

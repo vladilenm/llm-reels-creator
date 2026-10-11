@@ -11,7 +11,8 @@ def web_src(c):
     f = (base / c['file']).resolve()
     if f.suffix.lower() == '.mov':  # browsers can't play ProRes: make an on-black preview for the page
         pv = out / (f.stem + '_preview.mp4')
-        os.system(f'ffmpeg -loglevel error -y -f lavfi -i color=black:s=1920x1080 -i "{f}" -filter_complex "[0][1]overlay=shortest=1" -c:v libx264 -crf 20 -pix_fmt yuv420p "{pv}"')
+        wh = os.popen(f'ffprobe -v error -select_streams v:0 -show_entries stream=width,height -of csv=p=0:s=x "{f}"').read().strip() or '1920x1080'  # Reels Studio: keep the clip's own size
+        os.system(f'ffmpeg -loglevel error -y -f lavfi -i color=black:s={wh} -i "{f}" -filter_complex "[0][1]overlay=shortest=1" -c:v libx264 -crf 20 -pix_fmt yuv420p "{pv}"')
         return pv.name
     return os.path.relpath(f, out)
 clips = [{'n': c['id'], 't': c['title'], 'tc': f"{fmt(c['in'])} – {fmt(c['out'])}", 'q': c.get('line', ''), 'f': pathlib.Path(c['file']).name,

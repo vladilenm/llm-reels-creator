@@ -116,3 +116,27 @@ validators. Structural checks supplement rendered video and audio review.
 `object-separation` is optional and heavy: it needs a Python venv with torch and
 a 150–900 MB SAM 2 model, installed on first use only. Never run it in a reel
 unless the user asks for it. Vendored versions and local patches: `vendor/SOURCES.md`.
+
+## Reels Studio
+
+The main scenario is `/reel <file> [— brief] [--mode kit|full] [--review-cuts] [--density …]`.
+Route every reel to the `vladilen-reels` skill, not straight to `short-form-edit`;
+the orchestrator calls the chassis skills itself. Spec: `SPEC.md`.
+
+- Before creative work read `brand/brand.md`, `lessons.md`, `refs/NOTES.md`,
+  `MOTION_PHILOSOPHY.md`.
+- Priority when rules conflict: the customer's words in the current message →
+  `lessons.md` → `brand/brand.md` → `vladilen-reels` → chassis skills → other skills.
+- Educational speech: let phrases breathe; never turn it into a sizzle cut.
+- Never invent facts, numbers, results or testimonials.
+- Sources are read-only. Every derivative goes to `video-projects/<YYYY-MM-DD-slug>/`.
+- Publish or send nothing.
+- Paid calls (OpenAI/ElevenLabs transcription, Higgsfield) only inside a run.
+  Never re-transcribe a cached source (SHA-256 cache in `.cache/transcripts/`).
+  Higgsfield is phase 7: only on explicit request, with the prompt and expected
+  cost shown and a «да» before each generation.
+- Russian text only in fonts with Cyrillic (`brand/fonts/`); the bundled Inter
+  copies in HyperFrames and the vendored skills are Latin-only.
+- Claude cannot hear. Every report that touches audio ends with «Звук мной не
+  прослушан: громкость, музыку и склейки по интонации проверь на слух».
+- Reports: short, by stage — done, decided, needs the human.

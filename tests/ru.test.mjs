@@ -230,3 +230,30 @@ test("scripts/ru/transcribe.mjs serves an OpenAI cache hit without a key", async
   assert.match(r.stdout, /cached \(no API call\)/);
   assert.equal(JSON.parse(readFileSync(out, "utf8"))._provider, "openai");
 });
+
+// ---------- S5 captions ----------
+
+test("make-captions: every clean word lands in a cue, lines ≤22 chars, glyph-checked Cyrillic font", { skip: !canSay && "needs the fixture" }, async () => {
+  const { makeCaptions, captionCues } = await import("../scripts/ru/make-captions.mjs");
+  const { loadBrand } = await import("../scripts/ru/lib/brand.mjs");
+  const fx = makeFixture();
+  const P = tmp();
+  mkdirSync(join(P, "work"));
+  let r = node(["scripts/ru/normalize-transcript.mjs", join(fx.out, "transcript.synthetic.json"), "--media", join(fx.out, "raw.mov"), "--out", join(P, "transcript.clean.json")]);
+  assert.equal(r.status, 0, r.stderr);
+  writeFileSync(join(P, "meta.json"), JSON.stringify({ fps: 30 }));
+  const t = JSON.parse(readFileSync(join(P, "transcript.clean.json"), "utf8"));
+  const cues = captionCues(t, loadBrand());
+  assert.deepEqual(cues.flatMap((c) => c.lines.flat().map((w) => w.text)), t.words.map((w) => w.text));
+  for (const c of cues) {
+    assert.ok(c.lines.length <= 2);
+    for (const l of c.lines) assert.ok(l.map((w) => w.text).join(" ").length <= 22);
+    assert.ok(c.end - c.start >= 0.05);
+  }
+  const res = makeCaptions(P);
+  assert.equal(res.cues, cues.length);
+  assert.deepEqual(validateSrt(readFileSync(join(P, "captions.srt"), "utf8")), []);
+  const html = readFileSync(join(P, "captions/index.html"), "utf8");
+  assert.match(html, /@font-face\{font-family:"ReelCaption";src:url\("fonts\/Inter-700\.ttf"\)/);
+  assert.match(html, /window\.__timelines\["captions"\]/);
+});

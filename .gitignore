@@ -55,3 +55,4 @@ refs/*.mov
 refs/*.webm
 .cache/
 fixtures/out/
+video-projects/*/captions/node_modules
