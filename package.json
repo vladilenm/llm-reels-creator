@@ -25,8 +25,11 @@
     "node": ">=22"
   },
   "devDependencies": {
-    "hyperframes": "0.7.109",
+    "fontkit": "2.0.4",
     "gsap": "3.14.2",
-    "playwright": "^1.59.1"
+    "hyperframes": "0.8.147",
+    "playwright": "^1.59.1",
+    "puppeteer": "25.8.0",
+    "sharp": "0.35.3"
   }
 }

@@ -101,3 +101,18 @@ disabled; synthetic input must remain inside the virtual browser.
 
 For short-form edits, read `docs/SHORT-FORM.md` and use the plan and footage
 validators. Structural checks supplement rendered video and audio review.
+
+## Reels Studio: added skills
+
+| Need | Skill |
+| --- | --- |
+| Word-timed motion-graphic B-roll clips (one morphing shape) | `motion-broll` |
+| Captions on a talking head (rail + embedded peak) | `embedded-captions` |
+| Designed overlay cards on an untouched talking head | `talking-head-recut` |
+| Timing, easing and choreography principles | `motion-principles` |
+| Instagram Reels encode and safe zones | `reel-export` |
+| Rotoscope a subject with SAM 2 | `object-separation` (optional, heavy) |
+
+`object-separation` is optional and heavy: it needs a Python venv with torch and
+a 150–900 MB SAM 2 model, installed on first use only. Never run it in a reel
+unless the user asks for it. Vendored versions and local patches: `vendor/SOURCES.md`.
