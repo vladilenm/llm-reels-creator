@@ -1,0 +1,57 @@
+# Personal inputs, transcripts, edit decisions, and renders stay local.
+.env
+.env.*
+!.env.example
+*.env
+*.pem
+*.key
+node_modules/
+raw-media/
+renders/
+**/renders/
+tmp/
+archives/
+*.mp4
+*.mov
+*.mkv
+*.webm
+*.wav
+*.mp3
+*.m4a
+*.aac
+*.flac
+*.zip
+*.log
+__pycache__/
+*.pyc
+.DS_Store
+Thumbs.db
+.vscode/
+.claude/settings.local.json
+.codex/auth.json
+.codex/sessions/
+.codex/history.jsonl
+
+# Deliberately public synthetic timing data, without media.
+!examples/short-form/assets/
+!examples/short-form/assets/*.json
+
+# Three finished videos explicitly supplied for the public showcase.
+!examples/showcase/curiosity-reel-2.mp4
+!examples/showcase/curiosity-reel-1.mp4
+!examples/showcase/ais-live-ad.mp4
+
+# --- Reels Studio ---
+# Raw inputs, per-reel media and renders stay local. Text artifacts (.md, .json,
+# HTML compositions) inside video-projects/ ARE committed.
+inbox/*
+!inbox/.gitkeep
+video-projects/*/assets/
+video-projects/*/renders/
+video-projects/*/motion/work/
+video-projects/*/review/*.png
+refs/*.mp4
+refs/*.mov
+refs/*.webm
+.cache/
+fixtures/out/
