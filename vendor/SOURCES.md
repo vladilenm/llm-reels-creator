@@ -45,6 +45,12 @@ Copyright notices: Nate Herk (2026), Bart (2026), HeyGen (Apache-2.0, see
 | `.claude/skills/embedded-captions/scripts/hf-cli.cjs` | Added a final fallback: walk up from the script to the nearest `node_modules/hyperframes/dist/cli.js` | Upstream only finds a HeyGen source checkout or their plugin launcher; we use the project's pinned npm CLI |
 | `.claude/skills/object-separation/SKILL.md` | Windows home-directory example path → `%USERPROFILE%\.cache` | The chassis `npm run check` rejects machine-specific paths |
 | `scripts/check-kit.mjs` | Also skips `fixtures/out`, `inbox`, `refs`, `.cache` | Generated fixture media, raw inputs and reference reels are local-only and gitignored |
+| `scripts/transcribe-elevenlabs.mjs` | Default model `scribe_v1` → `scribe_v2`; default language `en` → `ru`; SHA-256 cache in `.cache/transcripts/` (key = file hash + model + language + flags; a hit copies the response and makes no API call; `--no-cache`, `--cache-dir`) | `scribe_v1` was removed by ElevenLabs on 2026-07-09; Russian is our language; never pay twice for the same source |
+| `.claude/skills/cut-mistakes/scripts/find-cut-candidates.mjs` | Tokens are Unicode-aware (was `[a-z0-9]` only, so every Cyrillic token was empty and the detector was blind on Russian). Stop words moved to a JSON config (`--lang`, `--fillers`; `config/en.json` keeps the original English list). Russian retake signatures compare 5-letter prefixes. New candidate types `hesitation`, `filler` (review only), `retake_marker` (chained markers, abandoned fragment) | SPEC §3.3 |
+| `.claude/skills/cut-mistakes/config/en.json` | New: the English vocabulary that used to be hard-coded, plus um/uh as hesitations | Config, not code |
+| `.claude/skills/cut-mistakes/SKILL.md` | Documents the language config, new types and the "read the whole transcript anyway" rule | |
+| `.claude/skills/motion-broll/scripts/words.py` | Also accepts a word-level JSON transcript and prints exact word times | SPEC §3.5: no ±0.2 s SRT estimate |
+| `.claude/skills/reel-export/SKILL.md` | Added `setparams=range=tv:colorspace=bt709:color_primaries=bt709:color_trc=bt709` to the encode filter chain | With ffmpeg 8.1 the original command writes `color_primaries`/`color_trc` as unknown; verified with ffprobe |
 
 ## Discrepancies between SPEC.md and the real repositories
 
@@ -54,8 +60,7 @@ Copyright notices: Nate Herk (2026), Bart (2026), HeyGen (Apache-2.0, see
 - **heygen skills assume a plugin install or a HeyGen monorepo checkout** to find
   the CLI (`hf-cli.cjs`). Patched as above.
 - **`embedded-captions` caption fonts are Latin-only subsets**
-  (`modes/standard/fonts/files/*-latin-*.woff2`). Cyrillic needs our own fonts; see
-  phase 3 notes in this file.
+  (`modes/standard/fonts/files/*-latin-*.woff2`). Cyrillic needs our own fonts (`brand/fonts/`).
 - **motion-broll `setup.sh` installs its own Playwright + Chromium into
   `./motion/node_modules`.** The chassis already ships Playwright 1.63 (Chromium
   rev 1243), so we run the engine with `NODE_PATH=<repo>/node_modules` and skip the
@@ -63,6 +68,22 @@ Copyright notices: Nate Herk (2026), Bart (2026), HeyGen (Apache-2.0, see
   example clip.
 - **heygen caption helpers (`preview-frames.cjs`, `check-*.cjs`)** launch the system
   Google Chrome via `executablePath`, so no Puppeteer browser download is needed.
+- **ElevenLabs `scribe_v1`** (the chassis default) no longer exists (removed
+  2026-07-09); `scribe_v2` is the batch model. `language_code` accepts ISO-639-1
+  or -3 (`ru`/`rus`); the response's `language_code` is ISO-639-3 (`rus`).
+- **ElevenLabs is geo-restricted from this machine's network**: on 2026-10-11 both
+  `elevenlabs.io/docs` and `api.elevenlabs.io` answered 302 to the
+  "restricted countries" help page. Transcription needs a network route ElevenLabs
+  accepts. The fixture therefore ships an exact synthetic transcript so S2 is
+  testable without the API.
+- **Inter is Latin-only everywhere it is bundled**: HyperFrames' own font cache
+  (`~/.cache/hyperframes/fonts/inter`), `talking-head-recut/assets/fonts/Inter-*-latin`
+  and `embedded-captions/.../inter-latin-*`. Rendering Cyrillic with them falls back
+  to a system font silently. `brand/fonts/` carries full Inter 4.001 (Google Fonts
+  static TTFs, OFL) and Geist (from motion-broll, OFL), both checked with
+  `scripts/ru/check-glyphs.mjs`.
+- **ffmpeg 8.1 + `-color_primaries/-color_trc`** does not tag the stream unless
+  `setparams` sets them in the filter graph (see reel-export patch).
 
 ## HyperFrames version decision (phase 2, 2026-10-11)
 

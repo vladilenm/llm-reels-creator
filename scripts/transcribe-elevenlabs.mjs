@@ -7,15 +7,18 @@
 //
 // Defaults:
 //   --output  <input-without-ext>.json next to the source
-//   --model   scribe_v1
-//   --language en
+//   --model   scribe_v2   (scribe_v1 was removed by ElevenLabs on 2026-07-09)
+//   --language ru          (ISO-639-1 or -3; Reels Studio default)
+//   --cache-dir .cache/transcripts  (keyed by SHA-256 of the input file; a hit
+//              copies the cached response and makes no API call; --no-cache skips it)
 //   --diarize (use --no-diarize to disable)
 //   audio extraction: mono 16 kHz mp3 @ 64 kbps via ffmpeg (deleted after upload
 //     unless --keep-audio). Audio inputs are uploaded as-is.
 //
 // Reads ELEVENLABS_API_KEY from process.env or the workspace .env file.
 
-import { readFileSync, writeFileSync, existsSync, statSync, unlinkSync, openAsBlob } from "node:fs";
+import { readFileSync, writeFileSync, existsSync, statSync, unlinkSync, openAsBlob, mkdirSync, copyFileSync, createReadStream } from "node:fs";
+import { createHash } from "node:crypto";
 import { dirname, join, resolve, basename, extname } from "node:path";
 import { spawnSync } from "node:child_process";
 import { argv, exit, env } from "node:process";
@@ -36,8 +39,8 @@ const args = argv.slice(2);
 if (args.length === 0 || args.includes("--help") || args.includes("-h")) {
   console.log(
     `Usage: node scripts/transcribe-elevenlabs.mjs <input> [--output path] ` +
-      `[--model scribe_v1|scribe_v1_experimental] [--language en] [--no-diarize] ` +
-      `[--tag-audio-events] [--keep-audio]`,
+      `[--model scribe_v2] [--language ru] [--no-diarize] ` +
+      `[--tag-audio-events] [--keep-audio] [--cache-dir dir] [--no-cache]`,
   );
   exit(args.length === 0 ? 1 : 0);
 }
@@ -45,8 +48,10 @@ if (args.length === 0 || args.includes("--help") || args.includes("-h")) {
 const opts = {
   input: null,
   output: null,
-  model: "scribe_v1",
-  language: "en",
+  model: "scribe_v2",
+  language: "ru",
+  cacheDir: join(WORKSPACE_ROOT, ".cache/transcripts"),
+  cache: true,
   diarize: true,
   tagAudioEvents: false,
   keepAudio: false,
@@ -60,6 +65,8 @@ for (let i = 0; i < args.length; i++) {
   else if (a === "--diarize") opts.diarize = true;
   else if (a === "--tag-audio-events") opts.tagAudioEvents = true;
   else if (a === "--keep-audio") opts.keepAudio = true;
+  else if (a === "--cache-dir") opts.cacheDir = resolve(args[++i]);
+  else if (a === "--no-cache") opts.cache = false;
   else if (a.startsWith("--")) die(`unknown option: ${a}`);
   else if (!opts.input) opts.input = a;
   else die(`unexpected argument: ${a}`);
@@ -73,6 +80,21 @@ const inputExt = extname(inputPath).toLowerCase();
 const inputDir = dirname(inputPath);
 const inputStem = basename(inputPath, extname(inputPath));
 const outputPath = resolve(opts.output ?? join(inputDir, `${inputStem}.json`));
+
+// --- cache: same source bytes + same request options => no second paid call ---
+async function sha256File(path) {
+  const h = createHash("sha256");
+  for await (const chunk of createReadStream(path)) h.update(chunk);
+  return h.digest("hex");
+}
+const sourceHash = await sha256File(inputPath);
+const cacheKey = `${sourceHash}.${opts.model}.${opts.language || "auto"}${opts.diarize ? ".diarize" : ""}${opts.tagAudioEvents ? ".events" : ""}`;
+const cachePath = join(opts.cacheDir, `${cacheKey}.json`);
+if (opts.cache && existsSync(cachePath)) {
+  copyFileSync(cachePath, outputPath);
+  console.log(`cached (sha256 ${sourceHash.slice(0, 12)}…) -> ${outputPath} · no API call`);
+  exit(0);
+}
 
 // --- load API key (env first, then workspace .env) ---
 let apiKey = env.ELEVENLABS_API_KEY ?? env.ELEVEN_API_KEY ?? env.XI_API_KEY;
@@ -144,6 +166,10 @@ if (!res.ok) {
 
 const json = await res.json();
 writeFileSync(outputPath, JSON.stringify(json, null, 2));
+if (opts.cache) {
+  mkdirSync(opts.cacheDir, { recursive: true });
+  writeFileSync(cachePath, JSON.stringify(json, null, 2));
+}
 
 if (tempAudioPath && !opts.keepAudio) unlinkSync(tempAudioPath);
 
@@ -151,5 +177,5 @@ const wordCount = Array.isArray(json.words)
   ? json.words.filter((w) => w.type === "word").length
   : 0;
 console.log(
-  `ok ${dt}s | ${wordCount} words | ${json.audio_duration_secs?.toFixed?.(1) ?? "?"}s audio | ${outputPath}`,
+  `ok ${dt}s · sha256 ${sourceHash.slice(0, 12)}… | ${wordCount} words | ${json.audio_duration_secs?.toFixed?.(1) ?? "?"}s audio | ${outputPath}`,
 );

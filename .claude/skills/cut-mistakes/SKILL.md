@@ -30,6 +30,14 @@ Input is normally Agent 1's `<stem>.silence-transcript.json`, so cuts land on th
 
 Candidate types: `stutter` (immediate word repeat), `retake` (duplicate/near-duplicate segment via Jaccard similarity), `false_start` (short abandoned phrase that restarts).
 
+**Language config (Reels Studio).** Vocabulary is no longer hard-coded: `--lang auto|ru|en` (auto picks `ru` when most letters are Cyrillic) loads `config/en.json` or `scripts/ru/ru-fillers.json`; `--fillers <file>` overrides. Tokens are compared Unicode-aware (lowercase, `ё→е`, letters/digits only), and Russian retake signatures compare word prefixes so inflected forms match. Extra types from the config:
+
+- `hesitation` — э-э, мм, хм: recommend **cut** (high).
+- `filler` — ну, вот, типа, короче, значит, «в общем», «как бы»: **review only**, they are often meaningful.
+- `retake_marker` — «стоп», «ещё раз», «заново», «так, ещё раз» (chained into one marker). The marker is cut; when the restart repeats the fragment before the marker, the whole abandoned fragment is proposed as one cut.
+
+A zero-candidate report does **not** mean the take is clean: after the detector, read the whole transcript yourself and add any missed retake or false start by hand.
+
 ### 2. Review (the gate — REQUIRED)
 
 Read each candidate **in context** and decide keep-or-cut. The mechanical detector cannot tell intentional emphasis/rhetoric from a real flub, so do not trust `recommend` blindly — read `removes` + `context`. Common false positives: emphatic repetition ("it's never, never hands-off"), copula-then-question ("the piece is, is this…"), listing.

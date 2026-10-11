@@ -1,0 +1,9 @@
+{
+  "language": "en",
+  "comment": "English vocabulary for find-cut-candidates.mjs (moved out of the script by Reels Studio; same schema as scripts/ru/ru-fillers.json).",
+  "stopwords": ["a", "an", "and", "are", "as", "at", "be", "but", "by", "for", "from", "i", "if", "in", "is", "it", "of", "on", "or", "so", "that", "this", "to", "was", "we", "with", "you", "your", "they", "their", "there", "what", "when", "where", "why", "how", "like", "um", "uh"],
+  "hesitations": { "words": ["um", "uh", "erm", "uhm", "hmm"], "patterns": ["^u+h+$", "^u+m+$"] },
+  "fillers": { "words": ["you know", "i mean", "kind of", "sort of", "basically", "literally"] },
+  "retakeMarkers": { "phrases": ["let me start again", "let me redo that", "one more time", "take two", "start over"] },
+  "signature": { "stemLength": 99, "minTokenLength": 3 }
+}

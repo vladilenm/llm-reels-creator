@@ -18,28 +18,49 @@
 //   <stem>.cut-candidates.md     human-readable proposal
 //
 // Usage:
-//   node find-cut-candidates.mjs <transcript.json> [--out-dir dir]
+//   node find-cut-candidates.mjs <transcript.json> [--out-dir dir] [--lang auto|ru|en] [--fillers file.json]
+//
+// Language config (Reels Studio patch): stop words, hesitation sounds, verbal
+// fillers and retake markers live in a JSON file instead of being hard-coded.
+//   en → ../config/en.json            ru → <repo>/scripts/ru/ru-fillers.json
+// `--lang auto` (default) picks ru when most letters are Cyrillic. Extra
+// candidate types from the config: `hesitation` (э-э, мм — recommend cut),
+// `filler` (ну, типа, короче — review only), `retake_marker` («стоп, ещё раз» —
+// cut the marker and the abandoned fragment before it).
 
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { dirname, join, resolve, basename, extname } from "node:path";
+import { fileURLToPath } from "node:url";
 import { argv, exit } from "node:process";
+import { normKey, normPhrase, cyrillicShare, loadFillers, isHesitation, matchPhraseAt } from "../../../../scripts/ru/lib/text.mjs";
 
+const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 const args = argv.slice(2);
 if (args.length === 0 || args.includes("--help")) {
-  console.log("Usage: node find-cut-candidates.mjs <transcript.json> [--out-dir dir]");
+  console.log("Usage: node find-cut-candidates.mjs <transcript.json> [--out-dir dir] [--lang auto|ru|en] [--fillers file.json]");
   exit(args.length === 0 ? 1 : 0);
 }
-let transcriptArg = null, outDirArg = null;
+let transcriptArg = null, outDirArg = null, langArg = "auto", fillersArg = null;
 for (let i = 0; i < args.length; i++) {
   if (args[i] === "--out-dir") outDirArg = args[++i];
+  else if (args[i] === "--lang") langArg = args[++i];
+  else if (args[i] === "--fillers") fillersArg = args[++i];
   else if (!transcriptArg) transcriptArg = args[i];
 }
 const transcriptPath = resolve(transcriptArg);
 const transcript = JSON.parse(readFileSync(transcriptPath, "utf8"));
 if (!Array.isArray(transcript.words)) { console.error("transcript has no words[]"); exit(1); }
 
+const lang = langArg === "auto"
+  ? (cyrillicShare(transcript.words.filter((w) => (w.type ? w.type === "word" : true))) >= 0.5 ? "ru" : "en")
+  : langArg;
+const fillersPath = fillersArg
+  ? resolve(fillersArg)
+  : lang === "ru" ? join(SCRIPT_DIR, "../../../../scripts/ru/ru-fillers.json") : join(SCRIPT_DIR, "../config/en.json");
+const vocab = loadFillers(fillersPath);
+
 function cleanToken(text) {
-  return (text ?? "").toLowerCase().replace(/^[^a-z0-9$%]+|[^a-z0-9$%]+$/g, "");
+  return normKey(text);
 }
 function displayText(ws) {
   return ws.map((w) => w.text).join(" ").replace(/\s+([,.!?;:])/g, "$1");
@@ -65,6 +86,7 @@ const ctx = (i, before = 6, after = 6) =>
 for (let i = 1; i < words.length; i++) {
   const a = words[i - 1], b = words[i];
   if (!b.token || b.token.length < 1) continue;
+  if (isHesitation(b.token, vocab)) continue; // «э э» is reported as hesitation below
   const closeGap = b.start - a.end < 0.5;
   if (a.token === b.token && closeGap) {
     candidates.push({
@@ -82,6 +104,90 @@ for (let i = 1; i < words.length; i++) {
   }
 }
 
+// ---- 1b) hesitations and verbal fillers (from the language config) ----
+const keys = words.map((w) => w.token);
+for (let i = 0; i < words.length; i++) {
+  if (isHesitation(keys[i], vocab)) {
+    // Remove the sound plus the air up to the next word, so the join is word-to-word.
+    const next = words[i + 1];
+    const end = next ? Math.min(next.start, words[i].end + 0.25) : words[i].end;
+    candidates.push({
+      id: `c${String(++cid).padStart(3, "0")}`,
+      type: "hesitation",
+      confidence: "high",
+      recommend: "cut",
+      cut: { start: Number(words[i].start.toFixed(3)), end: Number(end.toFixed(3)) },
+      removes: words[i].text,
+      context: ctx(i),
+      note: `hesitation "${keys[i]}"`,
+    });
+    continue;
+  }
+  const n = matchPhraseAt(keys, i, vocab.fillerPhrases);
+  if (n) {
+    const last = words[i + n - 1];
+    candidates.push({
+      id: `c${String(++cid).padStart(3, "0")}`,
+      type: "filler",
+      confidence: "low",
+      recommend: "review",
+      cut: { start: Number(words[i].start.toFixed(3)), end: Number(last.end.toFixed(3)) },
+      removes: displayText(words.slice(i, i + n)),
+      context: ctx(i),
+      note: "verbal filler: often meaningful, cut only if it reads as padding",
+    });
+    i += n - 1;
+  }
+}
+
+// ---- 1c) retake markers: «…экономят время. Стоп, ещё раз. Агенты экономят часы…» ----
+// The marker itself is always cut. The fragment before it (back to the previous
+// sentence end or pause) is the abandoned take; it is a strong cut when the
+// restart after the marker repeats its opening words.
+const stemOf = (t) => t.slice(0, vocab.stemLength);
+for (let i = 0; i < words.length; i++) {
+  let n = matchPhraseAt(keys, i, vocab.retakeMarkers);
+  if (!n) continue;
+  // Chain adjacent markers: «Стоп, ещё раз» is one marker, not two.
+  for (let m; (m = matchPhraseAt(keys, i + n, vocab.retakeMarkers)); ) n += m;
+  // A marker that is clearly mid-sentence (no punctuation or pause around it) is ordinary speech.
+  const before = words[i - 1], after = words[i + n];
+  const lastMarker = words[i + n - 1];
+  const pausedBefore = !before || /[.!?,…]$/.test(before.text) || words[i].start - before.end > 0.35;
+  const pausedAfter = !after || /[.!?,…]$/.test(lastMarker.text) || after.start - lastMarker.end > 0.35;
+  if (!pausedBefore || !pausedAfter) { i += n - 1; continue; }
+  // Abandoned fragment: walk back to the previous sentence end / long pause.
+  // The word right before the marker may itself end with "." (it ends the
+  // fragment), so boundaries only count once at least one word is included.
+  let fs = i;
+  while (fs > 0 && i - fs < 25) {
+    const p = words[fs - 1];
+    if (fs < i && (/[.!?…]$/.test(p.text) || words[fs].start - p.end > 0.85)) break;
+    fs -= 1;
+  }
+  // Restart overlap: the opening words after the marker vs the fragment.
+  const frag = keys.slice(fs, i).filter((k) => k && !vocab.stopwords.has(k)).map(stemOf);
+  const restart = keys.slice(i + n, i + n + Math.max(4, frag.length + 2)).filter((k) => k && !vocab.stopwords.has(k)).map(stemOf);
+  const shared = frag.filter((t) => restart.includes(t)).length;
+  const repeats = frag.length > 0 && shared / frag.length >= 0.4;
+  const cutEnd = after ? after.start : lastMarker.end;
+  candidates.push({
+    id: `c${String(++cid).padStart(3, "0")}`,
+    type: "retake_marker",
+    confidence: repeats ? "high" : "medium",
+    recommend: repeats ? "cut" : "review",
+    cut: { start: Number(words[repeats ? fs : i].start.toFixed(3)), end: Number(cutEnd.toFixed(3)) },
+    removes: displayText(words.slice(repeats ? fs : i, i + n)),
+    keeps: displayText(words.slice(i + n, i + n + 8)),
+    marker: displayText(words.slice(i, i + n)),
+    context: ctx(i, 10, 10),
+    note: repeats
+      ? `marker "${displayText(words.slice(i, i + n))}" + restart repeats ${shared}/${frag.length} content words of the fragment before it`
+      : `marker "${displayText(words.slice(i, i + n))}" — no clear restart; review whether the fragment before it is abandoned`,
+  });
+  i += n - 1;
+}
+
 // ---- build segments (for retake / false-start detection) ----
 const segments = [];
 let segStart = 0;
@@ -97,9 +203,14 @@ for (let i = 1; i < words.length; i++) {
 }
 segments.push({ id: segments.length + 1, wordStart: segStart, wordEnd: words.length - 1, start: words[segStart].start, end: words.at(-1).end, text: displayText(words.slice(segStart)) });
 
-const stop = new Set("a an and are as at be but by for from i if in is it of on or so that this to was we with you your they their there what when where why how like um uh".split(" "));
+// Stop words come from the language config; Russian tokens are compared on a
+// prefix (stemLength) because the language is inflected.
+const stop = vocab.stopwords;
 function signature(seg) {
-  return seg.text.toLowerCase().replace(/[^a-z0-9\s$%]/g, " ").split(/\s+/).filter((t) => t.length > 2 && !stop.has(t)).slice(0, 18);
+  return normPhrase(seg.text)
+    .filter((t) => t.length >= vocab.minTokenLength && !stop.has(t) && !isHesitation(t, vocab))
+    .map((t) => (lang === "ru" ? t.slice(0, vocab.stemLength) : t))
+    .slice(0, 18);
 }
 function jaccard(a, b) {
   const as = new Set(a), bs = new Set(b);
@@ -148,6 +259,8 @@ mkdirSync(outDir, { recursive: true });
 
 const out = {
   agent: "cut-mistakes",
+  language: lang,
+  vocabulary: fillersPath,
   source_transcript: transcriptPath,
   word_count: words.length,
   segment_count: segments.length,

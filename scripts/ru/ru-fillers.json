@@ -1,0 +1,28 @@
+{
+  "language": "ru",
+  "comment": "Russian filler / retake vocabulary for cut-mistakes. Matching uses normalized keys: lowercase, ё→е, letters and digits only (so «э-э» → «ээ»). Edit freely; the detector and tests read this file.",
+  "stopwords": [
+    "и", "а", "но", "в", "на", "с", "по", "к", "у", "о", "из", "за", "что", "это", "как", "так", "же", "ли", "бы", "не",
+    "я", "ты", "мы", "вы", "он", "она", "они", "оно", "то", "от", "до", "для", "при", "про", "об", "во", "со", "ко",
+    "да", "нет", "вот", "ну", "уже", "еще", "там", "тут", "здесь", "его", "ее", "их", "мне", "меня", "нам", "вам",
+    "был", "была", "было", "были", "есть", "будет", "который", "которая", "которые", "этот", "эта", "эти", "тот", "все", "всё"
+  ],
+  "hesitations": {
+    "comment": "Pure hesitation sounds. Safe to cut by default (high confidence).",
+    "words": ["э", "ээ", "эээ", "эм", "эмм", "мм", "ммм", "хм", "хмм", "а-а", "аа", "ааа", "м"],
+    "patterns": ["^э+м*$", "^м{2,}$", "^а{2,}$", "^х+м+$"]
+  },
+  "fillers": {
+    "comment": "Verbal fillers that are sometimes meaningful. Proposed for review, never auto-cut: «вот» and «значит» are often real words.",
+    "words": ["ну вот", "ну", "вот", "типа", "короче", "значит", "собственно", "блин", "так", "в общем", "как бы", "скажем так", "то есть", "это самое", "как его", "в принципе"]
+  },
+  "retakeMarkers": {
+    "comment": "Phrases a speaker says before restarting a take. A marker makes the preceding unfinished fragment a likely abandoned take.",
+    "phrases": ["ещё раз", "заново", "стоп", "сначала", "не так", "давай ещё", "так, ещё раз", "сорри", "извините", "переснимаю", "дубль"]
+  },
+  "signature": {
+    "comment": "Russian is inflected: compare retake signatures on a word prefix so «время» and «времени» match.",
+    "stemLength": 5,
+    "minTokenLength": 3
+  }
+}
