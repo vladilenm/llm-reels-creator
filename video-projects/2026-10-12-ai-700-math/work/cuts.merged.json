@@ -1,0 +1,54 @@
+{
+  "cuts": [
+    {
+      "start": 0,
+      "end": 0.28,
+      "reason": "head trim before first word"
+    },
+    {
+      "start": 4.146,
+      "end": 6.192,
+      "reason": "pause 2.29s -> 0.24s"
+    },
+    {
+      "start": 20.858,
+      "end": 21.507,
+      "reason": "pause 0.85s -> 0.20s"
+    },
+    {
+      "start": 24.12,
+      "end": 24.8,
+      "reason": "pause 1.18s -> 0.50s (вручную: пауза перед поворотом «потому что»)"
+    },
+    {
+      "start": 27.752,
+      "end": 31.812,
+      "reason": "pause 4.30s -> 0.24s"
+    },
+    {
+      "start": 34.657,
+      "end": 35.566,
+      "reason": "pause 1.05s -> 0.14s"
+    },
+    {
+      "start": 37.302,
+      "end": 37.887,
+      "reason": "pause 0.73s -> 0.14s"
+    },
+    {
+      "start": 38.347,
+      "end": 38.823,
+      "reason": "pause 0.62s -> 0.14s"
+    },
+    {
+      "start": 42.657,
+      "end": 43.267,
+      "reason": "pause 0.75s -> 0.14s"
+    },
+    {
+      "start": 45.76,
+      "end": 46.185,
+      "reason": "tail trim after final word"
+    }
+  ]
+}

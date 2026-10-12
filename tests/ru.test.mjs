@@ -258,6 +258,32 @@ test("make-captions: every clean word lands in a cue, lines ≤22 chars, glyph-c
   assert.match(html, /window\.__timelines\["captions"\]/);
 });
 
+test("make-captions: PLAN.json overrides hide windows and move the baseline", async () => {
+  const { applyHide, baselineAt, captionsHtml } = await import("../scripts/ru/make-captions.mjs");
+  const { loadBrand } = await import("../scripts/ru/lib/brand.mjs");
+  const cue = (start, end, text = "слово") => ({ start, end, lines: [[{ text, start, end }]] });
+  // fully hidden → dropped; straddling the end → trimmed to the window end
+  const kept = applyHide([cue(0, 2), cue(4, 6), cue(8, 9)], [{ in: 0, out: 4.6 }]);
+  assert.deepEqual(kept.map((c) => [c.start, c.end]), [[4.6, 6], [8, 9]]);
+  assert.equal(applyHide([cue(1, 2)]).length, 1);
+
+  const keys = [{ at: 10, baseline_y: 1410 }, { at: 10.5, baseline_y: 980 }, { at: 20, baseline_y: 980 }, { at: 20.5, baseline_y: 1410 }];
+  assert.equal(baselineAt(keys, 5, 1410), 1410);
+  assert.equal(baselineAt(keys, 15, 1410), 980);
+  assert.equal(baselineAt(keys, 30, 1410), 1410);
+  assert.equal(baselineAt(keys, 10.25, 1410), 1195);
+
+  const brand = loadBrand();
+  const lineH = Math.round(brand.captions.font_px * 1.3);
+  const html = captionsHtml([cue(12, 13), cue(19.5, 21)], { duration: 22, brand, fontUrl: "f.ttf", overrides: { baseline_keys: keys } });
+  assert.match(html, new RegExp(`id="c0"[^>]*top:${980 - lineH}px`));
+  assert.match(html, /tl\.to\("#c1",\{y:430,duration:0\.5,ease:"power3\.inOut"\},20\);/);
+  // no overrides → brand baseline, no y tweens
+  const plain = captionsHtml([cue(12, 13)], { duration: 22, brand, fontUrl: "f.ttf" });
+  assert.match(plain, new RegExp(`top:${brand.captions.baseline_y - lineH}px`));
+  assert.doesNotMatch(plain, /tl\.to\("#c0",\{y:/);
+});
+
 test("refineWithSilences pulls late whisper starts back to the speech onset and closes silence-free gaps", async () => {
   const { refineWithSilences } = await import("../scripts/ru/normalize-transcript.mjs");
   const words = [
@@ -280,4 +306,40 @@ test("build-edl snaps cut boundaries to word edges and restores sentence case", 
   const fixed = sentenceCase([{ text: "агентов." }, { text: "агенты" }, { text: "«пишите»" }].map((w, i, a) => (i === 2 ? { text: "«пишите»" } : w)));
   assert.deepEqual(fixed.map((w) => w.text), ["Агентов.", "Агенты", "«пишите»"]);
   assert.deepEqual(sentenceCase([{ text: "рутину." }, { text: "«пишите»" }]).map((w) => w.text), ["Рутину.", "«Пишите»"]);
+});
+
+test("words-to-srt breaks an overflowing cue at a phrase boundary, not mid-phrase", () => {
+  const text = "То есть, теперь математика под угрозой, потому что теперь математикам нужно проверить";
+  const words = text.split(" ").map((t, i) => ({ text: t, start: i * 0.3, end: i * 0.3 + 0.25, type: "word" }));
+  const cues = buildCues({ words }, { maxCue: 10 });
+  const joined = cues.map((c) => c.lines.join(" "));
+  for (const c of joined) {
+    assert.ok(!/ под$/.test(c), `cue ends on a preposition: "${c}"`);
+    assert.ok(!/потому$/.test(c), `«потому что» split across cues: "${c}"`);
+  }
+  assert.ok(joined.some((c) => c.startsWith("под угрозой")), joined.join(" | "));
+});
+
+test("assemble: base picture comes from broll/plan.json video, else clean.mp4", async () => {
+  const { basePicture } = await import("../scripts/ru/assemble.mjs");
+  const P = mkdtempSync(join(tmpdir(), "reel-base-"));
+  mkdirSync(join(P, "renders")); mkdirSync(join(P, "broll"));
+  writeFileSync(join(P, "renders/clean.mp4"), "");
+  assert.equal(basePicture(P, { clips: [] }), join(P, "renders/clean.mp4"));
+  assert.throws(() => basePicture(P, { video: "../renders/picture.mp4", clips: [] }), /picture\.mp4 missing/);
+  writeFileSync(join(P, "renders/picture.mp4"), "");
+  assert.equal(basePicture(P, { video: "../renders/picture.mp4", clips: [] }), join(P, "renders/picture.mp4"));
+});
+
+test("build-edl: --max-pause widens silence cuts without entering words", async () => {
+  const { tightenPauses } = await import("../scripts/ru/build-edl.mjs");
+  const words = [{ text: "а", start: 0.2, end: 1.0 }, { text: "б", start: 3.0, end: 3.5 }, { text: "в", start: 3.62, end: 4.0 }];
+  const cuts = [{ start: 0, end: 0.1, reasons: ["head"] }, { start: 1.13, end: 2.89, reasons: ["pause"] }];
+  const [head, mid] = tightenPauses(cuts, words, 0.12);
+  assert.deepEqual([head.start, head.end], [0, 0.1]);           // head trim untouched
+  assert.ok(Math.abs(mid.start - 1.066) < 1e-9 && Math.abs(mid.end - 2.946) < 1e-9);
+  assert.ok(mid.start >= 1.0 && mid.end <= 3.0);                   // never inside a word
+  assert.equal(tightenPauses(cuts, words, NaN), cuts);             // option off → unchanged
+  // a pause already shorter than the limit stays as it is
+  assert.deepEqual(tightenPauses([{ start: 1.05, end: 2.95, reasons: [] }], words, 0.12)[0], { start: 1.05, end: 2.95, reasons: [] });
 });

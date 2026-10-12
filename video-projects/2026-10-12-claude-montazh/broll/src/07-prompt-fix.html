@@ -1,0 +1,33 @@
+<title>07 Промпт · опусти субтитры</title>
+<style>
+/*COMMON*/
+.lab{position:absolute;left:-372px;top:-80px;font-size:22px;letter-spacing:.02em}
+.send{position:absolute;left:300px;top:-36px;width:72px;height:72px;border-radius:36px}
+</style>
+<div data-slot="shape">
+  <div class="L" id="Lin">
+    <div class="lab mono mut">Claude</div>
+    <div class="a" style="left:-372px;top:-42px;width:640px;font-size:34px;font-weight:500;line-height:44px;white-space:normal"><span id="typed"></span><span id="caret" style="display:inline-block;width:3px;height:36px;background:#F5F3FA;vertical-align:-6px;margin-left:3px"></span></div>
+    <div class="send" id="send"><div id="arr" style="position:absolute;left:18px;top:18px"></div></div>
+  </div>
+</div><!--/shape-->
+<script>
+// Clean anchors (clip in = 17.60): «что-то» 17.87 → 0.27, «словами» 19.05 → 1.45
+// The text is the customer's real correction from lessons.md (ai-700-math), paraphrased short.
+const $=id=>document.getElementById(id);
+const TXT='субтитры закрывают лицо — опусти ниже', TY0=0.15, TY1=1.30;
+$('arr').innerHTML=`<svg width="36" height="36" viewBox="0 0 24 24"><path d="M12 19V5M5 12l7-7 7 7" fill="none" stroke="#0E0B14" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+const sendBg=M.ctrack('#4A4258',[[TY1,'#F5F3FA'],[1.45,'#B79CFF']]);
+M.scene({
+  W:1080,H:1920,T:2.10,bg:null,center:[540,1110],intro:0.0,
+  SH:{input:{w:820,h:200,r:40,bg:'#0E0B14',cam:1}},
+  start:'input', SEQ:[], shapePress:[1.45],
+  layers:[
+    {el:'Lin',tin:0.0,tout:null,o:{din:0},update:(t)=>{
+      const n=Math.round(M.clamp((t-TY0)/(TY1-TY0))*TXT.length); M.setText($('typed'),TXT.slice(0,n));
+      $('caret').style.opacity=(t>1.45)?0:((t>TY0&&t<TY1+0.05)||Math.floor(t*2.4)%2==0?1:0);
+      $('send').style.background=sendBg(t);
+    }},
+  ],
+});
+</script>

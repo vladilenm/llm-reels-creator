@@ -1,0 +1,176 @@
+{
+  "agent": "cut-silences",
+  "params": {
+    "gap": 0.55,
+    "headPad": 0.22,
+    "tailPad": 0.34
+  },
+  "source_duration": 107.6,
+  "edited_duration": 45.951,
+  "removed": 61.649,
+  "delete_ranges": [
+    {
+      "start": 0,
+      "end": 0.623,
+      "reasons": [
+        "head trim before first word"
+      ]
+    },
+    {
+      "start": 5.178,
+      "end": 10.641,
+      "reasons": [
+        "pause 5.70s -> 0.24s"
+      ]
+    },
+    {
+      "start": 12.512,
+      "end": 18.03,
+      "reasons": [
+        "pause 5.76s -> 0.24s"
+      ]
+    },
+    {
+      "start": 20.461000000000002,
+      "end": 24.21,
+      "reasons": [
+        "pause 3.99s -> 0.24s"
+      ]
+    },
+    {
+      "start": 27.566000000000003,
+      "end": 40.811,
+      "reasons": [
+        "pause 13.48s -> 0.24s"
+      ]
+    },
+    {
+      "start": 44.324,
+      "end": 47.902,
+      "reasons": [
+        "pause 3.82s -> 0.24s"
+      ]
+    },
+    {
+      "start": 50.72,
+      "end": 51.308,
+      "reasons": [
+        "pause 0.79s -> 0.20s"
+      ]
+    },
+    {
+      "start": 54.211999999999996,
+      "end": 58.392,
+      "reasons": [
+        "pause 4.42s -> 0.24s"
+      ]
+    },
+    {
+      "start": 61.522999999999996,
+      "end": 63.019,
+      "reasons": [
+        "pause 1.70s -> 0.20s"
+      ]
+    },
+    {
+      "start": 65.162,
+      "end": 73.892,
+      "reasons": [
+        "pause 8.97s -> 0.24s"
+      ]
+    },
+    {
+      "start": 76.64200000000001,
+      "end": 81.27799999999999,
+      "reasons": [
+        "pause 4.88s -> 0.24s"
+      ]
+    },
+    {
+      "start": 84.936,
+      "end": 89.077,
+      "reasons": [
+        "pause 4.38s -> 0.24s"
+      ]
+    },
+    {
+      "start": 93.632,
+      "end": 97.60199999999999,
+      "reasons": [
+        "pause 4.21s -> 0.24s"
+      ]
+    },
+    {
+      "start": 100.569,
+      "end": 101.946,
+      "reasons": [
+        "pause 1.58s -> 0.20s"
+      ]
+    },
+    {
+      "start": 107.245,
+      "end": 107.6,
+      "reasons": [
+        "tail trim after final word"
+      ]
+    }
+  ],
+  "keep_ranges": [
+    {
+      "start": 0.623,
+      "end": 5.178
+    },
+    {
+      "start": 10.641,
+      "end": 12.512
+    },
+    {
+      "start": 18.03,
+      "end": 20.461000000000002
+    },
+    {
+      "start": 24.21,
+      "end": 27.566000000000003
+    },
+    {
+      "start": 40.811,
+      "end": 44.324
+    },
+    {
+      "start": 47.902,
+      "end": 50.72
+    },
+    {
+      "start": 51.308,
+      "end": 54.211999999999996
+    },
+    {
+      "start": 58.392,
+      "end": 61.522999999999996
+    },
+    {
+      "start": 63.019,
+      "end": 65.162
+    },
+    {
+      "start": 73.892,
+      "end": 76.64200000000001
+    },
+    {
+      "start": 81.27799999999999,
+      "end": 84.936
+    },
+    {
+      "start": 89.077,
+      "end": 93.632
+    },
+    {
+      "start": 97.60199999999999,
+      "end": 100.569
+    },
+    {
+      "start": 101.946,
+      "end": 107.245
+    }
+  ]
+}

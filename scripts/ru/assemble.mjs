@@ -38,10 +38,18 @@ export function loadPlan(project) {
 }
 
 // One ffmpeg pass: base video, then each clip overlaid in its window, then captions.
-export function composite(project, out, { scale = 1 } = {}) {
+// Base picture: broll/plan.json `video` (relative to broll/, e.g. a renders/picture.mp4
+// with edit effects and SFX baked in), else renders/clean.mp4. Its audio is the mix.
+export function basePicture(project, plan = loadPlan(project)) {
   const clean = join(project, "renders/clean.mp4");
-  if (!existsSync(clean)) throw new Error("renders/clean.mp4 missing (run S2)");
+  const base = plan.video ? resolve(join(project, "broll"), plan.video) : clean;
+  if (!existsSync(base)) throw new Error(`${relative(project, base)} missing (${base === clean ? "run S2" : "build the picture first"})`);
+  return base;
+}
+
+export function composite(project, out, { scale = 1 } = {}) {
   const plan = loadPlan(project);
+  const clean = basePicture(project, plan);
   const captions = join(project, "renders/kit/captions.mov");
   const inputs = [clean, ...plan.clips.map((c) => c.path), ...(existsSync(captions) ? [captions] : [])];
   const W = Math.round(1080 * scale), H = Math.round(1920 * scale);
@@ -71,6 +79,8 @@ export function buildKit(project) {
   mkdirSync(join(kit, "broll"), { recursive: true });
   copyFileSync(join(project, "renders/clean.mp4"), join(kit, "clean.mp4"));
   const plan = loadPlan(project);
+  const base = basePicture(project, plan);
+  if (basename(base) !== "clean.mp4") copyFileSync(base, join(kit, basename(base)));
   const slug = basename(project);
   const rows = [];
   plan.clips.forEach((c, i) => {

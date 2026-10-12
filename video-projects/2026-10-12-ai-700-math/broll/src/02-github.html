@@ -1,0 +1,69 @@
+<title>02 Две категории → GitHub</title>
+<style>
+/*COMMON*/
+.tile{position:absolute;width:40px;height:40px;border-radius:11px;background:#0B0B0F}
+.cat{position:absolute;top:134px;display:flex;align-items:center;gap:10px;font-size:32px;font-weight:600;color:#0B0B0F;white-space:nowrap}
+.rrow{position:absolute;left:-330px;display:flex;align-items:center;gap:16px;font-size:34px;color:#CFCAC2;white-space:nowrap}
+.sk{position:absolute;height:14px;border-radius:7px;background:#2A2A30}
+.div{position:absolute;left:-330px;width:660px;height:2px;background:#24242A}
+#tg{position:absolute;left:200px;top:394px;width:120px;height:66px;border-radius:33px;background:#3A3A40}
+#knob{position:absolute;left:6px;top:6px;width:54px;height:54px;border-radius:27px;background:#F4F2EE}
+</style>
+<div data-slot="world">
+  <div class="a" id="gh" style="left:0;top:-350px"><div class="row" style="transform:translate(-50%,-50%);gap:14px;background:#FFFFFF;border-radius:999px;padding:18px 34px;font-size:50px;font-weight:700;letter-spacing:-.03em;color:#0B0B0F;box-shadow:0 10px 30px -8px rgba(20,18,14,.18)"><span id="icGh"></span>GitHub</div></div>
+</div><!--/world-->
+<div data-slot="shape">
+  <div class="L" id="Lgrid">
+    <div class="row" style="left:-330px;top:46px;gap:14px"><span style="font-size:44px;font-weight:800;color:#FF5A1F;letter-spacing:-.03em">722</span><span class="sub">решённые задачи</span></div>
+    <div class="cat" id="c0" style="left:-336px"><span id="icF0"></span>категория 1</div>
+    <div class="cat" id="c1" style="left:36px"><span id="icF1"></span>категория 2</div>
+    <div class="a" id="grid" style="left:0;top:212px"></div>
+  </div>
+  <div class="L" id="Lchip"><div class="row" style="transform:translate(-50%,-50%);gap:16px;color:#F4F2EE;font-size:44px;font-weight:700;letter-spacing:-.02em"><span id="icFile"></span>722 решения</div></div>
+  <div class="L" id="Lrepo">
+    <div class="row mono" style="left:-330px;top:42px;gap:16px;font-size:34px;color:#F4F2EE"><span id="icFold"></span>GitHub / решения</div>
+    <div class="div" style="top:116px"></div>
+    <div class="rrow mono" style="top:150px"><span id="icR0"></span>категория 1/</div><div class="sk" style="left:120px;top:172px;width:200px"></div>
+    <div class="rrow mono" style="top:236px"><span id="icR1"></span>категория 2/</div><div class="sk" style="left:120px;top:258px;width:160px"></div>
+    <div class="div" style="top:326px"></div>
+    <div class="row" id="openLbl" style="left:-330px;top:398px;font-size:38px;font-weight:600;letter-spacing:-.02em">открытый доступ</div>
+    <div id="tg"><div id="knob"></div></div>
+  </div>
+</div><!--/shape-->
+<script>
+// Clean-timeline anchors (clip in = 12.30): «две» 0.19, «категории» 0.43, «выложили» 1.45, «решения» 2.43, «открытую» 5.23, «на» 5.41 (pill), «GitHub» 5.67
+const $=id=>document.getElementById(id);
+const ACC='#FF5A1F', INK='#0B0B0F';
+$('icF0').innerHTML=M.icon('folder',32,INK); $('icF1').innerHTML=M.icon('folder',32,INK);
+$('icFile').innerHTML=M.icon('file',40,'#F4F2EE'); $('icFold').innerHTML=M.icon('folder',34,'#F4F2EE');
+$('icR0').innerHTML=M.icon('folder',32,'#8F8C86'); $('icR1').innerHTML=M.icon('folder',32,'#8F8C86');
+$('icGh').innerHTML=M.icon('folder',44,INK);
+const N=72, COLS=12;
+$('grid').innerHTML=Array.from({length:N},(_,i)=>`<div class="tile" id="t${i}"></div>`).join('');
+const split=M.track(0,[[0.19,1,M.MORPH]]);
+const on=M.track(0,[[5.23,1,[18,.82]]]);
+M.scene({
+  W:1080,H:1920,T:6.30,intro:null,center:[540,760],
+  bg:'radial-gradient(ellipse 70% 38% at 50% 40%, rgba(255,90,31,.13), rgba(255,90,31,0) 70%), #E9E7E2',
+  SH:{grid:{w:780,h:570,r:48,bg:'#FFFFFF',cam:1}, chip:{w:520,h:140,r:70,bg:INK,cam:1.15}, repo:{w:780,h:520,r:48,bg:INK,cam:1}},
+  start:'grid', SEQ:[[1.45,'chip'],[2.43,'repo']],
+  layers:[
+    {el:'Lgrid',tin:null,tout:1.45,anchor:'t',update:(t)=>{
+      const k=split(t);
+      for(let i=0;i<N;i++){const c=i%COLS, r=Math.floor(i/COLS), g=c<6?0:1;
+        const x0=-306+c*52, x1=(g?36+(c-6)*52:-336+c*52);
+        const s=$('t'+i).style; s.left=M.lerp(x0,x1,k)+'px'; s.top=(r*52)+'px';}
+      for(const j of [0,1]) M.apply($('c'+j),M.vis(t,0.43+0.08*j,null,{din:0,lin:0.22}));
+    }},
+    {el:'Lchip',tin:1.45,tout:2.43,o:{din:0.06}},
+    {el:'Lrepo',tin:2.43,tout:null,anchor:'t',update:(t)=>{
+      const k=M.clamp(on(t));
+      $('tg').style.background=`rgb(${Math.round(58+197*k)},${Math.round(58+32*k)},${Math.round(64-33*k)})`;
+      $('knob').style.left=(6+54*k)+'px';
+      $('openLbl').style.color=k>0.5?'#F4F2EE':'#8F8C86';
+    }},
+  ],
+  cursor:{size:46,clicks:[1.45,5.23],keys:[[0,330,250],[1.1,140,70],[1.7,140,70],[2.3,300,220],[4.75,250,162],[5.5,250,162],[6.2,250,162]]},
+  extra:(t)=>{const v=M.vis(t,5.41,null,{din:0,lin:0.24}); const s=$('gh').style; s.opacity=v.o; s.filter=v.blur>0.05?`blur(${v.blur}px)`:'none'; s.transform=`scale(${v.s})`;},
+});
+</script>

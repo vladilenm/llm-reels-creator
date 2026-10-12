@@ -13,6 +13,8 @@
 //   --project      video-projects/<slug>   (outputs: EDL.json, CUTS.md,
 //                  transcript.clean.json, renders/clean.mp4, work/cuts.merged.json)
 //   --no-render    write EDL/CUTS/transcript only
+//   --max-pause S  widen silence cuts so at most S seconds of pause stay between
+//                  two words (55 % after the word, 45 % before the next; head/tail trims untouched)
 //
 // Rendering and retiming are delegated to the chassis' cut-mistakes/apply-cuts.mjs
 // so there is one implementation of trim+concat.
@@ -61,6 +63,22 @@ export function snapCutToWords(cut, words, { tol = 0.12 } = {}) {
   return { ...cut, start, end };
 }
 
+// Pace: widen silence cuts so the pause left between two words is at most maxPause.
+// Only grows a cut, never enters a word; head and tail trims (no word on one side) stay.
+export function tightenPauses(cuts, words, maxPause) {
+  if (!(maxPause > 0)) return cuts;
+  return cuts.map((d) => {
+    const prev = [...words].reverse().find((w) => w.end <= d.start + 0.02);
+    const next = words.find((w) => w.start >= d.end - 0.02);
+    if (!prev || !next) return d;
+    const kept = (d.start - prev.end) + (next.start - d.end);
+    if (kept <= maxPause + 1e-6) return d;
+    const start = Math.min(d.start, Math.max(prev.end, prev.end + maxPause * 0.55));
+    const end = Math.max(d.end, Math.min(next.start, next.start - maxPause * 0.45));
+    return { ...d, start, end, reasons: [...d.reasons, `темп: пауза ≤ ${maxPause} с`] };
+  });
+}
+
 // Sentence case after cuts: «…агентов. агенты берут…» → «…агентов. Агенты берут…».
 export function sentenceCase(words) {
   return words.map((w, i) => {
@@ -97,7 +115,7 @@ function main() {
   const duration = Number(transcript.audio_duration_secs);
 
   const silence = o.silenceEdl ? JSON.parse(readFileSync(resolve(o.silenceEdl), "utf8")) : { delete_ranges: [] };
-  const silenceCuts = (silence.delete_ranges ?? []).map((d) => ({ start: d.start, end: d.end, reasons: d.reasons ?? [d.reason ?? "silence"] }));
+  const silenceCuts = tightenPauses((silence.delete_ranges ?? []).map((d) => ({ start: d.start, end: d.end, reasons: d.reasons ?? [d.reason ?? "silence"] })), words, Number(o.maxPause));
 
   let approved;
   if (o.approved) approved = JSON.parse(readFileSync(resolve(o.approved), "utf8")).cuts ?? [];

@@ -42,12 +42,39 @@ export function captionCues(transcript, brand) {
   }).map((cue, i, all) => ({ ...cue, end: Math.min(cue.end, all[i + 1]?.start ?? Infinity) }));
 }
 
-export function captionsHtml(cues, { duration, brand, fontUrl, fps = 30 }) {
+// Optional per-reel overrides from PLAN.json `captions`:
+//   hide: [{ in, out }]               no captions in these clean-timeline windows
+//   baseline_keys: [{ at, baseline_y }] baseline over time, linear between keys,
+//                                     brand baseline before the first key
+export function applyHide(cues, hide = []) {
+  return cues.flatMap((cue) => {
+    let { start, end } = cue;
+    for (const h of hide) {
+      if (start >= h.in && end <= h.out) return [];
+      if (start < h.out && end > h.out && start >= h.in) start = h.out;
+      if (start < h.in && end > h.in && end <= h.out) end = h.in;
+    }
+    return end - start < 0.05 ? [] : [{ ...cue, start, end }];
+  });
+}
+
+export function baselineAt(keys = [], t, base) {
+  if (!keys.length || t <= keys[0].at) return keys.length && t === keys[0].at ? keys[0].baseline_y : base;
+  for (let i = 1; i < keys.length; i++) {
+    const a = keys[i - 1], b = keys[i];
+    if (t <= b.at) return a.baseline_y + (b.baseline_y - a.baseline_y) * ((t - a.at) / Math.max(1e-6, b.at - a.at));
+  }
+  return keys.at(-1).baseline_y;
+}
+
+export function captionsHtml(cues, { duration, brand, fontUrl, fps = 30, overrides = {} }) {
   const c = brand.captions;
   const lineH = Math.round(c.font_px * 1.3);
+  const keys = [...(overrides.baseline_keys ?? [])].sort((a, b) => a.at - b.at);
+  const base = (t) => baselineAt(keys, t, c.baseline_y);
   const clips = cues.map((cue, i) => {
     const d = Math.max(0.05, cue.end - cue.start);
-    const top = c.baseline_y - lineH * cue.lines.length;
+    const top = base(cue.start) - lineH * cue.lines.length;
     const lines = cue.lines.map((ln, li) => `<div class="ln"><span class="bg">${ln.map((w, wj) => `<span class="w" id="w${i}_${li}_${wj}">${esc(w.text)}</span>`).join(" ")}</span></div>`).join("");
     return `<div id="c${i}" class="cue clip" data-start="${r3(cue.start)}" data-duration="${r3(d)}" data-track-index="0" style="top:${top}px">${lines}</div>`;
   }).join("\n");
@@ -61,6 +88,13 @@ export function captionsHtml(cues, { duration, brand, fontUrl, fps = 30 }) {
       out.push(`tl.set("#w${i}_${li}_${wj}",{color:"${c.active_color}"},${r3(Math.max(cue.start, w.start))});`);
       out.push(`tl.set("#w${i}_${li}_${wj}",{color:"${c.color}"},${r3(Math.min(cue.end, Math.max(w.end, w.start + 0.12)))});`);
     }));
+    // Baseline moves inside the cue ride a y tween between consecutive keys.
+    for (let k = 1; k < keys.length; k++) {
+      const a = keys[k - 1], b = keys[k];
+      if (b.baseline_y === a.baseline_y || b.at <= cue.start || a.at >= cue.end) continue;
+      const t0 = Math.max(a.at, cue.start), t1 = Math.min(b.at, cue.end);
+      out.push(`tl.to("#c${i}",{y:${r3(base(t1) - base(cue.start))},duration:${r3(t1 - t0)},ease:"power3.inOut"},${r3(t0)});`);
+    }
     if (d > 0.3) out.push(`tl.to("#c${i}",{opacity:0,duration:0.15,ease:"power1.in"},${r3(cue.end - 0.15)});`);
     return out.join("\n");
   }).join("\n");
@@ -95,7 +129,9 @@ export function makeCaptions(project, { render = false, transcript } = {}) {
   const t = JSON.parse(readFileSync(transcript ?? join(project, "transcript.clean.json"), "utf8"));
   const duration = Number(t.audio_duration_secs);
   const fps = JSON.parse(readFileSync(join(project, "meta.json"), "utf8")).fps ?? 30;
-  const cues = captionCues(t, brand);
+  const planPath = join(project, "PLAN.json");
+  const overrides = existsSync(planPath) ? (JSON.parse(readFileSync(planPath, "utf8")).captions ?? {}) : {};
+  const cues = applyHide(captionCues(t, brand), overrides.hide);
 
   // Font: the brand body font at the caption weight, else the closest weight.
   const files = brand.font_body?.files ?? {};
@@ -112,7 +148,7 @@ export function makeCaptions(project, { render = false, transcript } = {}) {
   mkdirSync(join(dir, "assets"), { recursive: true });
   copyFileSync(fontSrc, join(dir, "fonts", basename(fontSrc)));
   copyFileSync(join(ROOT, "node_modules/gsap/dist/gsap.min.js"), join(dir, "assets/gsap.min.js"));
-  writeFileSync(join(dir, "index.html"), captionsHtml(cues, { duration, brand, fontUrl: `fonts/${basename(fontSrc)}`, fps }));
+  writeFileSync(join(dir, "index.html"), captionsHtml(cues, { duration, brand, fontUrl: `fonts/${basename(fontSrc)}`, fps, overrides }));
   if (!existsSync(join(dir, "meta.json"))) writeFileSync(join(dir, "meta.json"), JSON.stringify({ id: "captions", name: "captions", width: 1080, height: 1920, fps }, null, 2) + "\n");
 
   const srt = toSrt(cues.map((c) => ({ start: c.start, end: c.end, lines: c.lines.map((l) => l.map((w) => w.text).join(" ")) })));

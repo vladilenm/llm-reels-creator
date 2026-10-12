@@ -1,0 +1,42 @@
+<title>01b Хук · текст за головой</title>
+<style>
+/*COMMON*/
+.ln{position:absolute;left:-600px;width:1200px;text-align:center;white-space:nowrap;font-weight:800;letter-spacing:-.045em;line-height:1}
+.w{display:inline-block}
+#tc{position:absolute;left:-600px;width:1200px;text-align:center;top:-588px;font-size:30px}
+</style>
+<div data-slot="world">
+  <div class="a mono mut" id="tc"></div>
+  <div class="ln" id="a1" style="top:-545px;font-size:150px"><span class="w">Не</span></div>
+  <div class="ln" id="a2" style="top:-392px;font-size:140px"><span class="w">монтировал</span></div>
+  <div class="ln" id="b1" style="top:-545px;font-size:150px"><span class="w">Ни одной</span></div>
+  <div class="ln" id="b2" style="top:-392px;font-size:140px"><span class="w">склейки</span></div>
+  <div class="ln mono mut" id="c0" style="top:-590px;font-size:34px;font-weight:500;letter-spacing:.02em">собрал</div>
+  <div class="ln acc" id="c1" style="top:-540px;font-size:230px"><span class="w">Claude</span></div>
+</div><!--/world-->
+<div data-slot="shape"></div><!--/shape-->
+<script>
+// Text layer that sits BETWEEN the dark background and the rotoscoped speaker (fx.py).
+// World origin = screen (540, 960): line tops are relative to that.
+// Clean anchors: «Не» 1.26, «монтировал» 1.42, «Ни» 2.15, «склейки» 2.58, «собрал» 3.82, «Claude» 4.10,
+// reveal (room comes back) 4.42–4.85 → text leaves by 4.75.
+const $=id=>document.getElementById(id);
+const tc=t=>{const f=Math.max(0,Math.floor(t*30));return '00:00:'+String(Math.floor(f/30)).padStart(2,'0')+':'+String(f%30).padStart(2,'0');};
+// kinetic word: rises 70 px out of a blur, leaves upward faster
+const word=(el,tin,tout)=>t=>{const v=M.vis(t,tin,tout,{din:0,lin:0.28,lout:0.16});
+  const up=(1-M.eo(M.clamp((t-tin)/0.32)))*70 - (tout!=null?M.clamp((t-tout)/0.16)*40:0);
+  el.style.opacity=v.o; el.style.filter=v.blur>0.05?`blur(${v.blur}px)`:'none'; el.style.transform=`translateY(${up}px)`;};
+const W=[word($('a1'),1.20,2.50),word($('a2'),1.42,2.50),word($('b1'),2.15,3.74),word($('b2'),2.58,3.74),word($('c0'),3.74,4.55),word($('c1'),3.82,4.55)];
+const cl=$('c1');
+M.scene({
+  W:1080,H:1920,T:4.91,bg:null,center:[540,960],intro:null,
+  SH:{none:{w:0,h:0,r:0,bg:'rgba(0,0,0,0)',cam:1}}, start:'none', SEQ:[],
+  layers:[],
+  extra:(t)=>{
+    M.setText($('tc'),tc(t)); $('tc').style.opacity=1-M.clamp((t-3.60)/0.14);
+    W.forEach(f=>f(t));
+    // «Claude» lands with a small overshoot
+    if(t>=3.82){const k=M.S(t-3.82,16,0.55); cl.style.transform+=` scale(${0.86+0.14*k})`;}
+  }
+});
+</script>

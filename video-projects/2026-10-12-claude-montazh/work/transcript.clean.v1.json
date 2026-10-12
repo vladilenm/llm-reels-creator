@@ -1,0 +1,1008 @@
+{
+  "text": "Этот рилс я не монтировал. Ни одной склейки. Его полностью собрал Claude. Ни CapCut, ни Премьера. Я отдаю ему сырое видео одной командой. Он сам вырезает паузы, оговорки и неудачные дубли. Он сам придумывает графику под слова и вставляет субтитры. Вот исходник сырого видео, а вот этот рилс. Если что-то не нравится, пишу словами. И субтитры в кадре, правда, уезжают вниз. А правку он запоминает и в следующий раз больше не допускает таких ошибок. Перед рендером он показывает план. Где хук, где какая графика, на каком слове. Я одобряю, и после этого он начинает собирать уже видео. Монтажку я даже не открывал. Подписывайся. Здесь я проверяю ИИ для работы и использования.",
+  "language_code": "russian",
+  "audio_duration_secs": 38.881,
+  "source_audio_duration_secs": 107.6,
+  "timeline": "clean",
+  "words": [
+    {
+      "text": "Этот",
+      "source_start": 0.843,
+      "source_end": 1.44,
+      "start": 0.22,
+      "end": 0.817,
+      "type": "word",
+      "key": "этот"
+    },
+    {
+      "text": "рилс",
+      "source_start": 1.44,
+      "source_end": 1.68,
+      "start": 0.817,
+      "end": 1.057,
+      "type": "word",
+      "key": "рилс"
+    },
+    {
+      "text": "я",
+      "source_start": 1.68,
+      "source_end": 1.88,
+      "start": 1.057,
+      "end": 1.257,
+      "type": "word",
+      "key": "я"
+    },
+    {
+      "text": "не",
+      "source_start": 1.88,
+      "source_end": 2.04,
+      "start": 1.257,
+      "end": 1.417,
+      "type": "word",
+      "key": "не"
+    },
+    {
+      "text": "монтировал.",
+      "source_start": 2.04,
+      "source_end": 2.62,
+      "start": 1.417,
+      "end": 1.997,
+      "type": "word",
+      "key": "монтировал"
+    },
+    {
+      "text": "Ни",
+      "source_start": 2.769,
+      "source_end": 2.97,
+      "start": 2.146,
+      "end": 2.347,
+      "type": "word",
+      "key": "ни"
+    },
+    {
+      "text": "одной",
+      "source_start": 2.97,
+      "source_end": 3.2,
+      "start": 2.347,
+      "end": 2.577,
+      "type": "word",
+      "key": "одной"
+    },
+    {
+      "text": "склейки.",
+      "source_start": 3.2,
+      "source_end": 3.72,
+      "start": 2.577,
+      "end": 3.097,
+      "type": "word",
+      "key": "склейки"
+    },
+    {
+      "text": "Его",
+      "source_start": 3.73,
+      "source_end": 4,
+      "start": 3.107,
+      "end": 3.377,
+      "type": "word",
+      "key": "его"
+    },
+    {
+      "text": "полностью",
+      "source_start": 4,
+      "source_end": 4.44,
+      "start": 3.377,
+      "end": 3.817,
+      "type": "word",
+      "key": "полностью"
+    },
+    {
+      "text": "собрал",
+      "source_start": 4.44,
+      "source_end": 4.72,
+      "start": 3.817,
+      "end": 4.097,
+      "type": "word",
+      "key": "собрал"
+    },
+    {
+      "text": "Claude.",
+      "source_start": 4.72,
+      "source_end": 5.046,
+      "start": 4.097,
+      "end": 4.423,
+      "type": "word",
+      "key": "claude"
+    },
+    {
+      "text": "Ни",
+      "source_start": 10.749,
+      "source_end": 11,
+      "start": 4.663,
+      "end": 4.914,
+      "type": "word",
+      "key": "ни"
+    },
+    {
+      "text": "CapCut,",
+      "source_start": 11,
+      "source_end": 11.5,
+      "start": 4.914,
+      "end": 5.414,
+      "type": "word",
+      "key": "capcut"
+    },
+    {
+      "text": "ни",
+      "source_start": 11.51,
+      "source_end": 11.84,
+      "start": 5.424,
+      "end": 5.754,
+      "type": "word",
+      "key": "ни"
+    },
+    {
+      "text": "Премьера.",
+      "source_start": 11.84,
+      "source_end": 12.38,
+      "start": 5.754,
+      "end": 6.294,
+      "type": "word",
+      "key": "премьера"
+    },
+    {
+      "text": "Я",
+      "source_start": 18.138,
+      "source_end": 18.34,
+      "start": 6.534,
+      "end": 6.736,
+      "type": "word",
+      "key": "я"
+    },
+    {
+      "text": "отдаю",
+      "source_start": 18.34,
+      "source_end": 18.6,
+      "start": 6.736,
+      "end": 6.996,
+      "type": "word",
+      "key": "отдаю"
+    },
+    {
+      "text": "ему",
+      "source_start": 18.6,
+      "source_end": 18.92,
+      "start": 6.996,
+      "end": 7.316,
+      "type": "word",
+      "key": "ему"
+    },
+    {
+      "text": "сырое",
+      "source_start": 18.92,
+      "source_end": 19.18,
+      "start": 7.316,
+      "end": 7.576,
+      "type": "word",
+      "key": "сырое"
+    },
+    {
+      "text": "видео",
+      "source_start": 19.18,
+      "source_end": 19.54,
+      "start": 7.576,
+      "end": 7.936,
+      "type": "word",
+      "key": "видео"
+    },
+    {
+      "text": "одной",
+      "source_start": 19.54,
+      "source_end": 19.92,
+      "start": 7.936,
+      "end": 8.316,
+      "type": "word",
+      "key": "одной"
+    },
+    {
+      "text": "командой.",
+      "source_start": 19.92,
+      "source_end": 20.329,
+      "start": 8.316,
+      "end": 8.725,
+      "type": "word",
+      "key": "командой"
+    },
+    {
+      "text": "Он",
+      "source_start": 48.01,
+      "source_end": 48.18,
+      "start": 8.947,
+      "end": 9.117,
+      "type": "word",
+      "key": "он"
+    },
+    {
+      "text": "сам",
+      "source_start": 48.18,
+      "source_end": 48.35,
+      "start": 9.117,
+      "end": 9.287,
+      "type": "word",
+      "key": "сам"
+    },
+    {
+      "text": "вырезает",
+      "source_start": 48.35,
+      "source_end": 48.72,
+      "start": 9.287,
+      "end": 9.657,
+      "type": "word",
+      "key": "вырезает"
+    },
+    {
+      "text": "паузы,",
+      "source_start": 48.72,
+      "source_end": 49.14,
+      "start": 9.657,
+      "end": 10.077,
+      "type": "word",
+      "key": "паузы"
+    },
+    {
+      "text": "оговорки",
+      "source_start": 49.15,
+      "source_end": 49.58,
+      "start": 10.087,
+      "end": 10.517,
+      "type": "word",
+      "key": "оговорки"
+    },
+    {
+      "text": "и",
+      "source_start": 49.58,
+      "source_end": 49.74,
+      "start": 10.517,
+      "end": 10.677,
+      "type": "word",
+      "key": "и"
+    },
+    {
+      "text": "неудачные",
+      "source_start": 49.74,
+      "source_end": 50.16,
+      "start": 10.677,
+      "end": 11.097,
+      "type": "word",
+      "key": "неудачные"
+    },
+    {
+      "text": "дубли.",
+      "source_start": 50.16,
+      "source_end": 50.61,
+      "start": 11.097,
+      "end": 11.547,
+      "type": "word",
+      "key": "дубли"
+    },
+    {
+      "text": "Он",
+      "source_start": 51.398,
+      "source_end": 51.56,
+      "start": 11.747,
+      "end": 11.909,
+      "type": "word",
+      "key": "он"
+    },
+    {
+      "text": "сам",
+      "source_start": 51.56,
+      "source_end": 51.6,
+      "start": 11.909,
+      "end": 11.949,
+      "type": "word",
+      "key": "сам"
+    },
+    {
+      "text": "придумывает",
+      "source_start": 51.6,
+      "source_end": 52.12,
+      "start": 11.949,
+      "end": 12.469,
+      "type": "word",
+      "key": "придумывает"
+    },
+    {
+      "text": "графику",
+      "source_start": 52.12,
+      "source_end": 52.56,
+      "start": 12.469,
+      "end": 12.909,
+      "type": "word",
+      "key": "графику"
+    },
+    {
+      "text": "под",
+      "source_start": 52.56,
+      "source_end": 52.82,
+      "start": 12.909,
+      "end": 13.169,
+      "type": "word",
+      "key": "под"
+    },
+    {
+      "text": "слова",
+      "source_start": 52.82,
+      "source_end": 53.1,
+      "start": 13.169,
+      "end": 13.449,
+      "type": "word",
+      "key": "слова"
+    },
+    {
+      "text": "и",
+      "source_start": 53.1,
+      "source_end": 53.38,
+      "start": 13.449,
+      "end": 13.729,
+      "type": "word",
+      "key": "и"
+    },
+    {
+      "text": "вставляет",
+      "source_start": 53.38,
+      "source_end": 53.7,
+      "start": 13.729,
+      "end": 14.049,
+      "type": "word",
+      "key": "вставляет"
+    },
+    {
+      "text": "субтитры.",
+      "source_start": 53.7,
+      "source_end": 53.897,
+      "start": 14.049,
+      "end": 14.246,
+      "type": "word",
+      "key": "субтитры"
+    },
+    {
+      "text": "Вот",
+      "source_start": 58.5,
+      "source_end": 58.76,
+      "start": 14.486,
+      "end": 14.746,
+      "type": "word",
+      "key": "вот"
+    },
+    {
+      "text": "исходник",
+      "source_start": 58.76,
+      "source_end": 59.2,
+      "start": 14.746,
+      "end": 15.186,
+      "type": "word",
+      "key": "исходник"
+    },
+    {
+      "text": "сырого",
+      "source_start": 59.2,
+      "source_end": 59.62,
+      "start": 15.186,
+      "end": 15.606,
+      "type": "word",
+      "key": "сырого"
+    },
+    {
+      "text": "видео,",
+      "source_start": 59.62,
+      "source_end": 60.049,
+      "start": 15.606,
+      "end": 16.035,
+      "type": "word",
+      "key": "видео"
+    },
+    {
+      "text": "а",
+      "source_start": 60.36,
+      "source_end": 60.64,
+      "start": 16.346,
+      "end": 16.626,
+      "type": "word",
+      "key": "а"
+    },
+    {
+      "text": "вот",
+      "source_start": 60.64,
+      "source_end": 60.78,
+      "start": 16.626,
+      "end": 16.766,
+      "type": "word",
+      "key": "вот"
+    },
+    {
+      "text": "этот",
+      "source_start": 60.78,
+      "source_end": 60.996,
+      "start": 16.766,
+      "end": 16.982,
+      "type": "word",
+      "key": "этот"
+    },
+    {
+      "text": "рилс.",
+      "source_start": 61.114,
+      "source_end": 61.413,
+      "start": 17.1,
+      "end": 17.399,
+      "type": "word",
+      "key": "рилс"
+    },
+    {
+      "text": "Если",
+      "source_start": 63.109,
+      "source_end": 63.38,
+      "start": 17.599,
+      "end": 17.87,
+      "type": "word",
+      "key": "если"
+    },
+    {
+      "text": "что-то",
+      "source_start": 63.38,
+      "source_end": 63.8,
+      "start": 17.87,
+      "end": 18.29,
+      "type": "word",
+      "key": "чтото"
+    },
+    {
+      "text": "не",
+      "source_start": 63.8,
+      "source_end": 63.81,
+      "start": 18.29,
+      "end": 18.3,
+      "type": "word",
+      "key": "не"
+    },
+    {
+      "text": "нравится,",
+      "source_start": 63.81,
+      "source_end": 64.16,
+      "start": 18.3,
+      "end": 18.65,
+      "type": "word",
+      "key": "нравится"
+    },
+    {
+      "text": "пишу",
+      "source_start": 64.17,
+      "source_end": 64.56,
+      "start": 18.66,
+      "end": 19.05,
+      "type": "word",
+      "key": "пишу"
+    },
+    {
+      "text": "словами.",
+      "source_start": 64.56,
+      "source_end": 65.03,
+      "start": 19.05,
+      "end": 19.52,
+      "type": "word",
+      "key": "словами"
+    },
+    {
+      "text": "И",
+      "source_start": 74,
+      "source_end": 74.22,
+      "start": 19.76,
+      "end": 19.98,
+      "type": "word",
+      "key": "и"
+    },
+    {
+      "text": "субтитры",
+      "source_start": 74.22,
+      "source_end": 74.6,
+      "start": 19.98,
+      "end": 20.36,
+      "type": "word",
+      "key": "субтитры"
+    },
+    {
+      "text": "в",
+      "source_start": 74.6,
+      "source_end": 74.9,
+      "start": 20.36,
+      "end": 20.66,
+      "type": "word",
+      "key": "в"
+    },
+    {
+      "text": "кадре,",
+      "source_start": 74.9,
+      "source_end": 75.08,
+      "start": 20.66,
+      "end": 20.84,
+      "type": "word",
+      "key": "кадре"
+    },
+    {
+      "text": "правда,",
+      "source_start": 75.09,
+      "source_end": 75.55,
+      "start": 20.85,
+      "end": 21.31,
+      "type": "word",
+      "key": "правда"
+    },
+    {
+      "text": "уезжают",
+      "source_start": 75.56,
+      "source_end": 75.98,
+      "start": 21.32,
+      "end": 21.74,
+      "type": "word",
+      "key": "уезжают"
+    },
+    {
+      "text": "вниз.",
+      "source_start": 75.98,
+      "source_end": 76.51,
+      "start": 21.74,
+      "end": 22.27,
+      "type": "word",
+      "key": "вниз"
+    },
+    {
+      "text": "А",
+      "source_start": 81.386,
+      "source_end": 81.55,
+      "start": 22.51,
+      "end": 22.674,
+      "type": "word",
+      "key": "а"
+    },
+    {
+      "text": "правку",
+      "source_start": 81.55,
+      "source_end": 81.84,
+      "start": 22.674,
+      "end": 22.964,
+      "type": "word",
+      "key": "правку"
+    },
+    {
+      "text": "он",
+      "source_start": 81.84,
+      "source_end": 82.02,
+      "start": 22.964,
+      "end": 23.144,
+      "type": "word",
+      "key": "он"
+    },
+    {
+      "text": "запоминает",
+      "source_start": 82.02,
+      "source_end": 82.52,
+      "start": 23.144,
+      "end": 23.644,
+      "type": "word",
+      "key": "запоминает"
+    },
+    {
+      "text": "и",
+      "source_start": 82.52,
+      "source_end": 82.66,
+      "start": 23.644,
+      "end": 23.784,
+      "type": "word",
+      "key": "и"
+    },
+    {
+      "text": "в",
+      "source_start": 82.66,
+      "source_end": 82.8,
+      "start": 23.784,
+      "end": 23.924,
+      "type": "word",
+      "key": "в"
+    },
+    {
+      "text": "следующий",
+      "source_start": 82.8,
+      "source_end": 83.12,
+      "start": 23.924,
+      "end": 24.244,
+      "type": "word",
+      "key": "следующий"
+    },
+    {
+      "text": "раз",
+      "source_start": 83.12,
+      "source_end": 83.24,
+      "start": 24.244,
+      "end": 24.364,
+      "type": "word",
+      "key": "раз"
+    },
+    {
+      "text": "больше",
+      "source_start": 83.24,
+      "source_end": 83.58,
+      "start": 24.364,
+      "end": 24.704,
+      "type": "word",
+      "key": "больше"
+    },
+    {
+      "text": "не",
+      "source_start": 83.58,
+      "source_end": 83.68,
+      "start": 24.704,
+      "end": 24.804,
+      "type": "word",
+      "key": "не"
+    },
+    {
+      "text": "допускает",
+      "source_start": 83.68,
+      "source_end": 84.12,
+      "start": 24.804,
+      "end": 25.244,
+      "type": "word",
+      "key": "допускает"
+    },
+    {
+      "text": "таких",
+      "source_start": 84.12,
+      "source_end": 84.52,
+      "start": 25.244,
+      "end": 25.644,
+      "type": "word",
+      "key": "таких"
+    },
+    {
+      "text": "ошибок.",
+      "source_start": 84.52,
+      "source_end": 84.804,
+      "start": 25.644,
+      "end": 25.928,
+      "type": "word",
+      "key": "ошибок"
+    },
+    {
+      "text": "Перед",
+      "source_start": 89.185,
+      "source_end": 89.4,
+      "start": 26.168,
+      "end": 26.383,
+      "type": "word",
+      "key": "перед"
+    },
+    {
+      "text": "рендером",
+      "source_start": 89.4,
+      "source_end": 89.72,
+      "start": 26.383,
+      "end": 26.703,
+      "type": "word",
+      "key": "рендером"
+    },
+    {
+      "text": "он",
+      "source_start": 89.72,
+      "source_end": 89.92,
+      "start": 26.703,
+      "end": 26.903,
+      "type": "word",
+      "key": "он"
+    },
+    {
+      "text": "показывает",
+      "source_start": 89.92,
+      "source_end": 90.42,
+      "start": 26.903,
+      "end": 27.403,
+      "type": "word",
+      "key": "показывает"
+    },
+    {
+      "text": "план.",
+      "source_start": 90.42,
+      "source_end": 90.78,
+      "start": 27.403,
+      "end": 27.763,
+      "type": "word",
+      "key": "план"
+    },
+    {
+      "text": "Где",
+      "source_start": 90.79,
+      "source_end": 91.1,
+      "start": 27.773,
+      "end": 28.083,
+      "type": "word",
+      "key": "где"
+    },
+    {
+      "text": "хук,",
+      "source_start": 91.1,
+      "source_end": 91.44,
+      "start": 28.083,
+      "end": 28.423,
+      "type": "word",
+      "key": "хук"
+    },
+    {
+      "text": "где",
+      "source_start": 91.45,
+      "source_end": 91.86,
+      "start": 28.433,
+      "end": 28.843,
+      "type": "word",
+      "key": "где"
+    },
+    {
+      "text": "какая",
+      "source_start": 91.86,
+      "source_end": 92.1,
+      "start": 28.843,
+      "end": 29.083,
+      "type": "word",
+      "key": "какая"
+    },
+    {
+      "text": "графика,",
+      "source_start": 92.1,
+      "source_end": 92.5,
+      "start": 29.083,
+      "end": 29.483,
+      "type": "word",
+      "key": "графика"
+    },
+    {
+      "text": "на",
+      "source_start": 92.51,
+      "source_end": 92.76,
+      "start": 29.493,
+      "end": 29.743,
+      "type": "word",
+      "key": "на"
+    },
+    {
+      "text": "каком",
+      "source_start": 92.76,
+      "source_end": 93,
+      "start": 29.743,
+      "end": 29.983,
+      "type": "word",
+      "key": "каком"
+    },
+    {
+      "text": "слове.",
+      "source_start": 93,
+      "source_end": 93.5,
+      "start": 29.983,
+      "end": 30.483,
+      "type": "word",
+      "key": "слове"
+    },
+    {
+      "text": "Я",
+      "source_start": 97.71,
+      "source_end": 97.92,
+      "start": 30.723,
+      "end": 30.933,
+      "type": "word",
+      "key": "я"
+    },
+    {
+      "text": "одобряю,",
+      "source_start": 97.92,
+      "source_end": 98.36,
+      "start": 30.933,
+      "end": 31.373,
+      "type": "word",
+      "key": "одобряю"
+    },
+    {
+      "text": "и",
+      "source_start": 98.4,
+      "source_end": 98.58,
+      "start": 31.413,
+      "end": 31.593,
+      "type": "word",
+      "key": "и"
+    },
+    {
+      "text": "после",
+      "source_start": 98.58,
+      "source_end": 98.72,
+      "start": 31.593,
+      "end": 31.733,
+      "type": "word",
+      "key": "после"
+    },
+    {
+      "text": "этого",
+      "source_start": 98.72,
+      "source_end": 99,
+      "start": 31.733,
+      "end": 32.013,
+      "type": "word",
+      "key": "этого"
+    },
+    {
+      "text": "он",
+      "source_start": 99,
+      "source_end": 99.12,
+      "start": 32.013,
+      "end": 32.133,
+      "type": "word",
+      "key": "он"
+    },
+    {
+      "text": "начинает",
+      "source_start": 99.12,
+      "source_end": 99.48,
+      "start": 32.133,
+      "end": 32.493,
+      "type": "word",
+      "key": "начинает"
+    },
+    {
+      "text": "собирать",
+      "source_start": 99.48,
+      "source_end": 99.82,
+      "start": 32.493,
+      "end": 32.833,
+      "type": "word",
+      "key": "собирать"
+    },
+    {
+      "text": "уже",
+      "source_start": 99.82,
+      "source_end": 100.22,
+      "start": 32.833,
+      "end": 33.233,
+      "type": "word",
+      "key": "уже"
+    },
+    {
+      "text": "видео.",
+      "source_start": 100.22,
+      "source_end": 100.459,
+      "start": 33.233,
+      "end": 33.472,
+      "type": "word",
+      "key": "видео"
+    },
+    {
+      "text": "Монтажку",
+      "source_start": 102.036,
+      "source_end": 102.48,
+      "start": 33.672,
+      "end": 34.116,
+      "type": "word",
+      "key": "монтажку"
+    },
+    {
+      "text": "я",
+      "source_start": 102.48,
+      "source_end": 102.62,
+      "start": 34.116,
+      "end": 34.256,
+      "type": "word",
+      "key": "я"
+    },
+    {
+      "text": "даже",
+      "source_start": 102.62,
+      "source_end": 102.86,
+      "start": 34.256,
+      "end": 34.496,
+      "type": "word",
+      "key": "даже"
+    },
+    {
+      "text": "не",
+      "source_start": 102.86,
+      "source_end": 103,
+      "start": 34.496,
+      "end": 34.636,
+      "type": "word",
+      "key": "не"
+    },
+    {
+      "text": "открывал.",
+      "source_start": 103,
+      "source_end": 103.42,
+      "start": 34.636,
+      "end": 35.056,
+      "type": "word",
+      "key": "открывал"
+    },
+    {
+      "text": "Подписывайся.",
+      "source_start": 103.743,
+      "source_end": 104.36,
+      "start": 35.379,
+      "end": 35.996,
+      "type": "word",
+      "key": "подписывайся"
+    },
+    {
+      "text": "Здесь",
+      "source_start": 104.37,
+      "source_end": 104.66,
+      "start": 36.006,
+      "end": 36.296,
+      "type": "word",
+      "key": "здесь"
+    },
+    {
+      "text": "я",
+      "source_start": 104.66,
+      "source_end": 104.9,
+      "start": 36.296,
+      "end": 36.536,
+      "type": "word",
+      "key": "я"
+    },
+    {
+      "text": "проверяю",
+      "source_start": 104.9,
+      "source_end": 105.34,
+      "start": 36.536,
+      "end": 36.976,
+      "type": "word",
+      "key": "проверяю"
+    },
+    {
+      "text": "ИИ",
+      "source_start": 105.34,
+      "source_end": 105.58,
+      "start": 36.976,
+      "end": 37.216,
+      "type": "word",
+      "key": "ии"
+    },
+    {
+      "text": "для",
+      "source_start": 105.58,
+      "source_end": 105.78,
+      "start": 37.216,
+      "end": 37.416,
+      "type": "word",
+      "key": "для"
+    },
+    {
+      "text": "работы",
+      "source_start": 105.78,
+      "source_end": 106.22,
+      "start": 37.416,
+      "end": 37.856,
+      "type": "word",
+      "key": "работы"
+    },
+    {
+      "text": "и",
+      "source_start": 106.22,
+      "source_end": 106.42,
+      "start": 37.856,
+      "end": 38.056,
+      "type": "word",
+      "key": "и"
+    },
+    {
+      "text": "использования.",
+      "source_start": 106.42,
+      "source_end": 106.905,
+      "start": 38.056,
+      "end": 38.541,
+      "type": "word",
+      "key": "использования"
+    }
+  ]
+}

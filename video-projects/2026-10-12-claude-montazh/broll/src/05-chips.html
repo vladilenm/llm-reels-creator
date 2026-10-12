@@ -1,0 +1,36 @@
+<title>05 Графика · под слова · субтитры</title>
+<style>
+/*COMMON*/
+.chip{position:absolute;top:-38px;height:76px;border-radius:38px;font-size:38px;font-weight:600;line-height:76px;text-align:center;white-space:nowrap}
+</style>
+<div data-slot="shape">
+  <div class="L" id="Lc">
+    <div class="chip" id="c0" style="width:210px">графика</div>
+    <div class="chip" id="c1" style="width:240px">под слова</div>
+    <div class="chip" id="c2" style="width:230px">субтитры</div>
+  </div>
+</div><!--/shape-->
+<script>
+// Clean anchors (clip in = 11.75): «графику» 12.47 → 0.72, «слова» 13.17 → 1.42, «субтитры» 14.05 → 2.30
+const $=id=>document.getElementById(id);
+const ON=[0.72,1.42,2.30], WD=[210,240,230], G=16;
+// left edge of each chip inside the growing pill, so the row stays centred
+const lefts=n=>{const tot=WD.slice(0,n).reduce((a,b)=>a+b,0)+G*(n-1);let x=-tot/2;return WD.slice(0,n).map(w=>{const l=x;x+=w+G;return l;});};
+const L1=lefts(1),L2=lefts(2),L3=lefts(3);
+const xs=[M.track(L1[0],[[ON[1],L2[0],M.MORPH],[ON[2],L3[0],M.MORPH]]), M.track(L2[1],[[ON[2],L3[1],M.MORPH]]), M.track(L3[2],[])];
+const bgc=i=>M.ctrack('#2A2338',[[ON[i],'#B79CFF'],...(ON[i+1]?[[ON[i+1],'#2A2338']]:[])]);
+const fgc=i=>M.ctrack('#F5F3FA',[[ON[i],'#0E0B14'],...(ON[i+1]?[[ON[i+1],'#F5F3FA']]:[])]);
+const BG=[0,1,2].map(bgc), FG=[0,1,2].map(fgc);
+M.scene({
+  W:1080,H:1920,T:2.62,bg:null,center:[540,1100],intro:0.62,
+  SH:{c1:{w:250,h:116,r:58,bg:'#0E0B14',cam:1}, c2:{w:516,h:116,r:58,bg:'#0E0B14',cam:1}, c3:{w:762,h:116,r:58,bg:'#0E0B14',cam:1}},
+  start:'c1', SEQ:[[ON[1],'c2'],[ON[2],'c3']],
+  layers:[
+    {el:'Lc',tin:0.62,tout:null,o:{din:0},update:(t)=>{
+      for(let i=0;i<3;i++){const e=$('c'+i), v=M.vis(t,ON[i],null,{din:0.04,lin:0.2});
+        e.style.opacity=v.o; e.style.filter=v.blur>0.05?`blur(${v.blur}px)`:'none';
+        e.style.left=xs[i](t)+'px'; e.style.background=BG[i](t); e.style.color=FG[i](t);}
+    }},
+  ],
+});
+</script>

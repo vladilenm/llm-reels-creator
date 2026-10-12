@@ -1,0 +1,26 @@
+<title>11b Даже не открывал · текст за головой</title>
+<style>
+/*COMMON*/
+.ln{position:absolute;left:-600px;width:1200px;text-align:center;white-space:nowrap;font-weight:800;letter-spacing:-.045em;line-height:1}
+</style>
+<div data-slot="world">
+  <div class="ln mono mut" id="lb" style="top:-588px;font-size:32px;font-weight:500;letter-spacing:.02em">монтажка</div>
+  <div class="ln" id="l1" style="top:-545px;font-size:150px">даже</div>
+  <div class="ln acc" id="l2" style="top:-400px;font-size:136px">не открывал</div>
+</div><!--/world-->
+<div data-slot="shape"></div><!--/shape-->
+<script>
+// Title over the window, callback to the hook. Clip in = 32.565 (location join).
+// Clean anchors: «Монтажку» 32.62 → 0.05, «даже» 33.20 → 0.64, «открывал» 33.58 → 1.02, CTA/reveal 34.33 → 1.76
+const $=id=>document.getElementById(id);
+const word=(el,tin,tout)=>t=>{const v=M.vis(t,tin,tout,{din:0,lin:0.28,lout:0.16});
+  const up=(1-M.eo(M.clamp((t-tin)/0.32)))*70;
+  el.style.opacity=v.o; el.style.filter=v.blur>0.05?`blur(${v.blur}px)`:'none'; el.style.transform=`translateY(${up}px)`;};
+const W=[word($('lb'),0.08,1.76),word($('l1'),0.64,1.76),word($('l2'),0.96,1.76)];
+M.scene({
+  W:1080,H:1920,T:2.10,bg:null,center:[540,960],intro:null,
+  SH:{none:{w:0,h:0,r:0,bg:'rgba(0,0,0,0)',cam:1}}, start:'none', SEQ:[],
+  layers:[],
+  extra:(t)=>{W.forEach(f=>f(t));}
+});
+</script>

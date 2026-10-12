@@ -59,3 +59,4 @@ video-projects/*/captions/node_modules
 video-projects/*/broll/dist/
 video-projects/*/captions/fonts/
 video-projects/*/captions/assets/
+.object-separation/

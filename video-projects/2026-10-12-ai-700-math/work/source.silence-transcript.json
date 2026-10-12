@@ -1,0 +1,491 @@
+{
+  "language_code": "russian",
+  "source_audio_duration_secs": 46.185,
+  "audio_duration_secs": 35.104,
+  "produced_by": "cut-silences",
+  "words": [
+    {
+      "text": "До",
+      "source_start": 0.5,
+      "source_end": 0.62,
+      "start": 0.22,
+      "end": 0.34
+    },
+    {
+      "text": "дня",
+      "source_start": 0.62,
+      "source_end": 0.9,
+      "start": 0.34,
+      "end": 0.62
+    },
+    {
+      "text": "компания",
+      "source_start": 0.9,
+      "source_end": 1.44,
+      "start": 0.62,
+      "end": 1.16
+    },
+    {
+      "text": "OpenAI",
+      "source_start": 1.44,
+      "source_end": 2.02,
+      "start": 1.16,
+      "end": 1.74
+    },
+    {
+      "text": "выпустила",
+      "source_start": 2.02,
+      "source_end": 2.7,
+      "start": 1.74,
+      "end": 2.42
+    },
+    {
+      "text": "в",
+      "source_start": 2.7,
+      "source_end": 2.98,
+      "start": 2.42,
+      "end": 2.7
+    },
+    {
+      "text": "свет",
+      "source_start": 2.98,
+      "source_end": 4.014,
+      "start": 2.7,
+      "end": 3.734
+    },
+    {
+      "text": "722",
+      "source_start": 6.3,
+      "source_end": 7.62,
+      "start": 3.974,
+      "end": 5.294
+    },
+    {
+      "text": "решённые",
+      "source_start": 8.12,
+      "source_end": 9.38,
+      "start": 5.794,
+      "end": 7.054
+    },
+    {
+      "text": "математические",
+      "source_start": 9.38,
+      "source_end": 10.14,
+      "start": 7.054,
+      "end": 7.814
+    },
+    {
+      "text": "задачи,",
+      "source_start": 10.14,
+      "source_end": 10.74,
+      "start": 7.814,
+      "end": 8.414
+    },
+    {
+      "text": "которые",
+      "source_start": 10.74,
+      "source_end": 11,
+      "start": 8.414,
+      "end": 8.674
+    },
+    {
+      "text": "до",
+      "source_start": 11,
+      "source_end": 11.32,
+      "start": 8.674,
+      "end": 8.994
+    },
+    {
+      "text": "этого",
+      "source_start": 11.32,
+      "source_end": 11.48,
+      "start": 8.994,
+      "end": 9.154
+    },
+    {
+      "text": "никем",
+      "source_start": 11.48,
+      "source_end": 12,
+      "start": 9.154,
+      "end": 9.674
+    },
+    {
+      "text": "не",
+      "source_start": 12,
+      "source_end": 12.18,
+      "start": 9.674,
+      "end": 9.854
+    },
+    {
+      "text": "были",
+      "source_start": 12.18,
+      "source_end": 12.38,
+      "start": 9.854,
+      "end": 10.054
+    },
+    {
+      "text": "решены.",
+      "source_start": 12.38,
+      "source_end": 12.82,
+      "start": 10.054,
+      "end": 10.494
+    },
+    {
+      "text": "Они",
+      "source_start": 12.83,
+      "source_end": 13.53,
+      "start": 10.504,
+      "end": 11.204
+    },
+    {
+      "text": "изгруппировали",
+      "source_start": 13.53,
+      "source_end": 14.28,
+      "start": 11.204,
+      "end": 11.954
+    },
+    {
+      "text": "их",
+      "source_start": 14.28,
+      "source_end": 14.5,
+      "start": 11.954,
+      "end": 12.174
+    },
+    {
+      "text": "по",
+      "source_start": 14.5,
+      "source_end": 14.82,
+      "start": 12.174,
+      "end": 12.494
+    },
+    {
+      "text": "две",
+      "source_start": 14.82,
+      "source_end": 15.06,
+      "start": 12.494,
+      "end": 12.734
+    },
+    {
+      "text": "категории",
+      "source_start": 15.06,
+      "source_end": 15.58,
+      "start": 12.734,
+      "end": 13.254
+    },
+    {
+      "text": "и",
+      "source_start": 15.58,
+      "source_end": 15.964,
+      "start": 13.254,
+      "end": 13.638
+    },
+    {
+      "text": "выложили",
+      "source_start": 16.073,
+      "source_end": 16.8,
+      "start": 13.747,
+      "end": 14.474
+    },
+    {
+      "text": "все",
+      "source_start": 16.8,
+      "source_end": 17.06,
+      "start": 14.474,
+      "end": 14.734
+    },
+    {
+      "text": "решения",
+      "source_start": 17.06,
+      "source_end": 17.52,
+      "start": 14.734,
+      "end": 15.194
+    },
+    {
+      "text": "для",
+      "source_start": 17.52,
+      "source_end": 18.2,
+      "start": 15.194,
+      "end": 15.874
+    },
+    {
+      "text": "математического",
+      "source_start": 18.2,
+      "source_end": 18.74,
+      "start": 15.874,
+      "end": 16.414
+    },
+    {
+      "text": "сообщества",
+      "source_start": 18.74,
+      "source_end": 19.4,
+      "start": 16.414,
+      "end": 17.074
+    },
+    {
+      "text": "в",
+      "source_start": 19.4,
+      "source_end": 19.86,
+      "start": 17.074,
+      "end": 17.534
+    },
+    {
+      "text": "открытую",
+      "source_start": 19.86,
+      "source_end": 20.04,
+      "start": 17.534,
+      "end": 17.714
+    },
+    {
+      "text": "на",
+      "source_start": 20.04,
+      "source_end": 20.3,
+      "start": 17.714,
+      "end": 17.974
+    },
+    {
+      "text": "GitHub.",
+      "source_start": 20.3,
+      "source_end": 20.748,
+      "start": 17.974,
+      "end": 18.422
+    },
+    {
+      "text": "То",
+      "source_start": 21.597,
+      "source_end": 21.82,
+      "start": 18.622,
+      "end": 18.845
+    },
+    {
+      "text": "есть,",
+      "source_start": 21.82,
+      "source_end": 22,
+      "start": 18.845,
+      "end": 19.025
+    },
+    {
+      "text": "теперь",
+      "source_start": 22.01,
+      "source_end": 22.6,
+      "start": 19.035,
+      "end": 19.625
+    },
+    {
+      "text": "математика",
+      "source_start": 22.6,
+      "source_end": 23.06,
+      "start": 19.625,
+      "end": 20.085
+    },
+    {
+      "text": "под",
+      "source_start": 23.06,
+      "source_end": 23.36,
+      "start": 20.085,
+      "end": 20.385
+    },
+    {
+      "text": "угрозой,",
+      "source_start": 23.36,
+      "source_end": 23.898,
+      "start": 20.385,
+      "end": 20.923
+    },
+    {
+      "text": "потому",
+      "source_start": 25.079,
+      "source_end": 25.32,
+      "start": 21.063,
+      "end": 21.304
+    },
+    {
+      "text": "что",
+      "source_start": 25.32,
+      "source_end": 25.7,
+      "start": 21.304,
+      "end": 21.684
+    },
+    {
+      "text": "теперь",
+      "source_start": 25.7,
+      "source_end": 26.1,
+      "start": 21.684,
+      "end": 22.084
+    },
+    {
+      "text": "математикам",
+      "source_start": 26.1,
+      "source_end": 26.834,
+      "start": 22.084,
+      "end": 22.818
+    },
+    {
+      "text": "нужно",
+      "source_start": 27.07,
+      "source_end": 27.62,
+      "start": 23.054,
+      "end": 23.604
+    },
+    {
+      "text": "проверить",
+      "source_start": 31.92,
+      "source_end": 32.36,
+      "start": 23.844,
+      "end": 24.284
+    },
+    {
+      "text": "все",
+      "source_start": 32.36,
+      "source_end": 32.62,
+      "start": 24.284,
+      "end": 24.544
+    },
+    {
+      "text": "эти",
+      "source_start": 32.62,
+      "source_end": 32.88,
+      "start": 24.544,
+      "end": 24.804
+    },
+    {
+      "text": "решения.",
+      "source_start": 32.88,
+      "source_end": 33.571,
+      "start": 24.804,
+      "end": 25.495
+    },
+    {
+      "text": "И",
+      "source_start": 33.581,
+      "source_end": 33.92,
+      "start": 25.505,
+      "end": 25.844
+    },
+    {
+      "text": "если",
+      "source_start": 33.92,
+      "source_end": 34.06,
+      "start": 25.844,
+      "end": 25.984
+    },
+    {
+      "text": "хотя",
+      "source_start": 34.06,
+      "source_end": 34.24,
+      "start": 25.984,
+      "end": 26.164
+    },
+    {
+      "text": "бы",
+      "source_start": 34.24,
+      "source_end": 34.58,
+      "start": 26.164,
+      "end": 26.504
+    },
+    {
+      "text": "80%",
+      "source_start": 35.629,
+      "source_end": 36.22,
+      "start": 26.644,
+      "end": 27.235
+    },
+    {
+      "text": "из",
+      "source_start": 36.23,
+      "source_end": 36.94,
+      "start": 27.245,
+      "end": 27.955
+    },
+    {
+      "text": "них",
+      "source_start": 36.94,
+      "source_end": 37.225,
+      "start": 27.955,
+      "end": 28.24
+    },
+    {
+      "text": "будет",
+      "source_start": 37.95,
+      "source_end": 38.27,
+      "start": 28.38,
+      "end": 28.7
+    },
+    {
+      "text": "решены",
+      "source_start": 38.886,
+      "source_end": 39.4,
+      "start": 28.84,
+      "end": 29.354
+    },
+    {
+      "text": "правильно,",
+      "source_start": 39.4,
+      "source_end": 40.199,
+      "start": 29.354,
+      "end": 30.153
+    },
+    {
+      "text": "то",
+      "source_start": 40.679,
+      "source_end": 40.82,
+      "start": 30.633,
+      "end": 30.774
+    },
+    {
+      "text": "это",
+      "source_start": 40.82,
+      "source_end": 41.02,
+      "start": 30.774,
+      "end": 30.974
+    },
+    {
+      "text": "означает,",
+      "source_start": 41.02,
+      "source_end": 41.625,
+      "start": 30.974,
+      "end": 31.579
+    },
+    {
+      "text": "что",
+      "source_start": 41.78,
+      "source_end": 42.58,
+      "start": 31.734,
+      "end": 32.534
+    },
+    {
+      "text": "скорость",
+      "source_start": 43.33,
+      "source_end": 43.7,
+      "start": 32.674,
+      "end": 33.044
+    },
+    {
+      "text": "развития",
+      "source_start": 43.7,
+      "source_end": 44.18,
+      "start": 33.044,
+      "end": 33.524
+    },
+    {
+      "text": "науки",
+      "source_start": 44.18,
+      "source_end": 44.48,
+      "start": 33.524,
+      "end": 33.824
+    },
+    {
+      "text": "сильно",
+      "source_start": 44.48,
+      "source_end": 44.82,
+      "start": 33.824,
+      "end": 34.164
+    },
+    {
+      "text": "увеличилась.",
+      "source_start": 44.82,
+      "source_end": 45.42,
+      "start": 34.164,
+      "end": 34.764
+    }
+  ]
+}

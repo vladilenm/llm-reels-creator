@@ -1,0 +1,22 @@
+<title>11 Даже не открывал</title>
+<style>
+/*COMMON*/
+</style>
+<div data-slot="shape">
+  <div class="L" id="Lp"><div class="row" style="left:-118px;top:-24px;gap:14px;font-size:40px;font-weight:600"><span id="ic"></span>монтажка</div></div>
+  <div class="L" id="Lb"><div class="cc big" style="top:-42px;font-size:84px">даже <span class="acc">не открывал</span></div></div>
+</div><!--/shape-->
+<script>
+// Clean anchors (clip in = 33.67): «Монтажку» 33.67 → 0.00, «даже» 34.26 → 0.59 (big text lands here), «открывал» 34.64 → 0.97
+const $=id=>document.getElementById(id);
+$('ic').innerHTML=M.icon('x',40,'#B79CFF',2.6);
+M.scene({
+  W:1080,H:1920,T:1.71,bg:null,center:[540,1100],intro:0.05,
+  SH:{pill:{w:310,h:100,r:50,bg:'#0E0B14',cam:1}, big:{w:820,h:190,r:40,bg:'#0E0B14',cam:1}},
+  start:'pill', SEQ:[[0.59,'big']],
+  layers:[
+    {el:'Lp',tin:0.05,tout:0.59,o:{din:0}},
+    {el:'Lb',tin:0.59,tout:null},
+  ],
+});
+</script>

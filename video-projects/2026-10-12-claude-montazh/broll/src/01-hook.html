@@ -1,0 +1,37 @@
+<title>01 Хук · не монтировал</title>
+<style>
+/*COMMON*/
+.tc{font-size:26px}
+</style>
+<div data-slot="shape">
+  <div class="L" id="Lpill"><div class="cc mono tc" style="top:-16px;font-size:30px"><span class="tcv"></span></div></div>
+  <div class="L" id="L1">
+    <div class="cc mono tc mut" style="top:-92px"><span class="tcv"></span></div>
+    <div class="cc big" style="top:-40px;font-size:92px">Не монтировал</div>
+  </div>
+  <div class="L" id="L2">
+    <div class="cc mono tc mut" style="top:-92px"><span class="tcv"></span></div>
+    <div class="cc big" style="top:-40px;font-size:84px">Ни одной склейки</div>
+  </div>
+  <div class="L" id="L3">
+    <div class="cc mono tc mut" style="top:-92px">собрал</div>
+    <div class="cc big acc" style="top:-50px;font-size:132px">Claude</div>
+  </div>
+</div><!--/shape-->
+<script>
+// Clean-timeline anchors (clip in = 0.00): «монтировал» 1.42, «склейки» 2.58, «собрал» 3.82 (Claude card lands here, held ≥1 s), «Claude» 4.10
+const tcs=[...document.querySelectorAll('.tcv')];
+const tc=t=>{const f=Math.max(0,Math.floor(t*30));const s=Math.floor(f/30),fr=f%30;return '00:00:'+String(s).padStart(2,'0')+':'+String(fr).padStart(2,'0');};
+M.scene({
+  W:1080,H:1920,T:4.91,bg:null,center:[540,1100],intro:0.05,
+  SH:{pill:{w:300,h:72,r:36,bg:'#0E0B14',cam:1}, a:{w:780,h:230,r:40,bg:'#0E0B14',cam:1}, b:{w:820,h:230,r:40,bg:'#0E0B14',cam:1}, c:{w:520,h:250,r:40,bg:'#0E0B14',cam:1}},
+  start:'pill', SEQ:[[1.42,'a'],[2.58,'b'],[3.82,'c']],
+  layers:[
+    {el:'Lpill',tin:0.05,tout:1.42,o:{din:0}},
+    {el:'L1',tin:1.42,tout:2.58},
+    {el:'L2',tin:2.58,tout:3.82},
+    {el:'L3',tin:3.82,tout:null},
+  ],
+  extra:(t)=>{const s=tc(t); tcs.forEach(e=>M.setText(e,s));}
+});
+</script>

@@ -1,0 +1,36 @@
+<title>09 lessons.md · правка запомнена</title>
+<style>
+/*COMMON*/
+.sk{position:absolute;height:14px;border-radius:7px;background:#2A2338}
+</style>
+<div data-slot="shape">
+  <div class="L" id="Lf">
+    <div class="row" style="left:-370px;top:30px;gap:14px;font-size:26px"><span id="ic"></span><span class="mono mut">lessons.md</span></div>
+    <div class="a" id="ok" style="left:290px;top:22px"></div>
+    <div class="sk" style="left:-370px;top:96px;width:520px"></div>
+    <div class="sk" style="left:-370px;top:128px;width:380px"></div>
+    <div class="a mono" style="left:-370px;top:170px;width:740px;font-size:29px;white-space:nowrap"><span class="acc" id="tag"></span><span id="typed"></span><span id="caret" style="display:inline-block;width:3px;height:32px;background:#F5F3FA;vertical-align:-6px;margin-left:2px"></span></div>
+  </div>
+</div><!--/shape-->
+<script>
+// Clean anchors (clip in = 22.51): «запоминает» 23.14 → 0.63, «ошибок» 25.64 → 3.13
+// Real entry: lessons.md, 2026-10-12 · ai-700-math — «[субтитры] … перекрывали лицо» → baseline 1330 → 1410
+const $=id=>document.getElementById(id);
+const TAG='[субтитры] ', TXT='перекрывали лицо → ниже', T0=0.63, T1=1.75;
+$('ic').innerHTML=M.icon('file',30,'#8E86A3');
+const ck=`<svg width="56" height="56" viewBox="-28 -28 56 56"><circle r="28" fill="#B79CFF"/><path d="M-11 0 L-3 8 L12 -8" fill="none" stroke="#0E0B14" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+$('ok').innerHTML=ck;
+M.scene({
+  W:1080,H:1920,T:3.49,bg:null,center:[540,1100],intro:0.10,
+  SH:{card:{w:820,h:240,r:36,bg:'#0E0B14',cam:1}},
+  start:'card', SEQ:[], shapePress:[3.13],
+  layers:[
+    {el:'Lf',tin:0.10,tout:null,anchor:'t',o:{din:0},update:(t)=>{
+      const all=TAG+TXT, n=Math.round(M.clamp((t-T0)/(T1-T0))*all.length);
+      M.setText($('tag'),all.slice(0,Math.min(n,TAG.length))); M.setText($('typed'),n>TAG.length?all.slice(TAG.length,n):'');
+      $('caret').style.opacity=(t>T0&&t<T1+0.05)||(t<3.13&&Math.floor(t*2.4)%2==0)?1:0;
+      const v=M.vis(t,3.13,null,{din:0,lin:0.18}); $('ok').style.opacity=v.o; $('ok').style.transform=`scale(${0.6+0.4*v.a})`;
+    }},
+  ],
+});
+</script>

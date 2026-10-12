@@ -1,0 +1,178 @@
+{
+  "timeline": "source",
+  "source": "video-projects/2026-10-12-claude-montazh/assets/raw.mp4",
+  "source_duration": 107.6,
+  "clean_duration": 38.881,
+  "removed": 68.719,
+  "cuts": 14,
+  "delete_ranges": [
+    {
+      "start": 0,
+      "end": 0.623,
+      "reasons": [
+        "head trim before first word"
+      ],
+      "removed_text": ""
+    },
+    {
+      "start": 5.178,
+      "end": 10.641,
+      "reasons": [
+        "pause 5.70s -> 0.24s"
+      ],
+      "removed_text": ""
+    },
+    {
+      "start": 12.512,
+      "end": 18.03,
+      "reasons": [
+        "pause 5.76s -> 0.24s"
+      ],
+      "removed_text": ""
+    },
+    {
+      "start": 20.461,
+      "end": 24.21,
+      "reasons": [
+        "pause 3.99s -> 0.24s"
+      ],
+      "removed_text": ""
+    },
+    {
+      "start": 24.3,
+      "end": 48.01,
+      "reasons": [
+        "дубль: первые попытки битов 4–5 (паузы/дубли, графика/субтитры) и посторонние звуки 36–40 с; оставлен последний чистый дубль 48.0–53.9",
+        "pause 13.48s -> 0.24s",
+        "pause 3.82s -> 0.24s"
+      ],
+      "removed_text": "Он сам вырезает паузы, оговорки и неудачные дубли. Сам придумывает графику под слова и вставляет субтитры."
+    },
+    {
+      "start": 50.72,
+      "end": 51.308,
+      "reasons": [
+        "pause 0.79s -> 0.20s"
+      ],
+      "removed_text": ""
+    },
+    {
+      "start": 54.029,
+      "end": 58.392,
+      "reasons": [
+        "pause 4.60s -> 0.24s"
+      ],
+      "removed_text": ""
+    },
+    {
+      "start": 61.523,
+      "end": 63.019,
+      "reasons": [
+        "pause 1.70s -> 0.20s"
+      ],
+      "removed_text": ""
+    },
+    {
+      "start": 65.162,
+      "end": 73.892,
+      "reasons": [
+        "pause 8.97s -> 0.24s"
+      ],
+      "removed_text": ""
+    },
+    {
+      "start": 76.642,
+      "end": 81.278,
+      "reasons": [
+        "pause 4.88s -> 0.24s"
+      ],
+      "removed_text": ""
+    },
+    {
+      "start": 84.936,
+      "end": 89.077,
+      "reasons": [
+        "pause 4.38s -> 0.24s"
+      ],
+      "removed_text": ""
+    },
+    {
+      "start": 93.632,
+      "end": 97.602,
+      "reasons": [
+        "pause 4.21s -> 0.24s"
+      ],
+      "removed_text": ""
+    },
+    {
+      "start": 100.569,
+      "end": 101.946,
+      "reasons": [
+        "pause 1.58s -> 0.20s"
+      ],
+      "removed_text": ""
+    },
+    {
+      "start": 107.245,
+      "end": 107.6,
+      "reasons": [
+        "tail trim after final word"
+      ],
+      "removed_text": ""
+    }
+  ],
+  "keep_ranges": [
+    {
+      "start": 0.623,
+      "end": 5.178
+    },
+    {
+      "start": 10.641,
+      "end": 12.512
+    },
+    {
+      "start": 18.03,
+      "end": 20.461
+    },
+    {
+      "start": 24.21,
+      "end": 24.3
+    },
+    {
+      "start": 48.01,
+      "end": 50.72
+    },
+    {
+      "start": 51.308,
+      "end": 54.029
+    },
+    {
+      "start": 58.392,
+      "end": 61.523
+    },
+    {
+      "start": 63.019,
+      "end": 65.162
+    },
+    {
+      "start": 73.892,
+      "end": 76.642
+    },
+    {
+      "start": 81.278,
+      "end": 84.936
+    },
+    {
+      "start": 89.077,
+      "end": 93.632
+    },
+    {
+      "start": 97.602,
+      "end": 100.569
+    },
+    {
+      "start": 101.946,
+      "end": 107.245
+    }
+  ]
+}

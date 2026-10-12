@@ -1,0 +1,128 @@
+{
+  "timeline": "source",
+  "source": "video-projects/2026-10-12-ai-700-math/assets/raw.mp4",
+  "source_duration": 46.185,
+  "clean_duration": 35.465,
+  "removed": 10.72,
+  "cuts": 10,
+  "delete_ranges": [
+    {
+      "start": 0,
+      "end": 0.28,
+      "reasons": [
+        "head trim before first word"
+      ],
+      "removed_text": ""
+    },
+    {
+      "start": 4.146,
+      "end": 6.192,
+      "reasons": [
+        "pause 2.29s -> 0.24s"
+      ],
+      "removed_text": ""
+    },
+    {
+      "start": 20.858,
+      "end": 21.507,
+      "reasons": [
+        "pause 0.85s -> 0.20s"
+      ],
+      "removed_text": ""
+    },
+    {
+      "start": 24.12,
+      "end": 24.8,
+      "reasons": [
+        "pause 1.18s -> 0.50s (вручную: пауза перед поворотом «потому что»)"
+      ],
+      "removed_text": ""
+    },
+    {
+      "start": 27.752,
+      "end": 31.812,
+      "reasons": [
+        "pause 4.30s -> 0.24s"
+      ],
+      "removed_text": ""
+    },
+    {
+      "start": 34.657,
+      "end": 35.566,
+      "reasons": [
+        "pause 1.05s -> 0.14s"
+      ],
+      "removed_text": ""
+    },
+    {
+      "start": 37.302,
+      "end": 37.887,
+      "reasons": [
+        "pause 0.73s -> 0.14s"
+      ],
+      "removed_text": ""
+    },
+    {
+      "start": 38.347,
+      "end": 38.823,
+      "reasons": [
+        "pause 0.62s -> 0.14s"
+      ],
+      "removed_text": ""
+    },
+    {
+      "start": 42.657,
+      "end": 43.267,
+      "reasons": [
+        "pause 0.75s -> 0.14s"
+      ],
+      "removed_text": ""
+    },
+    {
+      "start": 45.76,
+      "end": 46.185,
+      "reasons": [
+        "tail trim after final word"
+      ],
+      "removed_text": ""
+    }
+  ],
+  "keep_ranges": [
+    {
+      "start": 0.28,
+      "end": 4.146
+    },
+    {
+      "start": 6.192,
+      "end": 20.858
+    },
+    {
+      "start": 21.507,
+      "end": 24.12
+    },
+    {
+      "start": 24.8,
+      "end": 27.752
+    },
+    {
+      "start": 31.812,
+      "end": 34.657
+    },
+    {
+      "start": 35.566,
+      "end": 37.302
+    },
+    {
+      "start": 37.887,
+      "end": 38.347
+    },
+    {
+      "start": 38.823,
+      "end": 42.657
+    },
+    {
+      "start": 43.267,
+      "end": 45.76
+    }
+  ]
+}
