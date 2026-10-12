@@ -37,20 +37,24 @@
       "at": "2026-10-12 06:17"
     },
     "S7": {
-      "state": "waiting",
-      "note": "ГЕЙТ C: превью renders/preview.mp4",
-      "at": "2026-10-12 06:17"
+      "state": "done",
+      "note": "kit (renders/kit/) + full (renders/final.mp4, check-reel PASS); правок на ГЕЙТЕ C: 0",
+      "at": "2026-10-12 06:20"
     },
     "S8": {
-      "state": "todo",
-      "note": "",
-      "at": null
+      "state": "done",
+      "note": "lessons.md + runs.log.jsonl",
+      "at": "2026-10-12 06:20"
     }
   },
   "decisions": [
     {
       "at": "2026-10-12 06:11",
       "text": "ГЕЙТ B: хук C (обещание первым, потом подводка), план графики без правок"
+    },
+    {
+      "at": "2026-10-12 06:20",
+      "text": "ГЕЙТ C: «для синтетики всё хорошо», правок нет"
     }
   ],
   "mode": "kit",
