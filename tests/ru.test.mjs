@@ -257,3 +257,27 @@ test("make-captions: every clean word lands in a cue, lines ≤22 chars, glyph-c
   assert.match(html, /@font-face\{font-family:"ReelCaption";src:url\("fonts\/Inter-700\.ttf"\)/);
   assert.match(html, /window\.__timelines\["captions"\]/);
 });
+
+test("refineWithSilences pulls late whisper starts back to the speech onset and closes silence-free gaps", async () => {
+  const { refineWithSilences } = await import("../scripts/ru/normalize-transcript.mjs");
+  const words = [
+    { text: "агентов.", start: 2.5, end: 3.1 },
+    { text: "Агенты", start: 6.3, end: 6.8 },    // real onset 5.9 after a pause
+    { text: "берут", start: 7.4, end: 7.8 },     // whisper hole 6.8–7.4, real speech continuous
+  ];
+  const silences = [{ start: 3.12, end: 5.9 }];
+  const { words: w } = refineWithSilences(words, silences);
+  assert.ok(Math.abs(w[1].start - 5.88) < 0.011, `start ${w[1].start}`);
+  assert.equal(w[2].start, 6.81, "gap without silence under it is closed");
+  assert.equal(w[0].end, 3.14, "end snapped to the silence start");
+});
+
+test("build-edl snaps cut boundaries to word edges and restores sentence case", async () => {
+  const { snapCutToWords, sentenceCase } = await import("../scripts/ru/build-edl.mjs");
+  const words = [{ text: "раз.", start: 13.54, end: 14.04 }, { text: "Например,", start: 14.736, end: 15.26 }];
+  assert.equal(snapCutToWords({ start: 9.42, end: 14.74 }, words).end, 14.736, "end inside the next word's head moves to its start");
+  assert.equal(snapCutToWords({ start: 14.0, end: 14.5 }, words).start, 14.04, "start inside a tail moves to the word end");
+  const fixed = sentenceCase([{ text: "агентов." }, { text: "агенты" }, { text: "«пишите»" }].map((w, i, a) => (i === 2 ? { text: "«пишите»" } : w)));
+  assert.deepEqual(fixed.map((w) => w.text), ["Агентов.", "Агенты", "«пишите»"]);
+  assert.deepEqual(sentenceCase([{ text: "рутину." }, { text: "«пишите»" }]).map((w) => w.text), ["Рутину.", "«Пишите»"]);
+});

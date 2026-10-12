@@ -1,0 +1,162 @@
+{
+  "language_code": "russian",
+  "source_audio_duration_secs": 26.033,
+  "audio_duration_secs": 14.809,
+  "produced_by": "cut-mistakes",
+  "words": [
+    {
+      "text": "Сегодня",
+      "source_start": 0.786,
+      "source_end": 1.36,
+      "start": 0.22,
+      "end": 0.794
+    },
+    {
+      "text": "расскажу",
+      "source_start": 1.36,
+      "source_end": 2.04,
+      "start": 0.794,
+      "end": 1.474
+    },
+    {
+      "text": "про",
+      "source_start": 2.04,
+      "source_end": 2.52,
+      "start": 1.474,
+      "end": 1.954
+    },
+    {
+      "text": "умных",
+      "source_start": 2.52,
+      "source_end": 3.12,
+      "start": 1.954,
+      "end": 2.554
+    },
+    {
+      "text": "агентов.",
+      "source_start": 3.12,
+      "source_end": 3.803,
+      "start": 2.554,
+      "end": 3.237
+    },
+    {
+      "text": "агенты",
+      "source_start": 5.882,
+      "source_end": 6.38,
+      "start": 3.515,
+      "end": 4.013
+    },
+    {
+      "text": "берут",
+      "source_start": 6.38,
+      "source_end": 6.9,
+      "start": 4.013,
+      "end": 4.533
+    },
+    {
+      "text": "на",
+      "source_start": 6.9,
+      "source_end": 7.38,
+      "start": 4.533,
+      "end": 5.013
+    },
+    {
+      "text": "себя",
+      "source_start": 7.38,
+      "source_end": 7.92,
+      "start": 5.013,
+      "end": 5.553
+    },
+    {
+      "text": "рутину.",
+      "source_start": 7.92,
+      "source_end": 8.52,
+      "start": 5.553,
+      "end": 6.153
+    },
+    {
+      "text": "Например,",
+      "source_start": 14.739,
+      "source_end": 15.26,
+      "start": 6.349,
+      "end": 6.87
+    },
+    {
+      "text": "агенты",
+      "source_start": 15.27,
+      "source_end": 15.9,
+      "start": 6.88,
+      "end": 7.51
+    },
+    {
+      "text": "экономят",
+      "source_start": 15.9,
+      "source_end": 16.72,
+      "start": 7.51,
+      "end": 8.33
+    },
+    {
+      "text": "часы",
+      "source_start": 16.72,
+      "source_end": 17.28,
+      "start": 8.33,
+      "end": 8.89
+    },
+    {
+      "text": "каждую",
+      "source_start": 17.28,
+      "source_end": 17.98,
+      "start": 8.89,
+      "end": 9.59
+    },
+    {
+      "text": "неделю.",
+      "source_start": 17.98,
+      "source_end": 18.556,
+      "start": 9.59,
+      "end": 10.166
+    },
+    {
+      "text": "пишите",
+      "source_start": 20.93,
+      "source_end": 21.4,
+      "start": 10.366,
+      "end": 10.836
+    },
+    {
+      "text": "в",
+      "source_start": 21.4,
+      "source_end": 22,
+      "start": 10.836,
+      "end": 11.436
+    },
+    {
+      "text": "комментарии,",
+      "source_start": 22,
+      "source_end": 22.74,
+      "start": 11.436,
+      "end": 12.176
+    },
+    {
+      "text": "что",
+      "source_start": 22.75,
+      "source_end": 23.26,
+      "start": 12.186,
+      "end": 12.696
+    },
+    {
+      "text": "автоматизировать",
+      "source_start": 23.26,
+      "source_end": 24.26,
+      "start": 12.696,
+      "end": 13.696
+    },
+    {
+      "text": "дальше.",
+      "source_start": 24.26,
+      "source_end": 25.033,
+      "start": 13.696,
+      "end": 14.469
+    }
+  ]
+}

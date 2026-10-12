@@ -48,6 +48,31 @@ export function acceptedFromCandidates(doc) {
     .map((c) => ({ start: c.cut.start, end: c.cut.end, reason: `${c.type}: ${c.removes}`.slice(0, 160) }));
 }
 
+// Snap an approved cut to word edges: a boundary that lands inside a word by a
+// little (typed or rounded times) would otherwise drop that word from the clean
+// transcript while its audio stays in the video. A start inside a word's tail
+// moves to the word's end; an end inside a word's head moves to its start.
+export function snapCutToWords(cut, words, { tol = 0.12 } = {}) {
+  let { start, end } = cut;
+  for (const w of words) {
+    if (end > w.start && end < w.end && end - w.start <= tol) end = w.start;
+    if (start > w.start && start < w.end && w.end - start <= tol) start = w.end;
+  }
+  return { ...cut, start, end };
+}
+
+// Sentence case after cuts: «…агентов. агенты берут…» → «…агентов. Агенты берут…».
+export function sentenceCase(words) {
+  return words.map((w, i) => {
+    const prev = words[i - 1];
+    if (i === 0 || /[.!?…]$/.test(prev.text)) {
+      const t = w.text.replace(/^(\P{L}*)(\p{Ll})/u, (_, lead, ch) => lead + ch.toUpperCase());
+      return t === w.text ? w : { ...w, text: t };
+    }
+    return w;
+  });
+}
+
 const fmt = (s) => { const m = Math.floor(s / 60); return `${m}:${(s - m * 60).toFixed(2).padStart(5, "0")}`; };
 
 function main() {
@@ -79,6 +104,7 @@ function main() {
   else if (o.accept === "recommended") approved = acceptedFromCandidates(JSON.parse(readFileSync(resolve(o.candidates), "utf8")));
   else throw new Error("--candidates needs --accept recommended");
 
+  approved = approved.map((c) => snapCutToWords(c, words));
   const deletes = mergeDeletes([...silenceCuts, ...approved.map((c) => ({ start: c.start, end: c.end, reasons: [c.reason ?? "approved cut"] }))])
     .map((d) => ({ ...d, start: Math.max(0, d.start), end: Math.min(duration, d.end) }))
     .filter((d) => d.end > d.start);
@@ -125,12 +151,12 @@ function main() {
 
   const mt = JSON.parse(readFileSync(join(work, "source.mistakes-transcript.json"), "utf8"));
   const clean = {
-    text: mt.words.map((w) => w.text).join(" "),
+    text: sentenceCase(mt.words).map((w) => w.text).join(" "),
     language_code: transcript.language_code ?? null,
     audio_duration_secs: mt.audio_duration_secs,
     source_audio_duration_secs: r3(duration),
     timeline: "clean",
-    words: mt.words.map((w) => ({ ...w, type: "word", key: normKey(w.text) })),
+    words: sentenceCase(mt.words).map((w) => ({ ...w, type: "word", key: normKey(w.text) })),
   };
   writeFileSync(join(project, "transcript.clean.json"), JSON.stringify(clean, null, 2) + "\n");
   console.log(JSON.stringify({ cuts: deletes.length, removed: r3(removed), clean_duration: edl.clean_duration, clean_words: clean.words.length, rendered: Boolean(o.video && o.render) }, null, 2));

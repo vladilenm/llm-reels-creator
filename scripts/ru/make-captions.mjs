@@ -26,7 +26,7 @@ const r3 = (x) => Math.round(x * 1000) / 1000;
 
 export function captionCues(transcript, brand) {
   const c = brand.captions;
-  const cues = buildCues(transcript, { maxChars: c.max_chars_per_line, maxLines: c.max_lines, gap: 0.6, maxCue: 3.2 });
+  const cues = buildCues(transcript, { maxChars: c.max_chars_per_line, maxLines: c.max_lines, gap: 0.6, maxCue: 3.6 });
   // Map words back onto lines so each word can light up at its own start.
   const words = transcript.words.filter((w) => (w.type ? w.type === "word" : true));
   let wi = 0;
@@ -36,22 +36,27 @@ export function captionCues(transcript, brand) {
       return { text: t, start: w?.start ?? cue.start, end: w?.end ?? cue.end };
     }));
     // Keep every cue on screen at least 0.5 s (rail rule) without overlapping the next one.
-    return { start: cue.start, end: Math.max(cue.end, cue.start + 0.5), lines };
+    // A cue that starts within the first 0.25 s starts at frame 0 (cover + muted hook).
+    const start = cue.start < 0.25 ? 0 : cue.start;
+    return { start, end: Math.max(cue.end, start + 0.5), lines };
   }).map((cue, i, all) => ({ ...cue, end: Math.min(cue.end, all[i + 1]?.start ?? Infinity) }));
 }
 
 export function captionsHtml(cues, { duration, brand, fontUrl, fps = 30 }) {
   const c = brand.captions;
-  const lineH = Math.round(c.font_px * 1.18);
+  const lineH = Math.round(c.font_px * 1.3);
   const clips = cues.map((cue, i) => {
     const d = Math.max(0.05, cue.end - cue.start);
     const top = c.baseline_y - lineH * cue.lines.length;
-    const lines = cue.lines.map((ln, li) => `<div class="ln">${ln.map((w, wj) => `<span class="w" id="w${i}_${li}_${wj}">${esc(w.text)}</span>`).join(" ")}</div>`).join("");
+    const lines = cue.lines.map((ln, li) => `<div class="ln"><span class="bg">${ln.map((w, wj) => `<span class="w" id="w${i}_${li}_${wj}">${esc(w.text)}</span>`).join(" ")}</span></div>`).join("");
     return `<div id="c${i}" class="cue clip" data-start="${r3(cue.start)}" data-duration="${r3(d)}" data-track-index="0" style="top:${top}px">${lines}</div>`;
   }).join("\n");
   const tl = cues.map((cue, i) => {
     const d = cue.end - cue.start;
-    const out = [`tl.fromTo("#c${i}",{opacity:0,y:14},{opacity:1,y:0,duration:0.18,ease:"power2.out"},${r3(cue.start)});`];
+    // The first cue is fully on screen at frame 0: the hook must read with the sound off.
+    const out = cue.start < 0.25
+      ? [`tl.set("#c${i}",{opacity:1,y:0},0);`]
+      : [`tl.fromTo("#c${i}",{opacity:0,y:14},{opacity:1,y:0,duration:0.18,ease:"power2.out"},${r3(cue.start)});`];
     cue.lines.forEach((ln, li) => ln.forEach((w, wj) => {
       out.push(`tl.set("#w${i}_${li}_${wj}",{color:"${c.active_color}"},${r3(Math.max(cue.start, w.start))});`);
       out.push(`tl.set("#w${i}_${li}_${wj}",{color:"${c.color}"},${r3(Math.min(cue.end, Math.max(w.end, w.start + 0.12)))});`);
@@ -69,6 +74,7 @@ html,body{margin:0;width:1080px;height:1920px;overflow:hidden;background:transpa
 #captions{position:relative;width:1080px;height:1920px;overflow:hidden;background:transparent}
 .cue{position:absolute;left:80px;width:880px;text-align:center;font-family:"ReelCaption";font-weight:${c.weight};font-size:${c.font_px}px;line-height:${lineH}px;color:${c.color};letter-spacing:-0.01em;text-shadow:${c.shadow};opacity:0}
 .ln{white-space:nowrap}
+.ln>span.bg{display:inline-block;padding:2px 18px 6px;border-radius:18px;background:${c.backdrop ?? "transparent"}}
 .w{display:inline}
 </style></head><body>
 <div id="captions" data-composition-id="captions" data-start="0" data-duration="${r3(duration)}" data-width="1080" data-height="1920" data-fps="${fps}">

@@ -1,0 +1,83 @@
+{
+  "agent": "cut-mistakes",
+  "language": "ru",
+  "vocabulary": "/Users/vladilen/Documents/dev/claude-rendering-client/scripts/ru/ru-fillers.json",
+  "source_transcript": "/Users/vladilen/Documents/dev/claude-rendering-client/video-projects/2026-10-11-fixture-agents/transcript.words.json",
+  "word_count": 34,
+  "segment_count": 4,
+  "counts": {
+    "hesitation": 3,
+    "retake_marker": 1,
+    "filler": 1
+  },
+  "proposed_cut_seconds": 6.08,
+  "candidates": [
+    {
+      "id": "c001",
+      "type": "hesitation",
+      "confidence": "high",
+      "recommend": "cut",
+      "cut": {
+        "start": 4.984,
+        "end": 5.35
+      },
+      "removes": "Э",
+      "context": "Сегодня расскажу про умных агентов. Э э э агенты берут на",
+      "note": "hesitation \"э\""
+    },
+    {
+      "id": "c002",
+      "type": "hesitation",
+      "confidence": "high",
+      "recommend": "cut",
+      "cut": {
+        "start": 5.35,
+        "end": 5.36
+      },
+      "removes": "э",
+      "context": "Сегодня расскажу про умных агентов. Э э э агенты берут на себя",
+      "note": "hesitation \"э\""
+    },
+    {
+      "id": "c003",
+      "type": "hesitation",
+      "confidence": "high",
+      "recommend": "cut",
+      "cut": {
+        "start": 5.36,
+        "end": 5.749
+      },
+      "removes": "э",
+      "context": "расскажу про умных агентов. Э э э агенты берут на себя рутину.",
+      "note": "hesitation \"э\""
+    },
+    {
+      "id": "c005",
+      "type": "retake_marker",
+      "confidence": "high",
+      "recommend": "cut",
+      "cut": {
+        "start": 9.424,
+        "end": 14.739
+      },
+      "removes": "Например, агенты экономят время. Стоп, ещё раз.",
+      "keeps": "Например, агенты экономят часы каждую неделю. Ну, вот,",
+      "marker": "Стоп, ещё раз.",
+      "context": "э агенты берут на себя рутину. Например, агенты экономят время. Стоп, ещё раз. Например, агенты экономят часы каждую неделю. Ну,",
+      "note": "marker \"Стоп, ещё раз.\" + restart repeats 3/4 content words of the fragment before it"
+    },
+    {
+      "id": "c004",
+      "type": "filler",
+      "confidence": "low",
+      "recommend": "review",
+      "cut": {
+        "start": 20.04,
+        "end": 20.92
+      },
+      "removes": "Ну, вот,",
+      "context": "Например, агенты экономят часы каждую неделю. Ну, вот, пишите в комментарии, что",
+      "note": "verbal filler: often meaningful, cut only if it reads as padding"
+    }
+  ]
+}

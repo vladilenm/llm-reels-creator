@@ -1,0 +1,88 @@
+{
+  "agent": "cut-silences",
+  "params": {
+    "gap": 0.55,
+    "headPad": 0.22,
+    "tailPad": 0.34
+  },
+  "source_duration": 26.033,
+  "edited_duration": 20.952,
+  "removed": 5.081,
+  "delete_ranges": [
+    {
+      "start": 0,
+      "end": 0.5660000000000001,
+      "reasons": [
+        "head trim before first word"
+      ]
+    },
+    {
+      "start": 3.913,
+      "end": 4.894,
+      "reasons": [
+        "pause 1.18s -> 0.20s"
+      ]
+    },
+    {
+      "start": 8.629999999999999,
+      "end": 9.334,
+      "reasons": [
+        "pause 0.90s -> 0.20s"
+      ]
+    },
+    {
+      "start": 12.081999999999999,
+      "end": 12.469,
+      "reasons": [
+        "pause 0.59s -> 0.20s"
+      ]
+    },
+    {
+      "start": 14.149999999999999,
+      "end": 14.649000000000001,
+      "reasons": [
+        "pause 0.70s -> 0.20s"
+      ]
+    },
+    {
+      "start": 18.666,
+      "end": 19.95,
+      "reasons": [
+        "pause 1.48s -> 0.20s"
+      ]
+    },
+    {
+      "start": 25.373,
+      "end": 26.033,
+      "reasons": [
+        "tail trim after final word"
+      ]
+    }
+  ],
+  "keep_ranges": [
+    {
+      "start": 0.5660000000000001,
+      "end": 3.913
+    },
+    {
+      "start": 4.894,
+      "end": 8.629999999999999
+    },
+    {
+      "start": 9.334,
+      "end": 12.081999999999999
+    },
+    {
+      "start": 12.469,
+      "end": 14.149999999999999
+    },
+    {
+      "start": 14.649000000000001,
+      "end": 18.666
+    },
+    {
+      "start": 19.95,
+      "end": 25.373
+    }
+  ]
+}

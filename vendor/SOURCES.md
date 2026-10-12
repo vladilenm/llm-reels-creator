@@ -50,6 +50,8 @@ Copyright notices: Nate Herk (2026), Bart (2026), HeyGen (Apache-2.0, see
 | `.claude/skills/cut-mistakes/config/en.json` | New: the English vocabulary that used to be hard-coded, plus um/uh as hesitations | Config, not code |
 | `.claude/skills/cut-mistakes/SKILL.md` | Documents the language config, new types and the "read the whole transcript anyway" rule | |
 | `.claude/skills/motion-broll/scripts/words.py` | Also accepts a word-level JSON transcript and prints exact word times | SPEC §3.5: no ±0.2 s SRT estimate |
+| `.claude/skills/motion-broll/engine/beats.js` | Resizes the viewport to the clip's stage before screenshots; tiles 360 px wide for vertical clips | Was fixed at 1920×1080, so 1080×1920 sheets lost the bottom 840 px |
+| `.claude/skills/motion-broll/scripts/make_pages.py` | The on-black web preview of a `.mov` panel uses the clip's own size | Was fixed at 1920×1080 |
 | `.claude/skills/reel-export/SKILL.md` | Added `setparams=range=tv:colorspace=bt709:color_primaries=bt709:color_trc=bt709` to the encode filter chain | With ffmpeg 8.1 the original command writes `color_primaries`/`color_trc` as unknown; verified with ffprobe |
 
 ## Discrepancies between SPEC.md and the real repositories
@@ -87,6 +89,14 @@ Copyright notices: Nate Herk (2026), Bart (2026), HeyGen (Apache-2.0, see
   to a system font silently. `brand/fonts/` carries full Inter 4.001 (Google Fonts
   static TTFs, OFL) and Geist (from motion-broll, OFL), both checked with
   `scripts/ru/check-glyphs.mjs`.
+- **`embedded-captions` is not used for S5.** Its renderer needs a subject matte
+  (u2net, ~168 MB, minutes of CPU per 10 s), the `anchor` theme is tuned for 1280×720
+  (at 1920 high the rail lands under the Reels UI), every bundled font is a Latin
+  subset and the rail has no line breaking. `scripts/ru/make-captions.mjs` implements
+  the same rail rules for 9:16 Russian with our transcript and fonts; the skill stays
+  installed for embedded/cinematic captions on request.
+- **`talking-head-recut` is not used by default either**: «карточка поверх» is built
+  as a transparent motion-broll panel, so S4 has one graphics engine.
 - **ffmpeg 8.1 + `-color_primaries/-color_trc`** does not tag the stream unless
   `setparams` sets them in the filter graph (see reel-export patch).
 

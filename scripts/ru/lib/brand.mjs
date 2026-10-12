@@ -14,7 +14,7 @@ export const DEFAULT_BRAND = {
   captions: {
     style: "anchor-rail", font_px: 64, weight: 700, color: "#FFFFFF", active_color: "#FF5A1F",
     max_chars_per_line: 22, max_lines: 2, baseline_y: 1330,
-    shadow: "0 3px 14px rgba(0,0,0,.55), 0 0 2px rgba(0,0,0,.9)",
+    shadow: "0 2px 8px rgba(0,0,0,.45)", backdrop: "rgba(11,11,15,.62)",
   },
 };
 

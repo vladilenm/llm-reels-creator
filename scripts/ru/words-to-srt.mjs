@@ -15,7 +15,10 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { wrapLines } from "./lib/text.mjs";
+import { wrapLines, normKey } from "./lib/text.mjs";
+
+// Russian function words that should not end a caption line when the sentence goes on.
+const DANGLING = new Set(["что", "чтобы", "и", "а", "но", "или", "в", "во", "на", "с", "со", "по", "к", "ко", "у", "о", "об", "из", "за", "для", "про", "от", "до", "при", "без", "как", "если", "когда", "где", "это", "не", "ни", "же", "the", "a", "an", "to", "of", "and"]);
 
 export function srtTime(sec) {
   const ms = Math.max(0, Math.round(sec * 1000));
@@ -59,6 +62,15 @@ export function buildCues(transcript, { mode = "captions", maxChars = 22, maxLin
     const continues = !/[.!?…]$/.test(p.at(-1).text) && g[0].start - p.at(-1).end <= gap;
     if (g.length === 1 && p.length >= 3 && continues && wrapLines([p.at(-1), ...g].map((x) => x.text), { maxChars, maxLines })) {
       g.unshift(p.pop());
+    }
+  }
+  // A cue must not end on a word that only makes sense with what follows
+  // («Пишите в комментарии, что | автоматизировать…»): move it to the next cue.
+  for (let i = 0; i < groups.length - 1; i++) {
+    const g = groups[i], nx = groups[i + 1], last = g.at(-1);
+    const continues = !/[.!?…,;:]$/.test(last.text) && nx[0].start - last.end <= gap;
+    if (g.length >= 2 && continues && DANGLING.has(normKey(last.text)) && wrapLines([last, ...nx].map((x) => x.text), { maxChars, maxLines })) {
+      nx.unshift(g.pop());
     }
   }
   const cues = groups.map((g) => ({
