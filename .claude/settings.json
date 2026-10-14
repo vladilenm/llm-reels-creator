@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "env": {
+    "HYPERFRAMES_NO_TELEMETRY": "1",
+    "HYPERFRAMES_NO_UPDATE_CHECK": "1",
+    "PUPPETEER_SKIP_DOWNLOAD": "1"
+  },
+  "permissions": {
+    "allow": [
+      "Bash(ffmpeg *)",
+      "Bash(ffprobe *)",
+      "Bash(node scripts/*)",
+      "Bash(node .claude/skills/*)",
+      "Bash(NODE_PATH=./node_modules node .claude/skills/motion-broll/engine/*)",
+      "Bash(python3 .claude/skills/*)",
+      "Bash(bash scripts/ru/*)",
+      "Bash(npx hyperframes *)",
+      "Bash(npm run *)",
+      "Bash(npm test)",
+      "Bash(git status*)",
+      "Bash(git diff*)",
+      "Bash(git log*)",
+      "Bash(rm video-projects/*/renders/*)",
+      "Bash(rm -r video-projects/*/renders/*)"
+    ]
+  }
+}
