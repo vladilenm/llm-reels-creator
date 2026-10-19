@@ -4,7 +4,7 @@
 // never touched) and is never used in our renders — only studied.
 //
 //   node scripts/ru/ref-intake.mjs <reference> --slug claude-one-phrase [--brief "…"]
-//        [--date 2026-10-13] [--every 0.5] [--scene 0.3] [--projects-dir video-projects]
+//        [--principles] [--date 2026-10-13] [--every 0.5] [--scene 0.3] [--projects-dir video-projects]
 //
 // Writes video-projects/<date>-remake-<slug>/:
 //   assets/ref.<ext>        copy of the reference (gitignored)
@@ -123,7 +123,7 @@ function main() {
   const src = a.find((x, i) => !x.startsWith("--") && !valueFlags.has(a[i - 1]));
   const slugArg = get("--slug");
   if (!src || !slugArg) {
-    console.error('Usage: node scripts/ru/ref-intake.mjs <reference> --slug name [--brief "…"] [--every 0.5] [--scene 0.3] [--date YYYY-MM-DD] [--projects-dir dir]');
+    console.error('Usage: node scripts/ru/ref-intake.mjs <reference> --slug name [--brief "…"] [--principles] [--every 0.5] [--scene 0.3] [--date YYYY-MM-DD] [--projects-dir dir]');
     process.exit(1);
   }
   if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slugArg)) throw new Error("slug: lowercase Latin kebab-case");
@@ -153,7 +153,7 @@ function main() {
     cuts_per_10s: r3(summary.duration ? ((shots.length - 1) / summary.duration) * 10 : 0),
   };
   writeFileSync(join(project, "REF.json"), JSON.stringify({ source: relative(ROOT, source), copy: relative(project, ref), summary, warnings, rhythm, shots, audio }, null, 2) + "\n");
-  return { project, ref, summary, warnings, shots, rhythm, audio, slug, source, brief: get("--brief", ""), every: Number(get("--every", 0.5)) };
+  return { project, ref, summary, warnings, shots, rhythm, audio, slug, source, brief: get("--brief", ""), principles: a.includes("--principles"), every: Number(get("--every", 0.5)) };
 }
 
 async function sheets(ctx) {
@@ -165,7 +165,7 @@ async function sheets(ctx) {
 }
 
 function writeBrief(ctx, sheetFiles) {
-  const { project, summary, warnings, rhythm, audio, slug, source, brief } = ctx;
+  const { project, summary, warnings, rhythm, audio, slug, source, brief, principles } = ctx;
   const rel = (f) => relative(project, f);
   writeFileSync(join(project, "BRIEF.md"), [
     `# BRIEF · ${slug}`,
@@ -176,6 +176,7 @@ function writeBrief(ctx, sheetFiles) {
     "",
     `- Референс: \`${relative(ROOT, source)}\` → копия \`assets/${rel(ctx.ref).split("/").pop()}\``,
     `- Бриф заказчика: ${brief ? `«${brief}»` : "—"}`,
+    `- Принципы сценария (--principles): ${principles ? "включены — проверка в R3, `PRINCIPLES.md`" : "выключены"}`,
     `- ${summary.width}×${summary.height}, ${summary.fps} fps, ${summary.duration.toFixed(1)} с${summary.audio ? "" : ", без звука"}`,
     `- Склеек: ${rhythm.shots - 1}, медианный план ${rhythm.median_shot} с (${rhythm.shortest}–${rhythm.longest} с), ${rhythm.cuts_per_10s} склейки на 10 с`,
     audio ? `- Звук (по цифрам, не на слух): средняя громкость ${audio.mean_db} дБ, пауз тише −40 дБ: ${audio.silences_over_0_25s}; ${audio.note}` : "- Звук: нет дорожки",
@@ -186,6 +187,7 @@ function writeBrief(ctx, sheetFiles) {
   const s = readStatus(project, { kind: "remake" });
   s.kind = "remake";
   s.brief = brief;
+  s.principles = principles;
   s.stages.R0 = { state: "done", note: `${summary.duration.toFixed(1)} с, ${rhythm.shots} планов, листов кадров: ${sheetFiles.timeline.length + sheetFiles.shots.length}`, at: now() };
   writeStatus(project, s);
 }

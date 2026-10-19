@@ -11,9 +11,9 @@ decided by Claude under the usual rules. The only other reason to stop is a bloc
 nothing can work around: an unusable transcript, a missing API key, no take in the footage.
 
 ```
-/remake-fast <reference> [— brief]      → F1: text to say + what to record → stop «снимай»
-/remake-fast <remake project>           → F2: footage → preview → stop «ок или правки?»
-«ок» / «да» on the preview              → F3: final + ×1.1 + Instagram caption
+/remake-fast <reference> [— brief] [--principles]  → F1: text to say + what to record → stop «снимай»
+/remake-fast <remake project>                       → F2: footage → preview → stop «ок или правки?»
+«ок» / «да» on the preview                          → F3: final + ×1.1 + Instagram caption
 ```
 
 Engines: `reel-remake` (R0–R3) and `vladilen-reels` (S0–S8). Read both SKILL.md files and run
@@ -24,7 +24,7 @@ words → `lessons.md` → `brand.md` → skills). Two projects exist: the remak
 ## F1 · Reference → what to say
 
 1. `reel-remake` R0–R2 as written (intake, transcription — the only paid call, cached —
-   sheets, `BREAKDOWN.md`).
+   sheets, `BREAKDOWN.md`). Pass `--principles` on to `ref-intake.mjs` when given.
 2. R3 without ГЕЙТ R, without the `refs/NOTES.md` offer and without the build offer
    (devices marked «собрать» are built in F2 S4). Every `[проверь: …]` is resolved here:
    - a fact Claude can verify (GitHub, README, a public site, past transcripts) → verify it
@@ -35,7 +35,10 @@ words → `lessons.md` → `brand.md` → skills). Two projects exist: the remak
 3. Write `SCRIPT.md` and `SHOOT.md` (formats: `reel-remake/references/formats.md`), plus
    `SAY.md` and `SCREEN.md` in the formats below. Default shoot: one location, one take.
    `SHOOT.md` «После съёмки» names `inbox/<slug>/` and `/remake-fast <remake project>`, not `/reel`.
-4. `mkdir -p inbox/<slug>`; `status.mjs <remake> --stage R3 --state done` with the decisions.
+4. Only with `--principles` (`principles: true` in `STATUS.json`) or on request: run the 8
+   checks of `reel-remake/references/script-principles.md` on `SAY.md` and write
+   `PRINCIPLES.md` (verdict per principle, numbered edits). `SAY.md` stays as written.
+5. `mkdir -p inbox/<slug>`; `status.mjs <remake> --stage R3 --state done` with the decisions.
 
 `SAY.md` — the card he reads from:
 
@@ -64,7 +67,11 @@ with Playwright (`node_modules/playwright`, `deviceScaleFactor: 2`) into the ree
 `screens/` in F2.
 
 **Hand-over — stop.** In chat: the full `SAY.md`, the recordings (file → what to do), the
-framing line from `SHOOT.md`, the decisions taken instead of questions. Last line, with the
+framing line from `SHOOT.md`, the decisions taken instead of questions. With principles, also
+the verdict table and the numbered edits, and the line «Правки по принципам в `SAY.md` не
+внесены: ответь номерами («бери 1, 3») — пришлю изменённые фразы — или снимай как есть».
+His answer is part of this same stop: apply the chosen edits to `SAY.md` and `SCRIPT.md`,
+send only the changed lines, then the usual last line. Last line, with the
 real path: «Снимай, клади всё в `inbox/<slug>/` и напиши
 `/remake-fast video-projects/<date>-remake-<slug>`».
 

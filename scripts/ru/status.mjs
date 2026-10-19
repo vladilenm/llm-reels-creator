@@ -49,8 +49,8 @@ export function writeStatus(project, s) {
   const md = [
     `# STATUS · ${s.slug}`,
     "",
-    s.kind === "remake" ? "Ремейк чужого рилса: разбор → сценарий → съёмка → `/reel … --remake`" : "",
-    s.mode ? `Режим: \`${s.mode}\` · плотность: \`${s.density ?? "medium"}\`${s.reviewCuts ? " · --review-cuts" : ""}` : "",
+    s.kind === "remake" ? `Ремейк чужого рилса: разбор → сценарий → съёмка → \`/reel … --remake\`${s.principles ? " · --principles" : ""}` : "",
+    s.mode ? `Режим: \`${s.mode}\` · плотность: \`${s.density ?? "medium"}\`${s.reviewCuts ? " · --review-cuts" : ""}${s.principles ? " · --principles" : ""}` : "",
     "",
     "| Стадия | Состояние | Заметка | Когда |",
     "|---|---|---|---|",

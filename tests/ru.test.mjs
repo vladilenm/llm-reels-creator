@@ -604,7 +604,7 @@ test("ref-intake: three shots, label-only sheets, remake status, --gaps", { time
     "-filter_complex", "[0:v][1:v][2:v]concat=n=3:v=1:a=0[v];[3:a]volume='if(between(t,1,2),0,1)':eval=frame[a]",
     "-map", "[v]", "-map", "[a]", "-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "aac", "-shortest", ref]);
   assert.equal(r.status, 0, String(r.stderr));
-  const out = node(["scripts/ru/ref-intake.mjs", ref, "--slug", "their-reel", "--date", "2026-01-01", "--projects-dir", d, "--every", "1"]);
+  const out = node(["scripts/ru/ref-intake.mjs", ref, "--slug", "their-reel", "--principles", "--date", "2026-01-01", "--projects-dir", d, "--every", "1"]);
   assert.equal(out.status, 0, out.stderr);
   const P = join(d, "2026-01-01-remake-their-reel");
   const j = JSON.parse(readFileSync(join(P, "REF.json"), "utf8"));
@@ -615,6 +615,8 @@ test("ref-intake: three shots, label-only sheets, remake status, --gaps", { time
   assert.ok(existsSync(join(P, "assets/ref.mp4")));
   const s = JSON.parse(readFileSync(join(P, "STATUS.json"), "utf8"));
   assert.equal(s.kind, "remake");
+  assert.equal(s.principles, true, "--principles is stored for R3");
+  assert.match(readFileSync(join(P, "STATUS.md"), "utf8"), /--principles/);
   assert.equal(s.stages.R0.state, "done");
   assert.equal(node(["scripts/ru/status.mjs", P, "--next"]).stdout.trim(), "R1");
   assert.equal(node(["scripts/ru/ref-intake.mjs", ref, "--slug", "their-reel", "--date", "2026-01-01", "--projects-dir", d]).status, 1, "refuses to overwrite");

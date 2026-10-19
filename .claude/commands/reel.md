@@ -1,6 +1,6 @@
 ---
 description: Смонтировать сырой вертикальный рилс (Reels Studio)
-argument-hint: <файл> [— бриф одной строкой] [--mode kit|full] [--review-cuts] [--density light|medium|heavy] [--slug name] [--remake video-projects/<date>-remake-<slug>]
+argument-hint: <файл> [— бриф одной строкой] [--mode kit|full] [--review-cuts] [--density light|medium|heavy] [--slug name] [--remake video-projects/<date>-remake-<slug>] [--principles]
 ---
 
 Запусти скилл `vladilen-reels` для этого рилса и веди его по стадиям S0–S8 строго по
@@ -11,7 +11,8 @@ argument-hint: <файл> [— бриф одной строкой] [--mode kit|f
 - Первый аргумент — путь к сырому файлу (обычно в `inbox/`). Текст после `—` — бриф.
 - `--remake <проект ремейка>` — сырьё снято по сценарию из `/remake`: передай флаг в
   `intake.mjs`, сценарий `SCRIPT.md` — основа для S2 и S3 (раздел «Ремейк» в скилле).
-- По умолчанию: `--mode kit`, `--density medium`, ГЕЙТ A выключен.
+- `--principles` — проверить снятую речь по принципам удержания (`.claude/skills/reel-remake/references/script-principles.md`): вердикт по каждому принципу «уместно / спорно / не здесь» и правки номерами (вырезать, переставить, показать в кадре — речь не дописывается). По умолчанию выключено; правки вносятся только те, что я выберу.
+- По умолчанию: `--mode kit`, `--density medium`, ГЕЙТ A выключен, принципы выключены.
 - Если проект этого рилса уже существует — продолжи с первой незавершённой стадии
   (`node scripts/ru/status.mjs <project> --next`), без повторных платных вызовов.
 - Остановки: ГЕЙТ B (хук и план графики) и ГЕЙТ C (правки по превью) — всегда;

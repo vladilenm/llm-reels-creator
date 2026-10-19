@@ -16,8 +16,12 @@ Worked example of the target quality: `refs/ref-04.md` (breakdown + adaptation) 
 ## Invocation
 
 ```
-/remake <reference file> [— brief: topic, what to keep, what to change] [--slug name]
+/remake <reference file> [— brief: topic, what to keep, what to change] [--slug name] [--principles]
 ```
+
+`--principles` (off by default) adds the script check from `references/script-principles.md`
+to R3. Pass it to `ref-intake.mjs`, which stores it in `STATUS.json` (`principles: true`).
+The same check runs on request («проверь сценарий по принципам») on an existing project.
 
 Without `--slug`, pick a short Latin kebab-case slug from the reference's topic.
 The project is `video-projects/<YYYY-MM-DD>-remake-<slug>/`. If it already exists,
@@ -52,7 +56,7 @@ decisions with `--decision "…"`.
 ### R0 Приём — no stop
 
 ```bash
-node scripts/ru/ref-intake.mjs <file> --slug <slug> --brief "<brief>"
+node scripts/ru/ref-intake.mjs <file> --slug <slug> --brief "<brief>" [--principles]
 ```
 
 Copies the reference to `assets/ref.*`, finds hard cuts, writes `REF.json` (probe,
@@ -110,9 +114,16 @@ Write `$P/SCRIPT.md` and `$P/SHOOT.md` by `references/formats.md`.
   files, props); where 4K or a wider frame is needed for a later zoom-out.
 - **New builds.** List devices our pipeline lacks, ranked by effect, with what each
   costs; offer to build them before the shoot so the edit does not wait.
+- **Principles** (only with `principles: true` in `STATUS.json` or on request). After
+  `SCRIPT.md` is written, run all 8 checks of `references/script-principles.md` and write
+  `$P/PRINCIPLES.md`: a verdict per principle (✓ уместно / ~ спорно / — не здесь, with the
+  reason for this script) and numbered edits «было → стало». `SCRIPT.md` stays as written
+  until the customer picks edits.
 
 **ГЕЙТ R:** show the story in one line, the full text as it will sound, the locations,
-every `[проверь: …]` question, and the new builds. Recommend, then stop and wait.
+every `[проверь: …]` question, and the new builds; with principles, also the verdict table
+and the numbered edits from `PRINCIPLES.md`. Recommend, then stop and wait. Edits the
+customer takes («бери 1 и 3») go into `SCRIPT.md`.
 Apply the edits, record decisions with `status.mjs --decision`, mark R3 done when the
 customer approves. Then offer to add a row about this reference to `refs/NOTES.md`
 (write it only after «да»).

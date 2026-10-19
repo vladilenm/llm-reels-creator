@@ -4,7 +4,7 @@
 //
 // Usage:
 //   node scripts/ru/intake.mjs <source> --slug agents-10h [--brief "…"] [--mode kit|full]
-//        [--density light|medium|heavy] [--review-cuts] [--date 2026-10-12]
+//        [--density light|medium|heavy] [--review-cuts] [--principles] [--date 2026-10-12]
 //        [--remake video-projects/<date>-remake-<slug>]
 // --remake links an approved remake (scripts/ru/ref-intake.mjs, /remake): BRIEF.md
 // points at its SCRIPT.md, STATUS.json keeps the path, and the remake's R4 is closed.
@@ -60,7 +60,7 @@ function main() {
   const valueFlags = new Set(["--slug", "--brief", "--mode", "--density", "--date", "--remake"]);
   const src = a.find((x, i) => !x.startsWith("--") && !valueFlags.has(a[i - 1]));
   if (!src || !get("--slug")) {
-    console.error('Usage: node scripts/ru/intake.mjs <source> --slug agents-10h [--brief "…"] [--mode kit|full] [--density medium] [--review-cuts]');
+    console.error('Usage: node scripts/ru/intake.mjs <source> --slug agents-10h [--brief "…"] [--mode kit|full] [--density medium] [--review-cuts] [--principles]');
     process.exit(1);
   }
   const source = resolve(src);
@@ -102,13 +102,14 @@ function main() {
   const mode = get("--mode", "kit");
   const density = get("--density", "medium");
   const reviewCuts = a.includes("--review-cuts");
+  const principles = a.includes("--principles");
   const brief = get("--brief", "");
   writeFileSync(join(project, "BRIEF.md"), [
     `# BRIEF · ${slug}`,
     "",
     `- Исходник: \`${relative(ROOT, source)}\` → копия \`${relative(project, raw)}\` (оригинал не трогаем)`,
     `- Бриф заказчика: ${brief ? `«${brief}»` : "—"}`,
-    `- Режим: \`${mode}\` · плотность графики: \`${density}\` · ГЕЙТ A (--review-cuts): ${reviewCuts ? "включён" : "выключен"}`,
+    `- Режим: \`${mode}\` · плотность графики: \`${density}\` · ГЕЙТ A (--review-cuts): ${reviewCuts ? "включён" : "выключен"} · принципы сценария (--principles): ${principles ? "включены" : "выключены"}`,
     `- Исходник: ${summary.width}×${summary.height}, ${summary.fps} fps, ${summary.duration.toFixed(1)} с, ${summary.video_codec}${summary.audio ? `, звук ${summary.audio.codec} ${summary.audio.sample_rate} Гц` : ", без звука"}`,
     ...(warnings.length ? ["", "## Предупреждения", "", ...warnings.map((w) => `- ${w}`)] : []),
     ...(remake ? [
@@ -128,7 +129,7 @@ function main() {
   ].join("\n"));
 
   const s = readStatus(project);
-  s.mode = mode; s.density = density; s.reviewCuts = reviewCuts; s.brief = brief;
+  s.mode = mode; s.density = density; s.reviewCuts = reviewCuts; s.principles = principles; s.brief = brief;
   if (remake) {
     s.remake = relative(ROOT, remake);
     const r = readStatus(remake);

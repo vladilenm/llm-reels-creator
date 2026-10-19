@@ -13,10 +13,10 @@ sound is checked by the human, and every report says so.
 ## Invocation
 
 ```
-/reel <file> [— brief in one line] [--mode kit|full] [--review-cuts] [--density light|medium|heavy] [--slug name] [--remake <remake project>]
+/reel <file> [— brief in one line] [--mode kit|full] [--review-cuts] [--density light|medium|heavy] [--slug name] [--remake <remake project>] [--principles]
 ```
 
-Defaults: `--mode kit`, `--density medium`, ГЕЙТ A off. Without `--slug`, pick a
+Defaults: `--mode kit`, `--density medium`, ГЕЙТ A off, principles off. Without `--slug`, pick a
 short Latin kebab-case slug from the brief (`agents-10h`). The project is
 `video-projects/<YYYY-MM-DD>-<slug>/`.
 
@@ -66,7 +66,7 @@ human decisions with `--decision "…"`.
 ### S0 Приём — no stop
 
 ```bash
-node scripts/ru/intake.mjs <file> --slug <slug> --brief "<brief>" --mode kit --density medium [--review-cuts] [--remake <remake project>]
+node scripts/ru/intake.mjs <file> --slug <slug> --brief "<brief>" --mode kit --density medium [--review-cuts] [--remake <remake project>] [--principles]
 ```
 
 Creates the project via `new-video`, copies the source to `assets/raw.*` (the
@@ -135,8 +135,14 @@ Follow `short-form-edit`'s opening rules on the clean transcript:
 A hook variant that needs reordering speech is allowed only as a proposal; it
 becomes a new EDL after approval.
 
-**ГЕЙТ B:** show the three hooks and the plan table, recommend one hook, then stop
-and wait. Record the answer with `status.mjs --decision` and count requested changes
+**Principles** (only with `principles: true` in `STATUS.json` or on request): run the
+checks of `.claude/skills/reel-remake/references/script-principles.md` on the clean
+transcript — 1, 3, 4, 6, 7 without `--remake`, only 7 (fluff not in the script) with it.
+The speech is already shot: an edit may only cut, reorder or show on screen what was
+said. Write `$P/PRINCIPLES.md`; cuts and reorders stay proposals like the hook reorder.
+
+**ГЕЙТ B:** show the three hooks and the plan table (with principles, also the verdict
+table and numbered edits), recommend one hook, then stop and wait. Record the answer with `status.mjs --decision` and count requested changes
 for `gate_b_changes`.
 
 ### S4 Графика — no stop

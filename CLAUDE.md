@@ -124,7 +124,7 @@ unless the user asks for it. Vendored versions and local patches: `vendor/SOURCE
 
 ## Reels Studio
 
-The main scenario is `/reel <file> [— brief] [--mode kit|full] [--review-cuts] [--density …]`.
+The main scenario is `/reel <file> [— brief] [--mode kit|full] [--review-cuts] [--density …] [--principles]`.
 Route every reel to the `vladilen-reels` skill, not straight to `short-form-edit`;
 the orchestrator calls the chassis skills itself. Spec: `SPEC.md`.
 Someone else's reel to replicate goes to `/remake <file> [— brief]` (`reel-remake`):
@@ -134,6 +134,10 @@ The short cycle is `/remake-fast <file> [— brief]` (`remake-fast`): the text t
 (`SAY.md`, 🎧 marks lines where an insert covers the speaker so he reads them) and the
 recordings to make → he shoots → `/remake-fast <remake project>` → preview → «да» →
 final, a ×1.1 cut and the Instagram caption. No ГЕЙТ R, A or B in this cycle.
+`--principles` (on `/reel`, `/remake`, `/remake-fast`; off by default, or «проверь сценарий
+по принципам») checks the script against `reel-remake/references/script-principles.md`:
+a verdict per principle (уместно / спорно / не здесь) and numbered edits in `PRINCIPLES.md`.
+Apply only the edits the customer picks; never invent a number to make a line specific.
 
 - Before creative work read `brand/brand.md`, `lessons.md`, `refs/NOTES.md`,
   `MOTION_PHILOSOPHY.md`.

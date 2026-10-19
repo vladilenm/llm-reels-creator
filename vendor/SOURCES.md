@@ -14,6 +14,7 @@ root `LICENSE`.
 | `heygen-com/hyperframes` | `d4dd6c097d22ca890c0eea401eaebf550ce10fae` (2026-10-11) | Apache-2.0 | `skills/embedded-captions`, `skills/talking-head-recut`, `skills/hyperframes/references/brief-contract.md` | `.claude/skills/embedded-captions/`, `.claude/skills/talking-head-recut/` |
 | `LottieFiles/motion-design-skill` | `f9a8a041b85185ee4881b3471d3415e939aac772` (2026-05-18) | MIT | `skills/motion-design` → renamed `motion-principles` | `.claude/skills/motion-principles/` |
 | `charlie947/motion-graphics-skills` | `229022ebca76972e119e36ada23a1648d51665ab` (2026-10-11) | MIT | `skills/reel-export` | `.claude/skills/reel-export/` |
+| `aiwithremy/content-principles` | `18f96703c98763b9c3bd647a46f2e031bda4a29d` (2026-10-13) | none (no `LICENSE`) | Ideas only, retold in Russian in our own words; no text copied, not installed as a skill | `.claude/skills/reel-remake/references/script-principles.md` |
 | `whaleyxbt/claude-motion` | `e627941543d9988b155dc610bb9cc0115a5e365e` (2026-10-09) | MIT | Text of the `review-loop` checklist and `sound-design` rules, adapted (not installed as skills) | `.claude/skills/vladilen-reels/references/` |
 
 Copyright notices: Nate Herk (2026), Bart (2026), HeyGen (Apache-2.0, see
