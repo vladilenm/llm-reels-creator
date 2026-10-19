@@ -25,8 +25,14 @@
     "files": {
       "400": "brand/fonts/Inter-400.ttf",
       "500": "brand/fonts/Inter-500.ttf",
-      "700": "brand/fonts/Inter-700.ttf"
+      "700": "brand/fonts/Inter-700.ttf",
+      "800": "brand/fonts/Inter-800.ttf"
     }
+  },
+  "font_serif": {
+    "family": "Playfair Display",
+    "italic": "brand/fonts/PlayfairDisplay-Italic-Variable.ttf",
+    "display": "brand/fonts/PlayfairDisplay-Variable.ttf"
   },
   "font_mono": {
     "family": "Geist Mono",
