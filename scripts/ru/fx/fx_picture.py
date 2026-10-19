@@ -4,6 +4,7 @@
 #
 #   python3 scripts/ru/fx/fx_picture.py <project> [--stills 1.0,4.6,...] [--validate] [--out renders/picture.v2.mp4]
 #   python3 scripts/ru/fx/fx_picture.py <project> --prep-swap     person masks for the world-swap joins (Apple Vision)
+#   python3 scripts/ru/fx/fx_picture.py <project> --prep-relocate person masks for the relocate windows
 #
 # fx.json (all times on the CLEAN timeline, seconds; "joins" are read from EDL.json):
 #   location_joins: [t]             zoom-blur «рывок» on these joins (location changes)
@@ -41,20 +42,55 @@
 #       a look that changes the picture live on a phrase («сделай мрачнее» → moody): ramps in
 #       over `rin` from t0, out over `rout` before t1. film adds letterbox bars and stronger grain;
 #       wipe "film" runs the old frame out and the new one in as a film strip with sprockets (0.5 s).
-#   textmask: [{t0, t1, text, size?, bg?: "#ECEAF2", font?}]   full frame: the video plays inside
-#       giant letters on a flat background (serif from brand/fonts by default).
+#   textmask: [{t0, t1, text, size?, bg?: brand canvas, font?}]   full frame: the video plays inside
+#       giant letters on a flat background (brand.md font_serif.display by default).
 #   shrink: [{t0, t1, rect: [x, y, w, h], r: 46, in: 0.6}]   the frame shrinks into a phone on the
 #       dark background (bezel, shadow); holds until t1.
 #   titles[].circle: [cx, cy, r]   instead of the bottom-anchored shrink, the room closes to a circle
 #       around the face (face track) placed at (cx, cy); the layer sits on the dark background.
 #   thumbs.behind: "fx/masks/<dir>"   the floating thumbnails go behind the speaker (person masks).
+#   split: [{t0, t1, rect: [x, y, w, h], r: 48, bg: brand canvas, fw: 400, fy: 0.42, in: 0.45, out: 0.4,
+#            in_from: "face"|"cut", out_to: "face"|"cut"}]
+#       a card-on-top layout: the speaker sits in a rounded window (rect) on a flat background, the
+#       face (face track) at (rect centre x, rect y + fy·h), about `fw` px wide (never less than the
+#       window needs to stay covered). in_from/out_to "face": the full frame springs into the window
+#       and grows back; "cut": the window is already there (a full-screen card covers the switch).
+#       Cards for the top half are overlays (motion-broll .mov), not part of this file.
+#   blurs: [{t, dur: 0.22, max: 16}]   the picture blurs up to `max` px around t (a blur dissolve
+#       under a card that fades in or out over it).
+#   relocate: [{t0, t1, head_top: 0.57, masks: "fx/masks/relocate", bg_blur: 28, lift: 0.45,
+#               sat: 0.55, in: 0.45, out: 0.4, in_from: "face"|"cut", out_to: "face"|"cut"}]
+#       «человек внизу, как на референсе» for footage shot with the head high: the speaker is cut out
+#       (person masks) and moved down so the top of the head sits at head_top·H (one shift per window,
+#       from the median mask top, so natural head motion stays); behind him the same frame, blurred,
+#       desaturated and lifted toward white — his own room out of focus — leaving the top half free
+#       for cards. in_from/out_to "face": the shift springs from / back to the normal frame. Keep the
+#       windows clear of titles and world swaps (their masks assume the unmoved speaker).
+#       Masks: --prep-relocate (Apple Vision on full-size frames).
 import json, os, subprocess, sys
 import numpy as np
 from PIL import Image, ImageDraw, ImageFilter
 
 W, H, FPS = 1080, 1920, 30
 ROOT = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", ".."))
-BRAND_BG0, BRAND_BG1 = "#0E0B14", "#1E1630"
+
+
+def load_brand():
+    """JSON block of brand/brand.md (or the shipped example); {} when neither exists."""
+    import re
+    for name in ("brand.md", "brand.example.md"):
+        p = os.path.join(ROOT, "brand", name)
+        if os.path.exists(p):
+            m = re.search(r"```json\s*\n(.*?)\n```", open(p, encoding="utf-8").read(), re.S)
+            if m: return json.loads(m.group(1))
+    return {}
+
+
+BRAND = load_brand()
+BRAND_BG0 = BRAND.get("background", "#0E0B14")    # dark brand background
+BRAND_BG1 = BRAND.get("glow", "#1E1630")          # the purple glow behind the speaker
+BRAND_CANVAS = BRAND.get("canvas", "#ECEAF2")     # light flat background for textmask / split
+BRAND_ACCENT_DARK = BRAND.get("accent_light", "#B79CFF")
 
 
 def hexc(h):
@@ -198,7 +234,7 @@ def look_bw(a, k):
 
 
 LOOKS = {"moody": look_moody, "film": look_film, "bw": look_bw}
-SERIF = "brand/fonts/PlayfairDisplay-Variable.ttf"
+SERIF = (BRAND.get("font_serif") or {}).get("display", "brand/fonts/PlayfairDisplay-Variable.ttf")
 
 
 def serif_font(size, weight="Black", path=SERIF):
@@ -274,8 +310,11 @@ def load_config(project):
         if not (len(c) in (6, 7) and c[0] < c[1]): errs.append(f"camera segment {c}: [t0<t1, s0, s1, ax, ay, \"ease\"?]")
     for L in cfg.get("looks", []):
         if L.get("kind") not in LOOKS or not L["t0"] < L["t1"]: errs.append(f"look {L}: kind in {list(LOOKS)}, t0 < t1")
-    for T in cfg.get("textmask", []) + cfg.get("shrink", []):
+    for T in cfg.get("textmask", []) + cfg.get("shrink", []) + cfg.get("split", []) + cfg.get("relocate", []):
         if not T["t0"] < T["t1"]: errs.append(f"{T}: t0 < t1")
+    for R in cfg.get("relocate", []):
+        if any(R["t0"] < T["reveal"][1] and T["t0"] < R["t1"] for T in cfg.get("titles", [])):
+            errs.append(f"relocate {R['t0']}–{R['t1']} overlaps a title moment")
     for T in cfg.get("titles", []):
         if not (T["t0"] <= T["reveal"][0] < T["reveal"][1]): errs.append(f"title at {T['t0']}: t0 ≤ r0 < r1")
         if not os.path.exists(os.path.join(project, T["layer"])): errs.append(f"missing layer {T['layer']}")
@@ -414,8 +453,22 @@ class Picture:
                 m = Image.new("L", (W, H), 0); m.paste(a, ((W - a.width) // 2, int(T.get("cy", H / 2) - a.height / 2))); a = m
             self.tmasks.append(dict(T, _a=a))
         self.shrinks = cfg.get("shrink", [])
+        self.splits = cfg.get("split", [])
+        self.blurs = cfg.get("blurs", [])
         self.looks = cfg.get("looks", [])
         self.film_cache = {}
+        self.relocs = []
+        for R in cfg.get("relocate", []):
+            d = os.path.join(project, R.get("masks", "fx/masks/relocate"))
+            tops = []
+            for f in range(int(round(R["t0"] * FPS)), int(round(R["t1"] * FPS)), 5):
+                p = os.path.join(d, f"{f:05d}.png")
+                if not os.path.exists(p): continue
+                a = np.asarray(Image.open(p).convert("L"), np.uint8) > 128
+                rows = np.flatnonzero(a.any(1))
+                if len(rows): tops.append(rows[0] / a.shape[0] * H)
+            if not tops: print(f"relocate {R['t0']}: no masks, run --prep-relocate"); continue
+            self.relocs.append(dict(R, _dir=d, _dy=R.get("head_top", 0.57) * H - float(np.median(tops))))
 
     # --- person mask, smoothed over ±1 frame (Vision masks are per-frame) ---
     def mask(self, T, f):
@@ -492,7 +545,7 @@ class Picture:
 
     # --- full-frame text with the video inside the letters ---
     def textmask_frame(self, img, T, t):
-        bg = Image.new("RGB", (W, H), hexc(T.get("bg", "#ECEAF2")))
+        bg = Image.new("RGB", (W, H), hexc(T.get("bg", BRAND_CANVAS)))
         p = (t - T["t0"]) / (T["t1"] - T["t0"])
         k = spring(t - T["t0"], 18, 0.6)
         room = scale_about(img, 1.0 + 0.06 * p, 540, 900)
@@ -544,7 +597,7 @@ class Picture:
         out.paste(room, (0, 0), Image.fromarray(m))
         if k > 0.5:
             d = ImageDraw.Draw(out)
-            d.ellipse([px - R - 3, py - R - 3, px + R + 3, py + R + 3], outline=hexc("#B79CFF"), width=4)
+            d.ellipse([px - R - 3, py - R - 3, px + R + 3, py + R + 3], outline=hexc(BRAND_ACCENT_DARK), width=4)
         return out
 
     def behind(self, out, room, f, t):
@@ -586,6 +639,71 @@ class Picture:
         out.paste(room, (0, 0), win)
         if txt is not None: out.paste(txt, (0, 0), txt)
         return out
+
+    # --- split: the speaker in a rounded window under a card ---
+    def split_k(self, S, t):
+        k = 1.0
+        if S.get("in_from", "face") == "face": k = min(k, spring(t - S["t0"], w=12.0 * 0.45 / max(S.get("in", 0.45), 1e-3), z=0.8))
+        if S.get("out_to", "face") == "face": k = min(k, eo((S["t1"] - t) / max(S.get("out", 0.4), 1e-3)))
+        return clamp(k)
+
+    def split_frame(self, img, S, t):
+        k = self.split_k(S, t)
+        x, y, w, h = S["rect"]
+        fx, fy, fw = self.face_at(t) if self.face is not None else (540.0, 760.0, 400.0)
+        st = max(S.get("fw", 400) / max(fw, 1), w / W, h / H)
+        tx_t, ty_t = x + w / 2 - st * fx, y + h * S.get("fy", 0.42) - st * fy
+        tx_t = min(x, max(x + w - st * W, tx_t)); ty_t = min(y, max(y + h - st * H, ty_t))   # window stays covered
+        Sk = 1 + (st - 1) * k
+        tx, ty = tx_t * k, ty_t * k                       # k=0: identity, k=1: window transform
+        X, Y, Wd, Hd = x * k, y * k, W + (w - W) * k, H + (h - H) * k
+        if Wd >= W - 1 and Hd >= H - 1: return img
+        moved = affine(img, Sk, tx, ty)
+        bg = Image.new("RGB", (W, H), hexc(S.get("bg", BRAND_CANVAS)))
+        res = Image.blend(img, bg, clamp(k * 1.4)) if k < 1 else bg
+        X0, Y0, w0, h0 = int(round(X)), int(round(Y)), max(1, int(round(Wd))), max(1, int(round(Hd)))
+        tile = moved.crop((X0, Y0, X0 + w0, Y0 + h0)).convert("RGBA")
+        tile.putalpha(rounded(w0, h0, int(round(S.get("r", 48) * k))))
+        sh = with_shadow(tile, pad=50, blur=26, strength=0.28 * k, dy=16)
+        res.paste(sh, (X0 - 50, Y0 - 50), sh)
+        return res
+
+    # --- relocate: the speaker cut out and moved down over his own blurred room ---
+    def relocate_frame(self, img, R, f, t):
+        k = self.split_k(R, t)
+        if k <= 1e-3: return img
+        m = self.mask_dir(R["_dir"], f)
+        if m is None: return img
+        # the room without the speaker: his area filled from the surroundings (a widened mask, so no
+        # halo stays), then blurred, desaturated and lifted; strength follows k
+        q = (W // 4, H // 4)                                            # the room is blurred anyway: work at ¼ size
+        wide = m.resize(q, Image.BILINEAR).filter(ImageFilter.MaxFilter(9)).resize((W, H), Image.BILINEAR).filter(ImageFilter.GaussianBlur(3))
+        wa = np.asarray(wide, np.float32) / 255
+        plate = fill_person(np.asarray(img, np.float32), wa)
+        full = np.flatnonzero(wa.mean(1) > 0.8)                         # rows the speaker fills edge to edge:
+        if len(full):                                                   # nothing to fill from, so the room
+            r0 = max(0, int(full[0]) - 40)                              # above continues down instead
+            plate[r0:] = plate[r0:r0 + 1]
+        r = max(0.1, R.get("bg_blur", 28) * k / 4)
+        bg = Image.fromarray(np.clip(plate, 0, 255).astype(np.uint8)).resize(q, Image.BOX).filter(ImageFilter.GaussianBlur(r)).resize((W, H), Image.BILINEAR)
+        a = np.asarray(bg, np.float32)
+        lum = a.mean(2, keepdims=True)
+        a = lum + (a - lum) * (1 - (1 - R.get("sat", 0.55)) * k)       # desaturate
+        a = a + (np.array(hexc("#F0EEF4"), np.float32) - a) * R.get("lift", 0.45) * k   # lift toward white
+        dy = R["_dy"] * k
+        moved = affine(img, 1.0, 0.0, dy)
+        mm = np.asarray(affine(m, 1.0, 0.0, dy), np.float32) / 255
+        sh = Image.fromarray((mm * 255).astype(np.uint8)).resize(q, Image.BILINEAR).filter(ImageFilter.GaussianBlur(10)).resize((W, H), Image.BILINEAR)
+        a = a * (1 - (np.asarray(sh, np.float32) / 255 * 0.16 * k)[..., None])   # soft shadow behind the shoulders
+        out = a * (1 - mm[..., None]) + np.asarray(moved, np.float32) * mm[..., None]
+        return Image.fromarray(np.clip(out, 0, 255).astype(np.uint8))
+
+    def blur_at(self, out, t):
+        r = 0.0
+        for B in self.blurs:
+            d = abs(t - B["t"]) / max(B.get("dur", 0.22), 1e-3)
+            if d < 1: r = max(r, B.get("max", 16) * (1 - d) ** 1.5)
+        return out.filter(ImageFilter.GaussianBlur(r)) if r > 0.4 else out
 
     def face_at(self, t):
         return self.face[min(len(self.face) - 1, max(0, int(round(t * FPS))))]
@@ -737,6 +855,8 @@ class Picture:
         if tm:
             out = self.textmask_frame(img, tm, t)
             return self.grade.add_grain(out, f) if self.grade else out
+        RL = next((R for R in self.relocs if R["t0"] <= t < R["t1"]), None)
+        if RL: img = self.relocate_frame(img, RL, f, t)
         raw = img
         img, bars = self.apply_looks(img, t)
         T = next((T for T in self.titles if T["t0"] <= t < T["reveal"][1] + 0.02), None)
@@ -752,6 +872,8 @@ class Picture:
             else:
                 out = self.world_swap(room, f, t)
             out = self.letterbox(out, bars)
+        SP = next((S for S in self.splits if S["t0"] <= t < S["t1"]), None)
+        if SP: out = self.split_frame(img, SP, t); room = None
         ph = self.cfg.get("phone")
         if ph and ph["reel_from"] - 0.1 <= t <= ph["reel_from"] + (ph["t1"] - ph["switch"]) + 0.2:
             self.reel_cache[f] = cover(out, self.sc_w, self.sc_h)
@@ -763,6 +885,7 @@ class Picture:
         if S: out = self.shrink_frame(out, S, t)
         self.phone(out, t)
         out = self.impact(out, t)
+        out = self.blur_at(out, t)
         if self.grade: out = self.grade.add_grain(out, f)
         return out
 
@@ -792,6 +915,18 @@ def main():
                          for e in cfg.get("sfx", []) if e.get("kind") == "hit"]
     for e in cfg.get("impacts", []):
         if "word" in e: e["_t"] = word_t(e["word"], e.get("after", 0.0))
+    if "--prep-relocate" in a:
+        need = set()
+        for R in cfg.get("relocate", []):
+            need |= set(range(int(round(R["t0"] * FPS)) - 1, int(round(R["t1"] * FPS)) + 2))
+        if not need: print("no relocate windows in fx.json"); return
+        fdir = os.path.join(P, "work", "relocate-frames"); os.makedirs(fdir, exist_ok=True)
+        for f, im in enumerate(reader(os.path.join(P, "renders", "clean.mp4"))):
+            if f > max(need): break
+            if f in need: im.save(os.path.join(fdir, f"{f:05d}.png"))
+        mdir = os.path.join(P, (cfg["relocate"][0].get("masks") or "fx/masks/relocate"))
+        subprocess.run(["swift", os.path.join(ROOT, "scripts/ru/fx/person-mask.swift"), fdir, mdir], check=True)
+        return
     if "--prep-swap" in a:
         ws = cfg.get("world_swap", {}); dur = ws.get("dur", 0.32)
         sel = cfg.get("location_joins", []) if ws.get("joins", "all") == "all" else ws["joins"]

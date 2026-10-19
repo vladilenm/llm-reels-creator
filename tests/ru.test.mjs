@@ -254,8 +254,20 @@ test("make-captions: every clean word lands in a cue, lines ≤22 chars, glyph-c
   assert.equal(res.cues, cues.length);
   assert.deepEqual(validateSrt(readFileSync(join(P, "captions.srt"), "utf8")), []);
   const html = readFileSync(join(P, "captions/index.html"), "utf8");
-  assert.match(html, /@font-face\{font-family:"ReelCaption";src:url\("fonts\/Inter-700\.ttf"\)/);
+  const b = loadBrand(), files = b.font_body.files;
+  const fontFile = (files[String(b.captions.weight)] ?? Object.values(files).at(-1)).split("/").at(-1);
+  assert.ok(html.includes(`@font-face{font-family:"ReelCaption";src:url("fonts/${fontFile}")`), `caption font is the brand body font ${fontFile}`);
   assert.match(html, /window\.__timelines\["captions"\]/);
+});
+
+test("brand fonts: kinetic accent and defaults come from brand.md font_serif", async () => {
+  const { kineticConfig } = await import("../scripts/ru/make-captions.mjs");
+  const { DEFAULT_BRAND } = await import("../scripts/ru/lib/brand.mjs");
+  assert.equal(kineticConfig(DEFAULT_BRAND).accent_font, "brand/fonts/PlayfairDisplay-Italic-Variable.ttf");
+  const custom = { ...DEFAULT_BRAND, font_serif: { italic: "brand/fonts/Spectral-SemiBoldItalic.ttf" } };
+  assert.equal(kineticConfig(custom).accent_font, "brand/fonts/Spectral-SemiBoldItalic.ttf");
+  assert.equal(kineticConfig(custom, { kinetic: { accent_font: "x.ttf" } }).accent_font, "x.ttf", "PLAN override wins");
+  for (const p of [DEFAULT_BRAND.font_serif.italic, DEFAULT_BRAND.font_serif.display]) assert.ok(existsSync(join(ROOT, p)), p);
 });
 
 test("make-captions: PLAN.json overrides hide windows and move the baseline", async () => {
@@ -282,6 +294,71 @@ test("make-captions: PLAN.json overrides hide windows and move the baseline", as
   const plain = captionsHtml([cue(12, 13)], { duration: 22, brand, fontUrl: "f.ttf" });
   assert.match(plain, new RegExp(`top:${brand.captions.baseline_y - lineH}px`));
   assert.doesNotMatch(plain, /tl\.to\("#c0",\{y:/);
+});
+
+test("make-captions kinetic: 1–3 word groups, prepositions carried, accents, forced breaks, themes", async () => {
+  const { kineticGroups, kineticConfig, kineticHtml } = await import("../scripts/ru/make-captions.mjs");
+  const { loadBrand } = await import("../scripts/ru/lib/brand.mjs");
+  const text = "Твой Claude Code умеет разбирать любое приложение у тебя на компьютере. И бесплатно. Это REA Reverse Engineer";
+  let t = 0;
+  const words = text.split(" ").map((w) => { const x = { text: w, start: +t.toFixed(2), end: +(t + 0.3).toFixed(2), type: "word" }; t += 0.34 + (/[.]$/.test(w) ? 0.5 : 0); return x; });
+  const brand = loadBrand();
+  const ov = { style: "kinetic", kinetic: { accent_words: ["бесплатно"], breaks: [words.find((w) => w.text === "Reverse").start], theme_keys: [{ at: words.find((w) => w.text === "И").start - 0.01, theme: "dark" }], y_keys: [{ at: 0, y: 1000 }] } };
+  const k = kineticConfig(brand, ov);
+  const g = kineticGroups({ words }, k, ov);
+  const lines = g.map((c) => c.lines[0].map((w) => w.text).join(" "));
+  assert.deepEqual(lines.flatMap((l) => l.split(" ")), words.map((w) => w.text.replace(/[.,;:]+$/, "")), "every word, in order");
+  for (const l of lines) assert.ok(l.split(" ").length <= 3 && (l.length <= k.max_chars || !l.includes(" ")), l);
+  for (const c of g) assert.ok(!["у", "на", "и", "в"].includes(c.lines[0].at(-1).text.toLowerCase()) || c.lines[0].length === 1, "no group ends on a preposition");
+  assert.ok(lines.includes("Reverse Engineer"), "forced break starts a group");
+  assert.ok(g.find((c) => c.lines[0].some((w) => w.text === "бесплатно")).lines[0].find((w) => w.text === "бесплатно").accent);
+  assert.equal(g[0].start, 0);
+  for (let i = 1; i < g.length; i++) assert.ok(g[i - 1].end <= g[i].start + 1e-9, "groups never overlap");
+  const html = kineticHtml(g, { duration: t + 1, brand, fontUrl: "a.ttf", accentUrl: "b.ttf", overrides: ov });
+  assert.match(html, /class="kg light clip"[^>]*top:955px/);
+  assert.match(html, /class="kg dark clip"/);
+  assert.match(html, /class="w acc"[^>]*>бесплатно</);
+  assert.match(html, /window\.__timelines\["captions"\]/);
+  assert.equal(k.light.accent, brand.accent);
+});
+
+test("screen kit: recording → frames + manifest; build.py embeds kit, brand and Cyrillic fonts", () => {
+  const d = tmp();
+  const rec = join(d, "rec.mp4");
+  let r = spawnSync("ffmpeg", ["-loglevel", "error", "-f", "lavfi", "-i", "testsrc2=size=640x360:rate=30", "-t", "1", "-pix_fmt", "yuv420p", rec], { encoding: "utf8" });
+  assert.equal(r.status, 0, r.stderr);
+  r = node(["scripts/ru/broll/screen-frames.mjs", rec, join(d, "screens", "term"), "--to", "0.5", "--width", "320"]);
+  assert.equal(r.status, 0, r.stderr);
+  const man = JSON.parse(r.stdout);
+  assert.equal(man.n, 15);
+  assert.equal(man.w, 320);
+  assert.match(readFileSync(join(d, "screens", "term", "manifest.js"), "utf8"), /\(window\.SKF=window\.SKF\|\|\{\}\)\["term"\]=\{"n":15,/);
+  mkdirSync(join(d, "clips"));
+  writeFileSync(join(d, "clips", "01-x.html"), "<title>x</title><script>SK.run({T:1, media:{a:{frames:'../screens/term'}}, shots:[[0,'a',[0,0,320]]]});</script>");
+  r = spawnSync("python3", ["scripts/ru/broll/build.py", join(d, "dist"), join(d, "clips", "01-x.html")], { encoding: "utf8", cwd: ROOT });
+  assert.equal(r.status, 0, r.stderr);
+  const html = readFileSync(join(d, "dist", "01-x.html"), "utf8");
+  assert.match(html, /window\.SK=\{BRAND:\{"accent":/);
+  assert.match(html, /BASE:"\.\.\/clips\/"/);
+  assert.match(html, /font-family:'SK Serif'/);
+  assert.ok(html.indexOf("SK.run = ") < html.indexOf("SK.run({T:1"), "kit before the fragment");
+  for (const f of ["render.js", "beats.js"]) assert.match(readFileSync(join(ROOT, ".claude/skills/motion-broll/engine", f), "utf8"), /window\.READY/);
+});
+
+test("refineWithSilences trims words whisper stretched over a long pause", async () => {
+  const { refineWithSilences } = await import("../scripts/ru/normalize-transcript.mjs");
+  const words = [
+    { text: "Он", start: 31.92, end: 32.64 },         // real onset 32.55 after 0.63 s of silence
+    { text: "Шаг", start: 45.5, end: 45.8 },
+    { text: "шагом.", start: 46.08, end: 47.7 },      // real end 46.43, then 1.3 s of silence inside «the word»
+  ];
+  const silences = [{ start: 30.0, end: 32.55 }, { start: 32.66, end: 45.48 }, { start: 46.41, end: 50.9 }];
+  const { words: w } = refineWithSilences(words, silences);
+  assert.ok(Math.abs(w[0].start - 32.53) < 0.011, `start ${w[0].start}`);
+  assert.ok(Math.abs(w[2].end - 46.43) < 0.011, `end ${w[2].end}`);
+  // the same silences no longer than maxShift behave as before
+  const short = refineWithSilences([{ text: "да", start: 10.0, end: 10.9 }], [{ start: 10.5, end: 10.7 }]).words[0];
+  assert.equal(short.end, 10.52);
 });
 
 test("refineWithSilences pulls late whisper starts back to the speech onset and closes silence-free gaps", async () => {
@@ -357,6 +434,34 @@ test("fx_picture --validate: joins come from EDL.json, a location join off a cut
   writeFileSync(join(P, "fx/fx.json"), JSON.stringify({ location_joins: [2.5, 4.5] }));
   r = spawnSync("python3", ["scripts/ru/fx/fx_picture.py", P, "--validate"], { encoding: "utf8" });
   assert.equal(r.status, 0, r.stdout + r.stderr);
+});
+
+test("fx_picture relocate: the speaker moves down, no ghost stays in the room, titles may not overlap", () => {
+  const P = mkdtempSync(join(tmpdir(), "reel-reloc-"));
+  mkdirSync(join(P, "fx"));
+  writeFileSync(join(P, "EDL.json"), JSON.stringify({ source_duration: 10, delete_ranges: [] }));
+  writeFileSync(join(P, "title.mov"), "");
+  writeFileSync(join(P, "fx/fx.json"), JSON.stringify({ relocate: [{ t0: 1, t1: 5 }], titles: [{ t0: 4, reveal: [4.5, 6], layer: "title.mov" }] }));
+  let r = spawnSync("python3", ["scripts/ru/fx/fx_picture.py", P, "--validate"], { encoding: "utf8" });
+  assert.equal(r.status, 1);
+  assert.match(r.stdout, /ERROR relocate 1–5 overlaps a title moment/);
+  const py = `
+import sys, types; sys.path.insert(0, "scripts/ru/fx"); import numpy as np; import fx_picture as F
+from PIL import Image, ImageDraw
+img = Image.new("RGB", (F.W, F.H), (90, 160, 90)); m = Image.new("L", (F.W, F.H), 0)
+for im, c in ((ImageDraw.Draw(img), (220, 30, 30)), (ImageDraw.Draw(m), 255)):
+    im.ellipse([390, 230, 690, 560], fill=c); im.rectangle([200, 520, 880, F.H], fill=c)   # head + body, top at y 230
+fake = types.SimpleNamespace(split_k=lambda R, t: 1.0, mask_dir=lambda d, f: m)
+R = {"t0": 0, "t1": 9, "_dir": "", "_dy": 0.57 * F.H - 230}
+a = np.asarray(F.Picture.relocate_frame(fake, img, R, 0, 1.0), np.float32)
+red = lambda y0, y1: float(((a[y0:y1, :, 0] > 170) & (a[y0:y1, :, 1] < 80)).mean())
+print(round(red(240, 900), 3), round(red(1180, 1400), 3))
+`;
+  r = spawnSync("python3", ["-c", py], { encoding: "utf8", cwd: ROOT });
+  assert.equal(r.status, 0, r.stderr);
+  const [ghost, moved] = r.stdout.trim().split(" ").map(Number);
+  assert.ok(ghost < 0.005, `speaker left in the room: ${ghost}`);
+  assert.ok(moved > 0.1, `speaker not found lower: ${moved}`);
 });
 
 test("fx sfx: whoosh waits for the last word, a sound inside a word is flagged", () => {

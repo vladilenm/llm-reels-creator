@@ -2,7 +2,7 @@
 const {chromium}=require('playwright');const path=require('path');const {execSync}=require('child_process');const fs=require('fs');
 (async()=>{const [html,out,...ts]=process.argv.slice(2);
  const b=await chromium.launch();const p=await b.newPage({viewport:{width:1920,height:1080}});const errs=[];p.on('pageerror',e=>errs.push(e.message));
- await p.goto('file://'+path.resolve(html)+'?render');await p.evaluate(()=>document.fonts.ready);
+ await p.goto('file://'+path.resolve(html)+'?render');await p.evaluate(()=>document.fonts.ready);await p.evaluate(()=>window.READY||null); // Reels Studio: screen-kit media preload
  const sz=await p.evaluate(()=>({W:document.getElementById('stage').offsetWidth,H:document.getElementById('stage').offsetHeight}));await p.setViewportSize({width:sz.W,height:sz.H}); // Reels Studio: vertical clips
  const dir=fs.mkdtempSync('/tmp/bt');const alpha=await p.evaluate(()=>{const a=document.documentElement.classList.contains('alpha');if(a){document.documentElement.style.background='#000';document.body.style.background='#000';}return a;});
  for(let i=0;i<ts.length;i++){await p.evaluate(t=>seek(t),+ts[i]);await p.screenshot({path:`${dir}/${String(i).padStart(3,'0')}.png`});}

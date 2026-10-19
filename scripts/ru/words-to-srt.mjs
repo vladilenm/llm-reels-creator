@@ -18,7 +18,7 @@ import { fileURLToPath } from "node:url";
 import { wrapLines, normKey } from "./lib/text.mjs";
 
 // Russian function words that should not end a caption line when the sentence goes on.
-const DANGLING = new Set(["что", "чтобы", "и", "а", "но", "или", "в", "во", "на", "с", "со", "по", "к", "ко", "у", "о", "об", "из", "за", "для", "про", "от", "до", "при", "без", "под", "над", "перед", "через", "как", "потому", "чем", "то", "если", "когда", "где", "это", "не", "ни", "же", "the", "a", "an", "to", "of", "and"]);
+export const DANGLING = new Set(["что", "чтобы", "и", "а", "но", "или", "в", "во", "на", "с", "со", "по", "к", "ко", "у", "о", "об", "из", "за", "для", "про", "от", "до", "при", "без", "под", "над", "перед", "через", "как", "потому", "чем", "то", "если", "когда", "где", "это", "не", "ни", "же", "the", "a", "an", "to", "of", "and"]);
 
 // Where to split an overflowing cue: the latest index j (≥ 2 words stay) such that
 // the previous word ends a clause («угрозой,») or word j opens a phrase («для …»,

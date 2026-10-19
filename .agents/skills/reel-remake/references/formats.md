@@ -119,7 +119,8 @@ Printable, no tables wider than the phone screen. Mirrors `refs/ref-04-text.md`.
 ## По локациям
 ### L1 · за столом, по грудь
 1. Я не смонтировал ни секунды этого ролика.
-2. …
+2. Это REA — открытый код и больше трёхсот тысяч звёзд на GitHub.
+   🎧 **за кадром** — лица не видно (тёмная врезка с GitHub), можно читать с листа
 
 ## Подготовить до съёмки
 - [ ] запись экрана: …
@@ -128,3 +129,7 @@ Printable, no tables wider than the phone screen. Mirrors `refs/ref-04-text.md`.
 ## После съёмки
 Файл в `inbox/`, затем `/reel inbox/<файл> --remake video-projects/<date>-remake-<slug>`.
 ```
+
+A line gets the 🎧 note when a full-frame insert covers the speaker for the whole line:
+the customer reads those lines instead of memorising them (2026-10-19), still in the same
+spot and voice as the rest.

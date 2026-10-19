@@ -51,6 +51,7 @@ Copyright notices: Nate Herk (2026), Bart (2026), HeyGen (Apache-2.0, see
 | `.claude/skills/cut-mistakes/SKILL.md` | Documents the language config, new types and the "read the whole transcript anyway" rule | |
 | `.claude/skills/motion-broll/scripts/words.py` | Also accepts a word-level JSON transcript and prints exact word times | SPEC §3.5: no ±0.2 s SRT estimate |
 | `.claude/skills/motion-broll/engine/beats.js` | Resizes the viewport to the clip's stage before screenshots; tiles 360 px wide for vertical clips | Was fixed at 1920×1080, so 1080×1920 sheets lost the bottom 840 px |
+| `.claude/skills/motion-broll/engine/render.js`, `beats.js` | After `document.fonts.ready` also await `window.READY` when a clip sets it | The screen kit (`scripts/ru/broll/screen-kit.js`) preloads screenshots and recording frames; the first seek must not draw an empty window |
 | `.claude/skills/motion-broll/scripts/make_pages.py` | The on-black web preview of a `.mov` panel uses the clip's own size | Was fixed at 1920×1080 |
 | `.claude/skills/reel-export/SKILL.md` | Added `setparams=range=tv:colorspace=bt709:color_primaries=bt709:color_trc=bt709` to the encode filter chain | With ffmpeg 8.1 the original command writes `color_primaries`/`color_trc` as unknown; verified with ffprobe |
 

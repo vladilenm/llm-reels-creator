@@ -5,7 +5,7 @@ const {chromium}=require('playwright');const {spawn}=require('child_process');co
  const [html,out,fpsArg]=process.argv.slice(2); const FPS=!fpsArg?30000/1001:(fpsArg.includes('/')?fpsArg.split('/')[0]/fpsArg.split('/')[1]:+fpsArg);
  const b=await chromium.launch();const p=await b.newPage({viewport:{width:1920,height:1080}});
  const errs=[];p.on('pageerror',e=>errs.push(e.message));
- await p.goto('file://'+path.resolve(html)+'?render');await p.evaluate(()=>document.fonts.ready);
+ await p.goto('file://'+path.resolve(html)+'?render');await p.evaluate(()=>document.fonts.ready);await p.evaluate(()=>window.READY||null); // Reels Studio: screen-kit media preload
  const info=await p.evaluate(()=>({T:window.DURATION,W:document.getElementById('stage').offsetWidth,H:document.getElementById('stage').offsetHeight,alpha:document.documentElement.classList.contains('alpha')}));
  await p.setViewportSize({width:info.W,height:info.H});
  const N=Math.round(info.T*FPS), K=4, sub=1/(FPS*2*K);

@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-// S5 captions: «anchor rail» for Russian vertical reels.
+// S5 captions: «anchor rail» for Russian vertical reels; «kinetic» (PLAN.json captions.style) for remakes
+// with a card above the head — see kineticHtml below.
 //
 // transcript.clean.json → cues (≤22 chars × ≤2 lines, no hyphenation) →
 //   <project>/captions/index.html   transparent 1080×1920 HyperFrames composition
@@ -17,7 +18,7 @@ import { readFileSync, writeFileSync, mkdirSync, copyFileSync, existsSync } from
 import { join, resolve, basename, relative } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { buildCues, toSrt, validateSrt } from "./words-to-srt.mjs";
+import { buildCues, toSrt, validateSrt, DANGLING } from "./words-to-srt.mjs";
 import { checkGlyphs } from "./check-glyphs.mjs";
 import { loadBrand, ROOT } from "./lib/brand.mjs";
 
@@ -123,6 +124,117 @@ window.__timelines=window.__timelines||{};window.__timelines["captions"]=tl;
 `;
 }
 
+// ---------- «kinetic»: 1–3 words between the window and the head (remakes with a card above) ----------
+// PLAN.json captions: { style: "kinetic", kinetic: { y_keys: [{at, y}], theme_keys: [{at, theme: "light"|"dark"}],
+//                       accent: [word start time], accent_words: ["бесплатно"], breaks: [word start time] } }
+// Defaults below, overridable in brand.md captions.kinetic. Future words of a group wait dimmed and
+// blurred; each lights up on its own start. The accent word is the brand serif italic (font_serif.italic)
+// (light theme: dark text on a light wall; dark theme: white, accent with a glow).
+export const KINETIC = {
+  font_px: 72, weight: 700, accent_scale: 1.12, max_chars: 18, max_words: 3, gap: 0.35, y: 1030,
+  accent_font: null, // null → brand.font_serif.italic
+  light: { color: "#17141C", dim: "#A9A3B5", accent: null, shadow: "0 0 18px rgba(255,255,255,.75)" },
+  dark: { color: "#FFFFFF", dim: "rgba(255,255,255,.42)", accent: null, shadow: "0 2px 10px rgba(0,0,0,.45)" },
+};
+const kText = (s) => String(s).replace(/[.,;:]+$/u, "");
+const kKey = (s) => String(s).toLowerCase().replace(/[^\p{L}\p{N}]+/gu, "");
+
+export function kineticConfig(brand, overrides = {}) {
+  const b = brand.captions?.kinetic ?? {}, o = overrides.kinetic ?? {};
+  const k = { ...KINETIC, ...b, ...o, light: { ...KINETIC.light, ...b.light, ...o.light }, dark: { ...KINETIC.dark, ...b.dark, ...o.dark } };
+  k.accent_font ??= brand.font_serif?.italic ?? "brand/fonts/PlayfairDisplay-Italic-Variable.ttf";
+  k.light.accent ??= brand.accent ?? "#7C3AED";
+  k.dark.accent ??= brand.accent_light ?? brand.accent ?? "#B79CFF";
+  return k;
+}
+
+export function kineticGroups(transcript, k, overrides = {}) {
+  const words = transcript.words.filter((w) => (w.type ? w.type === "word" : true) && String(w.text ?? "").trim());
+  const acc = new Set((overrides.kinetic?.accent_words ?? []).map(kKey));
+  const accT = overrides.kinetic?.accent ?? [], brk = overrides.kinetic?.breaks ?? [];
+  const groups = [];
+  let cur = [];
+  for (const [i, w] of words.entries()) {
+    const text = kText(w.text);
+    const len = [...cur.map((x) => x.text), text].join(" ").length;
+    const gapBefore = cur.length ? w.start - cur.at(-1).end : 0;
+    const forced = brk.some((t) => Math.abs(t - w.start) <= 0.06);
+    if (cur.length && (forced || cur.length >= k.max_words || len > k.max_chars || gapBefore > k.gap)) {
+      // a preposition or conjunction never ends a group: it moves on with the word it belongs to
+      const carry = !forced && gapBefore <= k.gap && cur.length > 1 && DANGLING.has(kKey(cur.at(-1).text)) ? [cur.pop()] : [];
+      groups.push(cur); cur = carry;
+    }
+    const accent = acc.has(kKey(w.text)) || accT.some((t) => Math.abs(t - w.start) <= 0.06);
+    cur.push({ text, start: w.start, end: w.end, accent });
+    if (/[.!?…,;:—]$/u.test(String(w.text).trim()) || i === words.length - 1) { groups.push(cur); cur = []; }
+  }
+  if (cur.length) groups.push(cur);
+  return groups.map((g, i, all) => {
+    const start = g[0].start < 0.25 && i === 0 ? 0 : g[0].start;
+    const next = all[i + 1]?.[0].start ?? Infinity;
+    return { start, end: Math.min(next, g.at(-1).end + 0.6), lines: [g] };
+  });
+}
+
+const keyAt = (keys = [], t, field, base) => {
+  let v = base;
+  for (const k of [...keys].sort((a, b) => a.at - b.at)) if (t >= k.at) v = k[field];
+  return v;
+};
+
+export function kineticHtml(groups, { duration, brand, fontUrl, accentUrl, fps = 30, overrides = {} }) {
+  const k = kineticConfig(brand, overrides), o = overrides.kinetic ?? {};
+  const lineH = Math.round(k.font_px * 1.25);
+  const yKeys = (o.y_keys ?? []).map((x) => ({ at: x.at, baseline_y: x.y }));
+  const clips = groups.map((g, i) => {
+    const d = Math.max(0.05, g.end - g.start);
+    const th = keyAt(o.theme_keys, g.start, "theme", "light") === "dark" ? "dark" : "light";
+    const top = Math.round(baselineAt(yKeys, g.start, k.y) - lineH / 2);
+    const ws = g.lines[0].map((w, j) => `<span class="w${w.accent ? " acc" : ""}" id="k${i}_${j}">${esc(w.text)}</span>`).join(" ");
+    return `<div id="c${i}" class="kg ${th} clip" data-start="${r3(g.start)}" data-duration="${r3(d)}" data-track-index="0" style="top:${top}px">${ws}</div>`;
+  }).join("\n");
+  const tl = groups.map((g, i) => {
+    const th = keyAt(o.theme_keys, g.start, "theme", "light") === "dark" ? k.dark : k.light;
+    const out = g.start < 0.25 ? [`tl.set("#c${i}",{opacity:1,y:0},0);`]
+      : [`tl.fromTo("#c${i}",{opacity:0,y:10},{opacity:1,y:0,duration:0.16,ease:"power2.out"},${r3(g.start)});`];
+    g.lines[0].forEach((w, j) => {
+      const col = w.accent ? th.accent : th.color;
+      const at = Math.max(g.start, w.start);
+      if (at - g.start < 0.02) out.push(`tl.set("#k${i}_${j}",{color:"${col}",opacity:1,filter:"blur(0px)"},${r3(g.start)});`);
+      else out.push(`tl.set("#k${i}_${j}",{color:"${th.dim}",opacity:0.55,filter:"blur(3px)"},${r3(g.start)});`,
+        `tl.to("#k${i}_${j}",{color:"${col}",opacity:1,filter:"blur(0px)",duration:0.14,ease:"power2.out"},${r3(at)});`);
+    });
+    if (g.end - g.start > 0.25) out.push(`tl.to("#c${i}",{opacity:0,duration:0.1,ease:"power1.in"},${r3(g.end - 0.1)});`);
+    return out.join("\n");
+  }).join("\n");
+  return `<!doctype html>
+<html lang="ru"><head><meta charset="utf-8"><title>captions</title>
+<script src="assets/gsap.min.js"></script>
+<style>
+@font-face{font-family:"ReelCaption";src:url("${fontUrl}");font-weight:${k.weight};font-style:normal;font-display:block}
+@font-face{font-family:"ReelAccent";src:url("${accentUrl}");font-weight:400 900;font-style:italic;font-display:block}
+*{box-sizing:border-box}
+html,body{margin:0;width:1080px;height:1920px;overflow:hidden;background:transparent}
+#captions{position:relative;width:1080px;height:1920px;overflow:hidden;background:transparent}
+.kg{position:absolute;left:60px;width:960px;text-align:center;white-space:nowrap;font-family:"ReelCaption";font-weight:${k.weight};font-size:${k.font_px}px;line-height:${lineH}px;letter-spacing:-0.02em;opacity:0}
+.kg.light{color:${k.light.color};text-shadow:${k.light.shadow}}
+.kg.dark{color:${k.dark.color};text-shadow:${k.dark.shadow}}
+.w{display:inline-block}
+.acc{font-family:"ReelAccent";font-style:italic;font-weight:600;font-size:${Math.round(k.font_px * k.accent_scale)}px;letter-spacing:-0.01em}
+.kg.dark .acc{text-shadow:0 0 22px ${k.dark.accent},0 0 6px ${k.dark.accent}}
+</style></head><body>
+<div id="captions" data-composition-id="captions" data-start="0" data-duration="${r3(duration)}" data-width="1080" data-height="1920" data-fps="${fps}">
+${clips}
+</div>
+<script>
+const tl=gsap.timeline({paused:true});
+${tl}
+tl.set({}, {}, ${r3(duration)});
+window.__timelines=window.__timelines||{};window.__timelines["captions"]=tl;
+</script></body></html>
+`;
+}
+
 export function makeCaptions(project, { render = false, transcript } = {}) {
   project = resolve(project);
   const brand = loadBrand();
@@ -131,7 +243,8 @@ export function makeCaptions(project, { render = false, transcript } = {}) {
   const fps = JSON.parse(readFileSync(join(project, "meta.json"), "utf8")).fps ?? 30;
   const planPath = join(project, "PLAN.json");
   const overrides = existsSync(planPath) ? (JSON.parse(readFileSync(planPath, "utf8")).captions ?? {}) : {};
-  const cues = applyHide(captionCues(t, brand), overrides.hide);
+  const kinetic = (overrides.style ?? brand.captions.style) === "kinetic";
+  const cues = applyHide(kinetic ? kineticGroups(t, kineticConfig(brand, overrides), overrides) : captionCues(t, brand), overrides.hide);
 
   // Font: the brand body font at the caption weight, else the closest weight.
   const files = brand.font_body?.files ?? {};
@@ -139,16 +252,26 @@ export function makeCaptions(project, { render = false, transcript } = {}) {
   const fontRel = files[weight] ?? Object.values(files).at(-1);
   if (!fontRel) throw new Error("brand.md has no font_body.files");
   const fontSrc = join(ROOT, fontRel);
-  const text = cues.flatMap((c) => c.lines.flat().map((w) => w.text)).join(" ");
+  const text = cues.flatMap((c) => c.lines.flat().filter((w) => !w.accent).map((w) => w.text)).join(" ");
   const g = checkGlyphs({ fonts: [fontSrc], text });
+  const accentSrc = kinetic ? join(ROOT, kineticConfig(brand, overrides).accent_font) : null;
+  if (kinetic) {
+    const accText = cues.flatMap((c) => c.lines.flat().filter((w) => w.accent).map((w) => w.text)).join(" ");
+    const ga = checkGlyphs({ fonts: [accentSrc], text: accText || "а" });
+    if (!ga.ok) throw new Error(`accent font ${basename(accentSrc)} lacks glyphs: ${ga.missing.map((m) => `${m.char} ${m.codepoint}`).join(", ")}`);
+  }
   if (!g.ok) throw new Error(`caption font ${basename(fontSrc)} lacks glyphs: ${g.missing.map((m) => `${m.char} ${m.codepoint}`).join(", ")}`);
 
   const dir = join(project, "captions");
   mkdirSync(join(dir, "fonts"), { recursive: true });
   mkdirSync(join(dir, "assets"), { recursive: true });
   copyFileSync(fontSrc, join(dir, "fonts", basename(fontSrc)));
+  if (accentSrc) copyFileSync(accentSrc, join(dir, "fonts", basename(accentSrc)));
   copyFileSync(join(ROOT, "node_modules/gsap/dist/gsap.min.js"), join(dir, "assets/gsap.min.js"));
-  writeFileSync(join(dir, "index.html"), captionsHtml(cues, { duration, brand, fontUrl: `fonts/${basename(fontSrc)}`, fps, overrides }));
+  const opts = { duration, brand, fontUrl: `fonts/${basename(fontSrc)}`, fps, overrides };
+  writeFileSync(join(dir, "index.html"), kinetic
+    ? kineticHtml(cues, { ...opts, accentUrl: `fonts/${basename(accentSrc)}` })
+    : captionsHtml(cues, opts));
   if (!existsSync(join(dir, "meta.json"))) writeFileSync(join(dir, "meta.json"), JSON.stringify({ id: "captions", name: "captions", width: 1080, height: 1920, fps }, null, 2) + "\n");
 
   const srt = toSrt(cues.map((c) => ({ start: c.start, end: c.end, lines: c.lines.map((l) => l.map((w) => w.text).join(" ")) })));
@@ -156,7 +279,7 @@ export function makeCaptions(project, { render = false, transcript } = {}) {
   if (errs.length) throw new Error(`SRT invalid: ${errs.join("; ")}`);
   writeFileSync(join(project, "captions.srt"), srt);
 
-  const result = { cues: cues.length, duration, font: relative(ROOT, fontSrc), html: relative(ROOT, join(dir, "index.html")), srt: relative(ROOT, join(project, "captions.srt")) };
+  const result = { style: kinetic ? "kinetic" : "anchor-rail", cues: cues.length, duration, font: relative(ROOT, fontSrc), html: relative(ROOT, join(dir, "index.html")), srt: relative(ROOT, join(project, "captions.srt")) };
   if (render) {
     mkdirSync(join(project, "renders/kit"), { recursive: true });
     const out = join(project, "renders/kit/captions.mov");

@@ -115,6 +115,7 @@ validators. Structural checks supplement rendered video and audio review.
 | Instagram Reels encode and safe zones | `reel-export` |
 | Rotoscope a subject with SAM 2 | `object-separation` (optional, heavy) |
 | Replicate someone else's reel: breakdown, adapted script, shooting plan | `reel-remake` |
+| Fast remake cycle: text to say → shoot → preview → final, fewest stops | `remake-fast` |
 
 `object-separation` is optional and heavy: it needs a Python venv with torch and
 a 150–900 MB SAM 2 model, installed on first use only. Never run it in a reel
@@ -128,6 +129,10 @@ the orchestrator calls the chassis skills itself. Spec: `SPEC.md`.
 Someone else's reel to replicate goes to `/remake <file> [— brief]` (`reel-remake`):
 breakdown → adapted script and shooting plan → ГЕЙТ R → the customer shoots →
 `/reel <raw> --remake <remake project>`. The reference is studied, never reused.
+The short cycle is `/remake-fast <file> [— brief]` (`remake-fast`): the text to say
+(`SAY.md`, 🎧 marks lines where an insert covers the speaker so he reads them) and the
+recordings to make → he shoots → `/remake-fast <remake project>` → preview → «да» →
+final, a ×1.1 cut and the Instagram caption. No ГЕЙТ R, A or B in this cycle.
 
 - Before creative work read `brand/brand.md`, `lessons.md`, `refs/NOTES.md`,
   `MOTION_PHILOSOPHY.md`.

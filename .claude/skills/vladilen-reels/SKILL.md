@@ -144,12 +144,24 @@ for `gate_b_changes`.
 Build each approved event with **motion-broll** (read its `reference/engine-api.md`
 and examples first). Vertical: every clip uses `W:1080,H:1920` and the source fps.
 
+**Window above the head** (remakes in the clone-app-good-ref look): write clips with `SK.run`
+from `scripts/ru/broll/screen-kit.js` (schema in its header: title, icons, browser window with our
+screenshots or recordings, camera moves, `hl`/`ring` marks, cursor, counter; `mode:'dark'` for the
+full-frame insert) and build them with `python3 scripts/ru/broll/build.py $P/broll/dist <clips>`;
+cut recordings with `node scripts/ru/broll/screen-frames.mjs <rec> $P/screens/<name> --from --to`.
+Light clips are panels (`.mov`), dark ones are `full`. Then render with the engine as usual.
+If the head sits high in the raw (no room above it), put the window phrases into `fx.json`
+`relocate` windows (customer, 2026-10-19: speaker cut out and moved down over his own blurred, lifted
+room) and run `fx_picture.py $P --prep-relocate` first; close-ups stay the plain frame.
+
 - `full` → opaque clip, render to `.mp4`.
 - `panel` / `card` → `bg:null`, render to `.mov` (ProRes 4444 with alpha), placed
   where `PLAN.json` says, never over the face unless the plan says so.
 - Text and logos inside y 360–1420, x ≤ 960. Brand colours/fonts from `brand.md`;
-  Cyrillic fonts only (the engine's Geist has Cyrillic; for Inter add `@font-face`
-  from `brand/fonts/`). Apply `motion-principles` for easing and choreography.
+  Cyrillic fonts only. Build every reel clip with `scripts/ru/broll/build.py`: it embeds
+  `font_body` as 'SK Sans', `font_serif.italic` as 'SK Serif', `font_mono` as 'SK Mono' and
+  switches the engine's `#stage`/`.mono` from Geist to them. Headings in clips use
+  `font_heading`. Apply `motion-principles` for easing and choreography.
 - Each state change lands on its word: clip-local time = word time on the clean
   timeline − clip in-point (`transcript.clean.json`).
 - Only real figures from the speech or the customer; otherwise relative bars,
@@ -157,10 +169,10 @@ and examples first). Vertical: every clip uses `W:1080,H:1920` and the source fp
 
 ```bash
 SK=.claude/skills/motion-broll
-python3 $SK/engine/build.py $P/broll/dist $P/broll/clips/NN-name.html
+python3 scripts/ru/broll/build.py $P/broll/dist $P/broll/clips/NN-name.html
 NODE_PATH=./node_modules node $SK/engine/beats.js $P/broll/dist/NN-name.html $P/review/NN-beats.png 0.4 1.2 …
 NODE_PATH=./node_modules node $SK/engine/render.js $P/broll/dist/NN-name.html $P/broll/NN-name.mov 30
-node scripts/ru/check-glyphs.mjs --font brand/fonts/Inter-700.ttf --font $SK/engine/fonts/Geist-Variable.woff2 --html $P/broll/clips/NN-name.html
+node scripts/ru/check-glyphs.mjs --font <font_body file> --font <font_heading file> --html $P/broll/clips/NN-name.html
 ```
 
 Write `$P/broll/plan.json` (motion-broll schema: `{ title, video: "../renders/clean.mp4",
@@ -250,6 +262,12 @@ lines, no hyphenation, active word in the accent colour, positioned from
 `brand.md` (`captions.baseline_y`). Writes `captions/index.html`, `captions.srt`,
 `renders/kit/captions.mov` (ProRes 4444 alpha). Fails if the font lacks any glyph.
 Why not the `embedded-captions` engine: `references/output-modes.md` § captions.
+
+**Kinetic style** (customer, 2026-10-18: a separate style for remakes with a window above the
+head): `PLAN.json` `captions.style: "kinetic"` → 1–3 words centred between the window and the head,
+future words dimmed, one accent word per phrase in the brand serif italic, `font_serif.italic` (`captions.kinetic.accent_words`
+or `accent` times, `breaks`, `y_keys`, `theme_keys` light/dark — schema in the header of
+`kineticHtml`). Use it when the remake's SCRIPT.md asks for it; anchor rail stays the default.
 
 ### S6 Самопроверка — no stop, max 3 iterations
 
