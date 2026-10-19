@@ -38,7 +38,7 @@ Thumbs.db
 
 # --- Reels Studio ---
 # Everything personal stays local: raw inputs, reel projects, references, the
-# run log and the studio's taste files. The repo ships *.example templates;
+# run log and the studio's taste files (brand/brand.md is tracked: private repo). The repo ships *.example templates;
 # `npm run setup` (and /reel S0) create the working copies when missing.
 inbox/*
 !inbox/.gitkeep
@@ -46,7 +46,6 @@ video-projects/*
 !video-projects/.gitkeep
 refs/*
 !refs/NOTES.example.md
-brand/brand.md
 brand/music/*
 !brand/music/README.md
 !brand/music/tracks.example.json

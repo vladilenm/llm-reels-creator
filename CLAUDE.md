@@ -53,10 +53,11 @@ Preserve raw files. Use a new output filename for each editing stage. Archive
 obsolete work. Video projects, personal footage, transcripts, credentials, and
 renders are gitignored: everything under `video-projects/`, `inbox/` and `refs/`
 stays local. Never print secrets or copy private media into library examples.
-`brand/brand.md`, `lessons.md`, `refs/NOTES.md`, `brand/music/tracks.json` and
-`runs.log.jsonl` are local too: the first four are created from their `*.example`
-templates by `npm run setup` or /reel S0. Write taste and brand changes to the local
-file; edit a template only to change the default for everyone who clones the kit.
+`lessons.md`, `refs/NOTES.md`, `brand/music/tracks.json` and `runs.log.jsonl` are local
+too; `brand/brand.md` is tracked in this private repo. `npm run setup` or /reel S0 creates
+any of the first four that is missing from its `*.example` template. Write taste and brand
+changes to `brand/brand.md` / `lessons.md`; edit a template only to change the default for
+everyone who clones the kit.
 
 ## Editing and timing
 
