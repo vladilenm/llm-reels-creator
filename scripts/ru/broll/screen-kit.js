@@ -3,20 +3,22 @@
    two-line title (grotesque + Playfair Italic on an accent plate), a row of app icons and a macOS
    browser window that plays our own screenshots / screen recordings with camera moves, text
    highlights, a focus ring, a cursor and a star counter. mode 'dark' is the full-frame insert on
-   the brand background. Every style is a pure function of t (engine contract); media are preloaded
+   the brand background; mode 'card' is a full-frame light card on the brand canvas («Плагин номер
+   один» + window). A numbered list (name blurred, stars visible) is the «top N» hook. Every style is a pure function of t (engine contract); media are preloaded
    and render.js / beats.js wait for window.READY before the first seek.
 
    SK.run({
-     T, mode:'light'|'dark', tin:0, tout:null,
+     T, mode:'light'|'dark'|'card', tin:0, tout:null,
      title:{l1, l2, y:372, tin?, tout?},          captions ≈1000–1070, the head starts ≈1095 (SHOOT.md)
      icons:{y:548, size:56, items:[{label, src?}], active:[[t, index]], tin?, tout?},
-     win:{x:540, y:624, w:820, h:340, keys:[[t,{x?,y?,w?,h?}]], tin?, tout?, bar:52},
+     win:{x:540, y:624, w:820, h:340, keys:[[t,{x?,y?,w?,h?}]], tin?, tout?, bar:52, pager?:'1/5'},
      media:{id:{src:'file.png'} | {frames:'dir', from:0}, url:'github.com/…'},   paths relative to the fragment
      shots:[[t, id, [x, y, w], trans:'whip'|'blur'|'cut']],   camera = visible media rect (x, y, width)
      cams:[[t, [x, y, w], dur=0.7]],                          camera moves inside the current shot
      marks:[{kind:'hl'|'ring'|'blur', rect:[x,y,w,h], t0, t1, shot?}],   media pixels; blur hides private text
      cursor:{keys:[[t, x, y]], clicks:[t]},                    media pixels
-     counter:{t, from:0, to:314, suffix:'k', label:'звёзд на GitHub', x:540, y:880, tout?},
+     counter:{t, from:0, to:314, suffix:'k', label:'звёзд на GitHub', x:540, y:880, tout?, lead?:'hide'},
+     list:{y:600, w:820, row:78, items:[{name, stars:'108k', t, lit?}], blur:[t0, t1|null], active:[[t, i]], tout?},
    })                                                                                              */
 (function(){
 const SK = window.SK = window.SK || {};
@@ -47,6 +49,14 @@ const css = `
 .sk-col>div{display:flex;flex-direction:column}
 .sk-col span{height:128px;display:block}
 .sk-lbl{margin-top:8px;font-weight:600;font-size:30px;color:#6B6577;white-space:nowrap}
+.sk-pg{position:absolute;top:50%;right:18px;transform:translateY(-50%);height:30px;padding:0 14px;border-radius:15px;background:${INK_DARK};color:#fff;font-family:'SK Mono',monospace;font-weight:500;font-size:18px;line-height:30px;white-space:nowrap}
+.sk-row{height:62px;display:flex;align-items:center;gap:18px}
+.sk-rn{width:44px;text-align:right;font-family:'SK Mono',monospace;font-weight:500;font-size:34px;color:#A39DB0}
+.sk-rp{flex:1;height:62px;border-radius:16px;background:#fff;display:flex;align-items:center;gap:16px;padding:0 22px;box-shadow:0 0 0 1.5px #E3DFEA,0 10px 26px -14px rgba(30,15,60,.35)}
+.sk-rd{width:30px;height:30px;border-radius:9px;background:${B.accent_soft}}
+.sk-rt{font-weight:600;font-size:30px;color:${INK_DARK};letter-spacing:-.01em;white-space:nowrap}
+.sk-rs{height:62px;border-radius:16px;background:#fff;display:flex;align-items:center;gap:10px;padding:0 20px;box-shadow:0 0 0 1.5px #E3DFEA,0 10px 26px -14px rgba(30,15,60,.35);font-weight:600;font-size:26px;color:#4A4458;white-space:nowrap}
+.sk-rs b{font-family:'SK Mono',monospace;font-weight:500;color:${INK_DARK}}
 `;
 
 // keyed interpolation: [{t, v:[...], dur, ease}] → t => v; a new key starts from wherever the last one was
@@ -66,7 +76,7 @@ function keyed(keys){
 const SPRINGY = x=>M.S(x*0.9,9.5,0.82);   // eased spring on a 0..1 clock (slight settle)
 
 SK.run = (cfg)=>{
-  const T = cfg.T, dark = cfg.mode==='dark';
+  const T = cfg.T, dark = cfg.mode==='dark', card = cfg.mode==='card';
   const tin = cfg.tin ?? 0, tout = cfg.tout ?? null;
   const st = document.createElement('style'); st.textContent = css; document.head.appendChild(st);
   const root = document.createElement('div'); root.id='sk'; document.getElementById('stage').appendChild(root);
@@ -74,6 +84,7 @@ SK.run = (cfg)=>{
   const vis = (t, a, b, o)=>M.vis(t, a ?? tin, b === undefined ? tout : b, o);
 
   const haze = dark ? el('a sk-glow') : el('a sk-haze');
+  if(card) haze.style.display = 'none';
 
   // ---------- title ----------
   let title = null;
@@ -119,6 +130,8 @@ SK.run = (cfg)=>{
   const barEl = el('sk-bar', win); barEl.style.height = bar+'px';
   ['#FF5F57','#FEBC2E','#28C840'].forEach((c,i)=>{const d=el('sk-dot',barEl); d.style.background=c; d.style.left=(22+i*25)+'px';});
   const urlEl = el('sk-url', barEl);
+  const pgEl = wc.pager ? el('sk-pg', barEl) : null;
+  if(pgEl) pgEl.textContent = wc.pager;
   const cv = el('sk-cv', win, 'canvas'); cv.style.top = bar+'px';
   const ctx = cv.getContext('2d');
 
@@ -229,6 +242,22 @@ SK.run = (cfg)=>{
     }
   };
 
+  // ---------- list («top N»: number, blurred name, stars) ----------
+  let list = null;
+  if(cfg.list){
+    const c = cfg.list, w = c.w ?? 820, row = c.row ?? 78, y0 = c.y ?? 600;
+    const rows = c.items.map((it,i)=>{
+      const r = el('a sk-row'); r.style.left = (W/2-w/2)+'px'; r.style.width = w+'px'; r.style.top = (y0+i*row)+'px';
+      const n = el('sk-rn', r); n.textContent = String(i+1);
+      const pill = el('sk-rp', r); el('sk-rd', pill); const nm = el('sk-rt', pill, 'span'); nm.textContent = it.name;
+      const st = el('sk-rs', r); st.innerHTML = '★ Star <b></b>'; st.querySelector('b').textContent = it.stars;
+      // it.lit: the number lights up and stays (a count); c.active: one row at a time
+      const keys = it.lit!=null ? [[it.lit, 1, M.FAST]] : (c.active||[]).map(([t,k])=>[t, k===i?1:0, M.FAST]);
+      return {r, n, nm, it, on: M.track(0, keys)};
+    });
+    list = {c, rows};
+  }
+
   // ---------- counter ----------
   let counter = null;
   if(cfg.counter){
@@ -288,6 +317,21 @@ SK.run = (cfg)=>{
       drawCanvas(t, cw, ch);
     }
 
+    if(list){
+      const c = list.c, [b0, b1] = c.blur ?? [-1, null];
+      list.rows.forEach((x,i)=>{
+        const v = vis(t, x.it.t ?? (tin+0.2+i*0.12), c.tout === undefined ? tout : c.tout, {lin:0.3});
+        if(!M.apply(x.r, v)) return;
+        x.r.style.transform = `translateY(${(14*(1-clamp((t-(x.it.t ?? 0))/0.35))).toFixed(1)}px) scale(${v.s.toFixed(4)})`;
+        const on = clamp(x.on(t));
+        const mix = (a,b2)=>{const A=M.hex(a),Bc=M.hex(b2); return `rgb(${A.map((q,k)=>Math.round(q+(Bc[k]-q)*on)).join(',')})`;};
+        x.n.style.color = mix('#A39DB0', B.accent);
+        x.n.style.transform = `scale(${(1+0.18*on).toFixed(3)})`;
+        const hid = t >= b0 && (b1==null || t < b1) ? 1 : clamp(1-(t-b1)/0.3);
+        x.nm.style.filter = hid>0.01 ? `blur(${(9*hid).toFixed(2)}px)` : 'none';
+      });
+    }
+
     if(counter){
       const c = counter.c, v = M.vis(t, c.t, c.tout ?? null, {lin:0.3});
       const pop = M.S(t-c.t, 15, 0.6);
@@ -304,14 +348,16 @@ SK.run = (cfg)=>{
           const rolling = p < 0.98 && (d===counter.digits-1 || (val % pow) > pow-1);
           strip.style.transform = `translateY(${(-pos*128).toFixed(1)}px)`;
           strip.style.filter = rolling ? 'blur(1.5px)' : 'none';
-          strip.parentNode.style.opacity = d===counter.digits-1 || val >= pow ? 1 : clamp(val/pow*1.5, 0.15, 1).toFixed(3);
+          // lead:'hide' keeps a leading digit hidden until the value reaches it (no «09 920»)
+          strip.parentNode.style.opacity = d===counter.digits-1 || val >= pow ? 1
+            : c.lead==='hide' ? 0 : clamp(val/pow*1.5, 0.15, 1).toFixed(3);
         });
       }
     }
   };
 
   window.READY = Promise.all(loads).then(()=>{ if(window.__skT!=null) draw(window.__skT); });
-  M.scene({W, H, T, bg: dark ? B.background : null, center:[W/2, H/2], intro:null,
+  M.scene({W, H, T, bg: dark ? B.background : card ? (B.canvas || '#EFEDF4') : null, center:[W/2, H/2], intro:null,
     SH:{none:{w:0, h:0, r:0, bg:'#FFFFFF', cam:1}}, start:'none', SEQ:[],
     extra:(t)=>{ window.__skT = t; draw(t); }});
   document.getElementById('shape').style.display = 'none';

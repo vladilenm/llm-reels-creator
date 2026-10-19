@@ -38,7 +38,7 @@ def brand_json():
 
 def brand_tokens(b=None):
     b = brand_json() if b is None else b
-    return {k: b[k] for k in ('accent', 'accent_light', 'accent_soft', 'background', 'ink', 'glow') if k in b}
+    return {k: b[k] for k in ('accent', 'accent_light', 'accent_soft', 'background', 'ink', 'glow', 'canvas') if k in b}
 
 
 def font_face(family, path, weight, style='normal'):
