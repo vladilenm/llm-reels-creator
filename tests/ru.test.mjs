@@ -738,3 +738,38 @@ print(src[150, 150, 0] - out[150, 150, 0], abs(src[20, 20] - out[20, 20]).max())
   assert.ok(drop > 15, `the shine is pulled down by ${drop}`);
   assert.ok(even <= 1, `even skin changes by ${even}`);
 });
+
+test("obs_relocate card look: the build-edl render becomes the source, the canvas covers the template, the card stays", { timeout: 180000 }, () => {
+  const P = tmp();
+  mkdirSync(join(P, "renders")); const fr = join(P, "frames"); mkdirSync(fr);
+  const py = `
+import sys, numpy as np
+from PIL import Image, ImageDraw
+rng = np.random.default_rng(2)
+for i in range(60):
+    im = Image.new("RGB", (1080, 1920), (0xF3, 0xF0, 0xED)); dr = ImageDraw.Draw(im)
+    dr.rectangle([226, 282, 855, 410], fill=(60, 140, 240))
+    cam = Image.fromarray(rng.integers(20, 120, (825, 989, 3), dtype=np.uint8))
+    m = Image.new("L", (989, 825), 0); ImageDraw.Draw(m).rounded_rectangle([0, 0, 988, 824], radius=79, fill=255)
+    im.paste(cam, (46, 1098), m); im.save(f"{sys.argv[1]}/{i:03d}.png")
+`;
+  assert.equal(spawnSync("python3", ["-c", py, fr]).status, 0);
+  const clean = join(P, "renders/clean.mp4");
+  assert.equal(spawnSync("ffmpeg", ["-v", "error", "-y", "-framerate", "30", "-i", join(fr, "%03d.png"), "-f", "lavfi", "-i", "anullsrc=r=48000:cl=mono",
+    "-shortest", "-pix_fmt", "yuv420p", "-c:a", "aac", clean]).status, 0);
+  writeFileSync(join(P, "EDL.json"), JSON.stringify({ source_duration: 3, delete_ranges: [{ start: 1.0, end: 1.2 }] }));
+  const r = spawnSync("python3", [join(ROOT, "scripts/ru/fx/obs_relocate.py"), P, "--jobs", "1"], { encoding: "utf8" });
+  assert.equal(r.status, 0, r.stderr + r.stdout);
+  assert.ok(existsSync(join(P, "renders/clean.source.mp4")), "build-edl's render kept as the source");
+  const st = JSON.parse(readFileSync(join(P, "renders/clean.obs.json"), "utf8"));
+  assert.equal(st.look, "card");
+  assert.deepEqual(st.zoom, [1, 1.07]);
+  const px = spawnSync("python3", ["-c", `
+import subprocess, numpy as np
+b = subprocess.run(["ffmpeg", "-v", "error", "-i", "${clean}", "-frames:v", "1", "-f", "rawvideo", "-pix_fmt", "rgb24", "-"], capture_output=True).stdout
+a = np.frombuffer(b, np.uint8).reshape(1920, 1080, 3).astype(int)
+print(*a[340, 540], *a[1500, 540])`], { encoding: "utf8" });
+  const v = px.stdout.trim().split(/\s+/).map(Number);
+  assert.ok(Math.abs(v[0] - 0xef) < 6 && Math.abs(v[1] - 0xed) < 6 && Math.abs(v[2] - 0xf4) < 6, `template box covered by the canvas: ${v.slice(0, 3)}`);
+  assert.ok(v[3] < 140, `the camera stays in the card: ${v.slice(3)}`);
+});

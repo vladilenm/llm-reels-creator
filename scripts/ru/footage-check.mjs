@@ -11,8 +11,8 @@
 //   above 35 % of the height means «голова высоко» → fx.json relocate for the window phrases
 // - OBS layout: the take was recorded through an OBS scene — a flat one-colour canvas around a
 //   rounded camera card, template placeholders burned in above (scripts/ru/fx/obs_relocate.py
-//   --detect). `take.obs` gives the card; the whole take is relocated by obs_relocate.py after
-//   build-edl (S2), so the head check and fx.json relocate windows are skipped
+//   --detect). `take.obs` gives the card; the whole take goes through obs_relocate.py after
+//   build-edl (S2, the card on the brand canvas), so the head check and relocate windows are skipped
 // Prints JSON; exit code 0 even with missing files (the report says what is missing).
 
 import { spawnSync } from "node:child_process";

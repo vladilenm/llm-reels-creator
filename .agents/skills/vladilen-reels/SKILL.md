@@ -75,7 +75,7 @@ append to `BRIEF.md` 3–6 bullets of what matters from brand/lessons/refs for t
 reel. Deal with PROBE warnings (rotation, VFR, HEVC/HDR) in the plan.
 Check the layout: `python3 scripts/ru/fx/obs_relocate.py --detect <project>/assets/raw.<ext>` — `obs: true`
 means the take was recorded through his OBS scene (flat canvas, rounded camera card at the bottom,
-template placeholders above); note the card in STATUS and plan the OBS pass of S2.
+template placeholders above); note the card in STATUS and plan the OBS pass of S2 (card on canvas).
 
 ### S1 Транскрипция — stop only if the transcript is garbage
 
@@ -130,24 +130,29 @@ build again; the script trims a word's quiet edge to such a cut instead of snapp
 `transcript.words.json` if they are said, or they drop out of the captions. Without `--envelope`
 the old word-based pace applies (`--max-pause` only).
 
-**OBS take** (S0 `obs: true`, or `take.obs` from `footage-check.mjs`): the card is only the source of
-the picture, the reel is always relocate (customer, 2026-10-21: «почему мы до этого вырезали мою
-голову… а сейчас оставил как есть»). After build-edl:
+**OBS take** (S0 `obs: true`, or `take.layout: "obs"` from `footage-check.mjs`). Default — the card on
+the brand canvas: the placeholders of the OBS template disappear under `canvas`, the camera card stays
+where OBS put it (customer, 2026-10-21, on two reels in a row: «маска работает плохо, она стул мигает,
+очень некрасиво выглядит», «уже больно лагающе выглядит» — the cut-out went back to the card).
+After build-edl:
 
 ```bash
-python3 scripts/ru/fx/obs_relocate.py $P --stills 1.0,4.5,10.0   # review/obs-relocate-*.png first
-python3 scripts/ru/fx/obs_relocate.py $P                         # → renders/clean.mp4 (~3 min first, ~1 min again)
+python3 scripts/ru/fx/obs_relocate.py $P --stills 1.0,4.5,10.0   # review/obs-card-*.png first
+python3 scripts/ru/fx/obs_relocate.py $P                         # → renders/clean.mp4 (~1–3 min)
 ```
 
 It moves build-edl's `renders/clean.mp4` to `renders/clean.source.mp4`, finds the card on the frames,
-cuts him out with Apple Vision masks (cached in `work/obs/`), stretches the card ×1.1 to the full width
-with the top of the head at ≈ 59 % of the height, rebuilds the top of the head where the hair touches
-the card edge, and puts his own room behind him — filled, blurred, desaturated, lifted toward white.
-Zoom alternates 1.00/1.05 on the joins (`--zoom-gap 1` for at most one change per second when the
-joins are a few frames apart), the last piece has none; its masks go to `fx/masks/cta`. Skin shine:
-put `"skin": {"deshine": 0.8}` into `fx/fx.json` before this pass (see S4b). Check on the stills:
-nothing of the OBS template, no flat top of the head, captions at y 1030 clear of the hair, the chair
-back not glued to the shoulder. The geometry and joins it used are in `renders/clean.obs.json`.
+covers everything around it with the canvas, and on every join alternates 1.00/1.07 inside the card
+about a point above the face (the head does not jump on a jump cut; `--zoom-gap 1` for at most one
+change per second when the joins are a few frames apart); the last piece has no zoom. Skin shine: put
+`"skin": {"deshine": 0.8}` into `fx/fx.json` before this pass (see S4b) — the card is then masked with
+Apple Vision (cached in `work/obs/`). What it used is in `renders/clean.obs.json`.
+
+`--look relocate` (him cut out, stretched ×1.1 to the full width, head top at ≈ 59 %, his own room
+blurred and lifted behind him, the top of the head rebuilt where the hair touches the card edge) only
+when the masks hold **in motion**: watch a moving stretch of `--stills` neighbours or a short render —
+no chair back, armrest or other furniture flickering at the shoulders. Even then it is a choice to
+offer on the preview next to the card, never a silent switch.
 
 ### S3 Драматургия — ГЕЙТ B, always stop
 
@@ -194,7 +199,7 @@ Light clips are panels (`.mov`), dark ones are `full`. Then render with the engi
 If the head sits high in the raw (no room above it), put the window phrases into `fx.json`
 `relocate` windows (customer, 2026-10-19: speaker cut out and moved down over his own blurred, lifted
 room) and run `fx_picture.py $P --prep-relocate` first; close-ups stay the plain frame. An OBS take is
-already relocated whole in S2 (`obs_relocate.py`): no `relocate` windows on top of it.
+prepared whole in S2 (`obs_relocate.py`): no `relocate` windows on top of it.
 
 - `full` → opaque clip, render to `.mp4`.
 - `panel` / `card` → `bg:null`, render to `.mov` (ProRes 4444 with alpha), placed
@@ -280,12 +285,13 @@ shines or the customer asks; 0.8 is the approved strength — stronger made the 
 `fx_picture.py` applies it first, before the grade and every cut-out, kept to the person by
 `"masks"` (any person-mask dir) or an ellipse around the face track — keep `face.track` on: without
 masks or a track it searches the whole frame (~1 s per frame; with them only the face). On an OBS take `obs_relocate.py`
-already applied it to the card before the cut-out (`renders/clean.obs.json` says so) and
+already applied it to the card (`renders/clean.obs.json` says so) and
 `fx_picture.py` skips it. Check a still against the raw frame: shine softer, face not plastic.
 
-**OBS take in S4b.** Title masks come from the relocate pass, not from Vision on `clean.mp4`: after
-adding `titles` with `"masks"` to `fx.json`, run `python3 scripts/ru/fx/obs_relocate.py $P --masks`
-(the last piece is always in `fx/masks/cta`).
+**OBS take in S4b.** Title masks come from the OBS pass, not from Vision on `clean.mp4`: after adding
+`titles` with `"masks"` to `fx.json`, run `python3 scripts/ru/fx/obs_relocate.py $P --masks` (add
+`--look relocate` if the reel is relocated; there the last piece is always in `fx/masks/cta`). The
+same mask flicker that rules out relocate shows in a title with text behind the head — check it in motion.
 
 **World swap and impact (default since 2026-10-13).** `"world_swap": {"joins": "all", "dur": 0.32}`:
 on each location change (not next to a title moment) the speaker is cut out and stays while

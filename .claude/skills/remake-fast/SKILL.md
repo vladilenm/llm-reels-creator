@@ -90,14 +90,15 @@ node scripts/ru/footage-check.mjs <remake project>     # take, recordings, head 
 - `take.relocate: true` → `fx.json` `relocate` on every window line (фон: his room blurred
   and lifted, decision 2026-10-19); close-ups stay the plain frame.
 - `take.layout: "obs"` (recorded through his OBS scene: flat canvas, rounded camera card, template
-  placeholders burned in) → never keep the card as it is: S2 ends with `obs_relocate.py` and the whole
-  reel is relocate (decision 2026-10-21), no `relocate` windows on top.
+  placeholders burned in) → S2 ends with `obs_relocate.py`: the card on the brand canvas, zoom inside it
+  on the joins (decision 2026-10-21: the mask cut-out flickered on the chair and was taken back). Relocate
+  (`--look relocate`) only as a choice on the preview, and only if the masks hold in motion.
 
 Reel project: `node scripts/ru/intake.mjs <take.file> --slug <slug> --brief "<one line from the
 remake BRIEF.md>" --mode full --remake <remake project>`, then `vladilen-reels` S1–S6 with:
 S2 — keep the last complete take of each line, pauses by the envelope (`--envelope -55`, then the
 audible ones from `work/pauses.remaining.md` — he asked for shorter pauses three reels in a row),
-the first frame with open eyes, OBS takes through `obs_relocate.py`; S3 — `PLAN.json` straight from `SCRIPT.md`,
+the first frame with open eyes, OBS takes through `obs_relocate.py` (card on canvas); S3 — `PLAN.json` straight from `SCRIPT.md`,
 hook = the script's hook, no ГЕЙТ B (alternatives go to `DESIGN.md`); recordings with private
 data (notes, names, messengers) get `blur` marks; captions `kinetic` for window-above-head
 remakes. S6 self-review is mandatory (2–3 sheets), then `assemble.mjs <reel> --preview`.
