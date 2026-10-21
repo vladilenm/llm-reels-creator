@@ -9,6 +9,10 @@
 //   «obsidian.mp4», «A obsidian.MOV» and «A-obsidian.mov» all match «A-obsidian.mov»
 // - head position: Apple Vision person masks on 3 frames of the take; the top of the head
 //   above 35 % of the height means «голова высоко» → fx.json relocate for the window phrases
+// - OBS layout: the take was recorded through an OBS scene — a flat one-colour canvas around a
+//   rounded camera card, template placeholders burned in above (scripts/ru/fx/obs_relocate.py
+//   --detect). `take.obs` gives the card; the whole take is relocated by obs_relocate.py after
+//   build-edl (S2), so the head check and fx.json relocate windows are skipped
 // Prints JSON; exit code 0 even with missing files (the report says what is missing).
 
 import { spawnSync } from "node:child_process";
@@ -65,6 +69,12 @@ export function headTop(file, duration) {
   } finally { rmSync(dir, { recursive: true, force: true }); }
 }
 
+// OBS layout check: { obs, card: [x0, y0, x1, y1], r, bg } or null when python3 fails
+export function obsLayout(file) {
+  const r = spawnSync("python3", [join(ROOT, "scripts/ru/fx/obs_relocate.py"), "--detect", file], { encoding: "utf8" });
+  try { return r.status === 0 ? JSON.parse(r.stdout) : null; } catch { return null; }
+}
+
 export function footageCheck(remake, folder, { head = true } = {}) {
   remake = resolve(remake);
   const slug = basename(remake).replace(/^\d{4}-\d{2}-\d{2}-remake-/, "");
@@ -78,10 +88,15 @@ export function footageCheck(remake, folder, { head = true } = {}) {
   const screenMd = existsSync(join(remake, "SCREEN.md")) ? readFileSync(join(remake, "SCREEN.md"), "utf8") : "";
   const { rows, extra } = matchRecordings(expectedRecordings(screenMd), screens);
   const rel = (f) => (f ? relative(ROOT, f) : null);
-  const top = take && head ? headTop(take, info[take].duration) : null;
+  const obs = take ? obsLayout(take) : null;
+  const isObs = Boolean(obs?.obs);
+  const top = take && head && !isObs ? headTop(take, info[take].duration) : null;
   return {
     folder: rel(folder),
-    take: take ? { file: rel(take), ...info[take], head_top_pct: top, relocate: top != null ? top < 35 : null } : null,
+    take: take ? {
+      file: rel(take), ...info[take], head_top_pct: top, relocate: isObs ? false : top != null ? top < 35 : null,
+      layout: isObs ? "obs" : "camera", obs: isObs ? { card: obs.card, r: obs.r, bg: obs.bg } : null,
+    } : null,
     other_vertical: vertical.slice(1).map(rel),
     recordings: rows.map((r) => ({ ...r, file: rel(r.file), duration: r.file ? info[r.file].duration : null })),
     missing: rows.filter((r) => !r.file).map((r) => r.expected),

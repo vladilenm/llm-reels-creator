@@ -89,10 +89,15 @@ node scripts/ru/footage-check.mjs <remake project>     # take, recordings, head 
   never fake a run or a result. `extra` files → look at a frame, map them by content.
 - `take.relocate: true` → `fx.json` `relocate` on every window line (фон: his room blurred
   and lifted, decision 2026-10-19); close-ups stay the plain frame.
+- `take.layout: "obs"` (recorded through his OBS scene: flat canvas, rounded camera card, template
+  placeholders burned in) → never keep the card as it is: S2 ends with `obs_relocate.py` and the whole
+  reel is relocate (decision 2026-10-21), no `relocate` windows on top.
 
 Reel project: `node scripts/ru/intake.mjs <take.file> --slug <slug> --brief "<one line from the
 remake BRIEF.md>" --mode full --remake <remake project>`, then `vladilen-reels` S1–S6 with:
-S2 — keep the last complete take of each line; S3 — `PLAN.json` straight from `SCRIPT.md`,
+S2 — keep the last complete take of each line, pauses by the envelope (`--envelope -55`, then the
+audible ones from `work/pauses.remaining.md` — he asked for shorter pauses three reels in a row),
+the first frame with open eyes, OBS takes through `obs_relocate.py`; S3 — `PLAN.json` straight from `SCRIPT.md`,
 hook = the script's hook, no ГЕЙТ B (alternatives go to `DESIGN.md`); recordings with private
 data (notes, names, messengers) get `blur` marks; captions `kinetic` for window-above-head
 remakes. S6 self-review is mandatory (2–3 sheets), then `assemble.mjs <reel> --preview`.
