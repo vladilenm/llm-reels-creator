@@ -15,6 +15,9 @@
 //   --no-render    write EDL/CUTS/transcript only
 //   --max-pause S  widen silence cuts so at most S seconds of pause stay between
 //                  two words (55 % after the word, 45 % before the next; head/tail trims untouched)
+//   --snap-fps F   move every cut edge to the nearest source frame (1/F s, ≤ half a frame). Without it
+//                  trim+concat rounds each kept piece up to whole frames, so renders/clean.mp4 drifts
+//                  late against EDL/transcript.clean times (~0.12 s after 17 joins at 25 fps).
 //
 // Rendering and retiming are delegated to the chassis' cut-mistakes/apply-cuts.mjs
 // so there is one implementation of trim+concat.
@@ -126,6 +129,11 @@ function main() {
   const deletes = mergeDeletes([...silenceCuts, ...approved.map((c) => ({ start: c.start, end: c.end, reasons: [c.reason ?? "approved cut"] }))])
     .map((d) => ({ ...d, start: Math.max(0, d.start), end: Math.min(duration, d.end) }))
     .filter((d) => d.end > d.start);
+  if (o.snapFps) {
+    const f = Number(o.snapFps), snap = (t) => Math.round(t * f) / f;
+    for (const d of deletes) { if (d.start > 0) d.start = snap(d.start); if (d.end < duration) d.end = Math.min(duration, snap(d.end)); }
+    for (let i = deletes.length - 1; i >= 0; i--) if (deletes[i].end <= deletes[i].start) deletes.splice(i, 1);
+  }
   for (const d of deletes) {
     d.removed_text = words.filter((w) => w.start < d.end && d.start < w.end).map((w) => w.text).join(" ");
   }

@@ -36,6 +36,12 @@ phrases breathe; this is not a sizzle cut. Never invent numbers, facts, results,
 quotes or testimonials — only what is said in the video or given by the customer.
 Never publish or send anything.
 
+## Wide OBS recordings
+
+A `Reels-wide-*.mp4` (4104×1964: the reels layout left, the Mac screen 1:1 right) goes to the `reel-wide`
+skill (`/reel-wide`): it runs these stages with its own cutting, window and base scripts (`scripts/ru/wide/`)
+and the customer's standing brief for that format.
+
 ## Remake (`--remake`)
 
 The raw footage was shot from a script made by `reel-remake` (`/remake`): someone

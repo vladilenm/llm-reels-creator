@@ -117,6 +117,7 @@ validators. Structural checks supplement rendered video and audio review.
 | Rotoscope a subject with SAM 2 | `object-separation` (optional, heavy) |
 | Replicate someone else's reel: breakdown, adapted script, shooting plan | `reel-remake` |
 | Fast remake cycle: text to say → shoot → preview → final, fewest stops | `remake-fast` |
+| Wide OBS recording (layout + screen 1:1) → reel: all speech, screen matched to words | `reel-wide` |
 
 `object-separation` is optional and heavy: it needs a Python venv with torch and
 a 150–900 MB SAM 2 model, installed on first use only. Never run it in a reel
@@ -134,6 +135,10 @@ The short cycle is `/remake-fast <file> [— brief]` (`remake-fast`): the text t
 (`SAY.md`, 🎧 marks lines where an insert covers the speaker so he reads them) and the
 recordings to make → he shoots → `/remake-fast <remake project>` → preview → «да» →
 final, a ×1.1 cut and the Instagram caption. No ГЕЙТ R, A or B in this cycle.
+A wide OBS recording (`Reels-wide-*.mp4`, 4104×1964: layout left, screen right) goes to
+`/reel-wide <file> [— brief]` (`reel-wide`, engine `vladilen-reels`): every spoken comment kept, empty
+stretches cut, the matching screen moment under each phrase, preview (normal + ×1.12) → «ок» → final.
+No ГЕЙТ A or B; scripts in `scripts/ru/wide/`.
 `--principles` (on `/reel`, `/remake`, `/remake-fast`; off by default, or «проверь сценарий
 по принципам») checks the script against `reel-remake/references/script-principles.md`:
 a verdict per principle (уместно / спорно / не здесь) and numbered edits in `PRINCIPLES.md`.

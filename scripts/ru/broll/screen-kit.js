@@ -10,6 +10,7 @@
    SK.run({
      T, mode:'light'|'dark'|'card', tin:0, tout:null,
      title:{l1, l2, y:372, tin?, tout?},          captions ≈1000–1070, the head starts ≈1095 (SHOOT.md)
+     titles:[{l1, l2, y?, tin, tout}],            several titles in turn over one window (sections of a long clip)
      icons:{y:548, size:56, items:[{label, src?}], active:[[t, index]], tin?, tout?},
      win:{x:540, y:624, w:820, h:340, keys:[[t,{x?,y?,w?,h?}]], tin?, tout?, bar:52, pager?:'1/5'},
      media:{id:{src:'file.png'} | {frames:'dir', from:0}, url:'github.com/…'},   paths relative to the fragment
@@ -18,7 +19,8 @@
      marks:[{kind:'hl'|'ring'|'blur', rect:[x,y,w,h], t0, t1, shot?}],   media pixels; blur hides private text
      cursor:{keys:[[t, x, y]], clicks:[t]},                    media pixels
      counter:{t, from:0, to:314, suffix:'k', label:'звёзд на GitHub', x:540, y:880, tout?, lead?:'hide'},
-     list:{y:600, w:820, row:78, items:[{name, stars:'108k', t, lit?}], blur:[t0, t1|null], active:[[t, i]], tout?},
+     list:{y:600, w:820, row:78, items:[{name, stars:'108k', t, lit?}], blur:[t0, t1|null], active:[[t, i]], tout?,
+           cols?:2, gap?:24, rh?:62, mono?:true},   cols: column-major grid; rh: row height; no stars → no star pill
    })                                                                                              */
 (function(){
 const SK = window.SK = window.SK || {};
@@ -86,16 +88,15 @@ SK.run = (cfg)=>{
   const haze = dark ? el('a sk-glow') : el('a sk-haze');
   if(card) haze.style.display = 'none';
 
-  // ---------- title ----------
-  let title = null;
-  if(cfg.title){
-    const c = cfg.title, y = c.y ?? 372;
+  // ---------- titles ----------
+  const titles = (cfg.titles || (cfg.title ? [cfg.title] : [])).map((c)=>{
+    const y = c.y ?? cfg.title?.y ?? 372;
     const t1 = el('a sk-t1'); t1.textContent = c.l1 || ''; t1.style.top = y+'px';
     if(dark) t1.style.color = B.ink;
     const w2 = el('a sk-t2w'); w2.style.top = (y+66)+'px';
     const t2 = el('sk-t2', w2); const tx = el('', t2, 'span'); tx.textContent = c.l2 || '';
-    title = {c, t1, w2, t2, tx};
-  }
+    return {c, t1, w2, t2, tx};
+  });
 
   // ---------- icons ----------
   let icons = null;
@@ -246,11 +247,16 @@ SK.run = (cfg)=>{
   let list = null;
   if(cfg.list){
     const c = cfg.list, w = c.w ?? 820, row = c.row ?? 78, y0 = c.y ?? 600;
+    const cols = c.cols ?? 1, gap = c.gap ?? 24, per = Math.ceil(c.items.length/cols), cw = (w - gap*(cols-1))/cols;
     const rows = c.items.map((it,i)=>{
-      const r = el('a sk-row'); r.style.left = (W/2-w/2)+'px'; r.style.width = w+'px'; r.style.top = (y0+i*row)+'px';
+      const col = Math.floor(i/per), k = i % per;
+      const r = el('a sk-row'); r.style.left = (W/2-w/2+col*(cw+gap))+'px'; r.style.width = cw+'px'; r.style.top = (y0+k*row)+'px';
+      if(c.rh){ r.style.height = c.rh+'px'; }
       const n = el('sk-rn', r); n.textContent = String(i+1);
       const pill = el('sk-rp', r); el('sk-rd', pill); const nm = el('sk-rt', pill, 'span'); nm.textContent = it.name;
-      const st = el('sk-rs', r); st.innerHTML = '★ Star <b></b>'; st.querySelector('b').textContent = it.stars;
+      if(c.rh) pill.style.height = c.rh+'px';
+      if(c.mono){ nm.style.fontFamily = "'SK Mono',monospace"; nm.style.fontWeight = 500; }
+      if(it.stars!=null){ const st = el('sk-rs', r); st.innerHTML = '★ Star <b></b>'; st.querySelector('b').textContent = it.stars; if(c.rh) st.style.height = c.rh+'px'; }
       // it.lit: the number lights up and stays (a count); c.active: one row at a time
       const keys = it.lit!=null ? [[it.lit, 1, M.FAST]] : (c.active||[]).map(([t,k])=>[t, k===i?1:0, M.FAST]);
       return {r, n, nm, it, on: M.track(0, keys)};
@@ -278,7 +284,7 @@ SK.run = (cfg)=>{
     const pv = vis(t, tin, tout, {lin:0.32});
     haze.style.opacity = (dark ? 1 : pv.o).toFixed(3);
 
-    if(title){
+    for(const title of titles){
       const c = title.c, a = c.tin ?? tin + 0.1, b = c.tout === undefined ? tout : c.tout;
       M.apply(title.t1, vis(t, a, b));
       const v2 = vis(t, a+0.12, b, {lin:0.3});
