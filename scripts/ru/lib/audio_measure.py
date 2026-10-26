@@ -1,13 +1,14 @@
 """Shared measurements for the brand sound library (music_screen.py, sfx_screen.py, sound_review.py).
 numpy + ffmpeg only, system python3. Functions take float samples in −1…1 (mono unless named x2) and a rate."""
-import subprocess
+import re, subprocess
 import numpy as np
 
 
 def channels(path):
     r = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "a:0", "-show_entries", "stream=channels",
                         "-of", "csv=p=0", str(path)], capture_output=True, text=True)
-    return int(r.stdout.strip() or 0)
+    m = re.match(r"\d+", r.stdout.strip())            # csv may carry a trailing comma ("2,")
+    return int(m.group()) if m else 0
 
 
 def decode(path, sr=22050, seconds=None, start=0.0, mono=True):

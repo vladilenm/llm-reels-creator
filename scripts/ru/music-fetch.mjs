@@ -66,6 +66,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
         const file = join(DIR, `${c.id}.${ext}`);
         try { await download(c.url, file, { maxBytes: HEAD_BYTES }); } catch (e) { console.warn(`skip ${c.title}: ${e.message}`); continue; }
         cands[c.id] = { ...c, file: file.slice(ROOT.length + 1), fetched: new Date().toISOString().slice(0, 10) };
+        writeFileSync(join(DIR, "candidates.json"), JSON.stringify(cands, null, 1));   // an interrupted run keeps what it got
         got++;
       }
     }

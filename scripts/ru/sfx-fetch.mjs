@@ -33,14 +33,12 @@ export function haveIds(sfxDir, folder) {
 export function migrateLegacy(lib, credits) {
   for (const [old, now] of Object.entries(LEGACY)) {
     const a = join(lib, old), b = join(lib, now);
-    if (!existsSync(a) || existsSync(b)) continue;
-    renameSync(a, b);
+    if (existsSync(a) && !existsSync(b)) { renameSync(a, b); console.log(`moved library/${old} → library/${now}`); }
     for (const k of Object.keys(credits)) {
       if (!k.includes(`/library/${old}/`)) continue;
       credits[k.replace(`/library/${old}/`, `/library/${now}/`)] = { ...credits[k], kind: now };
       delete credits[k];
     }
-    console.log(`moved library/${old} → library/${now}`);
   }
   return credits;
 }
@@ -53,7 +51,8 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   const SFX = join(ROOT, "brand", "sfx"), LIB = join(SFX, "library");
   const creditsPath = join(LIB, "credits.json");
   let credits = existsSync(creditsPath) ? JSON.parse(readFileSync(creditsPath, "utf8")) : {};
-  if (!dry) credits = migrateLegacy(LIB, credits);
+  const save = () => writeFileSync(creditsPath, JSON.stringify(credits, null, 1));
+  if (!dry) { credits = migrateLegacy(LIB, credits); save(); }
   let first = true;
   for (const kind of kinds) {
     const p = PALETTE[kind];
@@ -75,10 +74,10 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
         credits[rel] = { kind, title: r.title, creator: r.creator, license: r.license, license_url: r.license_url,
           source: r.source, page: r.foreign_landing_url, duration_ms: r.duration, query: q,
           fetched: new Date().toISOString().slice(0, 10) };
+        save();                                              // an interrupted run keeps the authors of what it got
         got++;
       }
     }
     console.log(`${kind}: ${got} new${dry ? " (dry)" : ` → ${dir.slice(ROOT.length + 1)}`}`);
   }
-  if (!dry) writeFileSync(creditsPath, JSON.stringify(credits, null, 1));
 }

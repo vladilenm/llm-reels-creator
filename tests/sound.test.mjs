@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import { join, resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { searchUrl, creditLine, licenseName, download } from "../scripts/ru/lib/openverse.mjs";
+import { searchUrl, creditLine, licenseName, download, search } from "../scripts/ru/lib/openverse.mjs";
 import { selectMusic, MOODS } from "../scripts/ru/music-fetch.mjs";
 import { PALETTE, selectSfx, folderFor } from "../scripts/ru/lib/sfx-palette.mjs";
 import { haveIds, migrateLegacy } from "../scripts/ru/sfx-fetch.mjs";
@@ -37,6 +37,14 @@ test("openverse download asks for the head of the file with a Range header", asy
   assert.equal(n, 3);
   assert.equal(seen.Range, "bytes=0-1023");
   assert.deepEqual([...readFileSync(join(d, "y.mp3"))], [1, 2, 3]);
+});
+
+test("openverse search retries a 504 and a 429, gives up on a 400", async () => {
+  const answers = (codes) => { let i = 0; return async () => { const c = codes[i++];
+    return { ok: c === 200, status: c, text: async () => "x", json: async () => ({ results: [{ id: "r" }] }) }; }; };
+  assert.deepEqual(await search("q", {}, answers([504, 429, 200]), { waits: [0, 0] }), [{ id: "r" }]);
+  await assert.rejects(search("q", {}, answers([504, 504, 504]), { waits: [0, 0] }), /Openverse 504/);
+  await assert.rejects(search("q", {}, answers([400, 200]), { waits: [0, 0] }), /Openverse 400/);
 });
 
 test("music-fetch keeps CC0 / CC BY instrumentals of 60 s – 8 min and skips seen ids", () => {
@@ -83,6 +91,9 @@ test("sfx-fetch: CC0 Freesound files within the length limit, ids on disk skippe
   assert.deepEqual(Object.keys(credits), ["brand/sfx/library/click_tick/id1.mp3"]);
   assert.equal(credits["brand/sfx/library/click_tick/id1.mp3"].kind, "click_tick");
   assert.deepEqual([...haveIds(d, "click_tick")].sort(), ["id1", "id2"]);
+  // a folder moved by an interrupted run: only the credits keys are left to fix
+  const again = migrateLegacy(join(d, "library"), { "brand/sfx/library/tick/id3.mp3": { kind: "tick" } });
+  assert.deepEqual(Object.keys(again), ["brand/sfx/library/click_tick/id3.mp3"]);
 });
 
 // ---------- library: measurements ----------

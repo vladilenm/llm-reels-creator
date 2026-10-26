@@ -17,16 +17,22 @@ export function searchUrl(q, { license = "cc0", source = null, page = 1, pageSiz
   return `${API}?${p}`;
 }
 
-export async function search(q, opts = {}, fetchImpl = fetch) {
-  const res = await fetchImpl(searchUrl(q, opts), { headers: UA });
-  if (!res.ok) throw new Error(`Openverse ${res.status}: ${(await res.text()).slice(0, 200)}`);
-  return (await res.json()).results ?? [];
+// A 429 or a 5xx (Openverse answers 504 now and then) is retried after each of `waits` ms
+export async function search(q, opts = {}, fetchImpl = fetch, { waits = [10000, 30000] } = {}) {
+  for (let i = 0; ; i++) {
+    const res = await fetchImpl(searchUrl(q, opts), { headers: UA });
+    if (res.ok) return (await res.json()).results ?? [];
+    if (i >= waits.length || !(res.status === 429 || res.status >= 500))
+      throw new Error(`Openverse ${res.status}: ${(await res.text()).slice(0, 200)}`);
+    console.warn(`Openverse ${res.status} on «${q}», retry in ${waits[i] / 1000} s`);
+    await sleep(waits[i]);
+  }
 }
 
 // maxBytes: a Range request for the head of a long file (the screen needs ~90 s, not the whole track)
 export async function download(url, file, { maxBytes = null } = {}, fetchImpl = fetch) {
   const headers = { ...UA, ...(maxBytes ? { Range: `bytes=0-${maxBytes - 1}` } : {}) };
-  const res = await fetchImpl(url, { headers });
+  const res = await fetchImpl(url, { headers, signal: AbortSignal.timeout(180000) });
   if (!res.ok) throw new Error(`${res.status} ${url}`);
   const buf = Buffer.from(await res.arrayBuffer());
   writeFileSync(file, buf);
