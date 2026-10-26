@@ -499,9 +499,9 @@ const swatch = (a) => {
 };
 OK.O.fan = {
   vb: [-76, -120, 152, 124],
-  svg: () => ['fl', 'fr', 'ft', 'fr', 'fa'].map((c, i) => face(swatch(0), 0, c, 's' + i)).join('') + face(upright(circ(0, 12, 6, 12)), 0, 'fi'),
+  svg: () => ['fl', 'fr', 'ft', 'fr', 'fa'].map((c, i) => face(swatch((i - 2) * 0.32 * 0.12), 0, c, 's' + i)).join('') + face(upright(circ(0, 12, 6, 12)), 0, 'fi'),
   pose: (P, s, T) => {
-    for (let i = 0; i < 5; i++) P['s' + i].setAttribute('points', pts(swatch((i - 2) * 0.32 * s.open).map(([x, z]) => [x, 0, z])));
+    for (let i = 0; i < 5; i++) P['s' + i].setAttribute('points', pts(swatch((i - 2) * 0.32 * (0.12 + 0.88 * s.open)).map(([x, z]) => [x, 0, z])));
     P.s4.style.fill = s.active > 0.5 ? T.on : '';
   },
 };
@@ -518,6 +518,7 @@ OK.O.chart = {
     const k = 0.15 + 0.85 * s.fill;
     BARS.forEach((h, i) => { P['b' + i].innerHTML = bar(i, h * k); });
     P.b3.querySelectorAll('polygon')[2].style.fill = s.active > 0.5 ? T.on : '';
+    P.tr.setAttribute('points', BARS.map((h, i) => at(-49 + i * 32, 0, 6 + h * k + 14).join(',')).join(' '));
     P.tr.style.strokeDashoffset = (1 - c01((s.fill - 0.5) * 2)).toFixed(4);
   },
 };
