@@ -595,18 +595,18 @@ OK.O.mail = {
 // rocket (a launch, growth, speed): a body, a nose, fins and a flame; open launches it up, play flickers the flame,
 // active lights the window
 OK.O.rocket = {
-  vb: [-50, -220, 100, 250],
+  vb: [-54, -220, 108, 252],
   svg: () => {
     const [rx, ry] = OK.ellipse(24), [X, Yt] = OK.iso(0, 0, 120);
-    return `<g data-p="rk"><polygon class="fa" data-p="fire" points="${[[-12, 0, 22], [12, 0, 22], [0, 0, -14]].map((p) => at(...p).join(',')).join(' ')}"/>`
-      + face([[-24, 26], [-50, 0], [-24, 56]], 0, 'fr') + face([[24, 26], [50, 0], [24, 56]], 0, 'fr')
+    return `<g data-p="rk"><polygon class="fa" data-p="fire" points="${upright([[-12, 24], [12, 24], [0, -18]]).map(([x, z]) => at(x, 0, z).join(',')).join(' ')}"/>`
+      + face(upright([[-22, 30], [-46, 4], [-22, 60]]), 0, 'fr') + face(upright([[22, 30], [46, 4], [22, 60]]), 0, 'fr')
       + OK.cyl(0, 0, 20, 24, 100)
       + `<path class="ft" d="M${f1(X - rx)},${f1(Yt)} A${f1(rx)},${f1(ry)} 0 0 0 ${f1(X + rx)},${f1(Yt)} L${f1(X)},${f1(Yt - 56)} Z"/>`
       + OK.disc(8, 8, 86, 10, 'y', 'fd', 'win') + '</g>';
   },
   pose: (P, s, T) => {
     P.rk.setAttribute('transform', `translate(0 ${f1(-36 * s.open)})`);
-    const k = 0.7 + 0.3 * s.play * (0.5 + 0.5 * Math.sin(s.t * 23)), [fx, fy] = OK.iso(0, 0, 22);
+    const k = 0.7 + 0.3 * s.play * (0.5 + 0.5 * Math.sin(s.t * 23)), [ux, uz] = upright([[0, 24]])[0], [fx, fy] = OK.iso(ux, 0, uz);
     P.fire.setAttribute('transform', `translate(${f1(fx)} ${f1(fy)}) scale(1 ${k.toFixed(3)}) translate(${f1(-fx)} ${f1(-fy)})`);
     P.fire.style.opacity = (0.4 + 0.6 * Math.max(s.play, s.open)).toFixed(3);
     P.win.style.fill = s.active > 0.5 ? T.on : '';
