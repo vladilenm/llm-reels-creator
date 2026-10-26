@@ -2,6 +2,7 @@
 # The customer's listening page for the brand sound library (design 2026-10-26). Claude cannot hear:
 # the customer marks «беру / нет» once, and the marks become the library.
 #   python3 scripts/ru/sound_review.py build [--out .cache/sound-review] [--voice-reel <reel>] [--voice-start 5] [--swap-t 43.29]
+#                                            [--level -17] [--duck -9]   (music against the voice, as fx.json sound.music)
 #   python3 scripts/ru/sound_review.py serve [--out .cache/sound-review] [--port 8765]   → http://127.0.0.1:8765
 #   python3 scripts/ru/sound_review.py apply [--out .cache/sound-review] [--no-index]
 #   common: [--music-dir brand/music] [--lib brand/sfx/library]
@@ -396,6 +397,9 @@ def main():
     mdir = os.path.abspath(opt("--music-dir", os.path.join(ROOT, "brand", "music")))
     lib = os.path.abspath(opt("--lib", os.path.join(ROOT, "brand", "sfx", "library")))
     if a[0] == "build":
+        global LEVEL_DB, DUCK_DB
+        LEVEL_DB, DUCK_DB = float(opt("--level", LEVEL_DB)), float(opt("--duck", DUCK_DB))
+        print(f"music {LEVEL_DB:g} dB against the voice between phrases, {LEVEL_DB + DUCK_DB:g} dB under speech")
         build(out, mdir, lib, os.path.abspath(opt("--voice-reel", DEFAULT_REEL)), float(opt("--voice-start", 5)), float(opt("--swap-t", 43.29)))
     elif a[0] == "serve":
         serve(out, mdir, lib, int(opt("--port", 8765)))
