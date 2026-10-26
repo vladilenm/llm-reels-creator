@@ -2501,7 +2501,7 @@ clip("09-ear", 32.43, 35.74, "panel", "OK.run", (L) => ({
   mode: "panel", theme: "night",
   chapter: { idx: "03 — если звука нет", l1: "Если звука", l2: "нет в базе", y: 170, tin: -0.1,
     keys: [[L(W("earshot", 34.8)), { idx: "03 — инструмент", l1: "Инструмент 3", l2: "earshot" }]] },
-  prompt: { y: 390, w: 900, text: "стеклянный звон задом наперёд", t: L(W("если", 32.5)), dur: 0.8,
+  prompt: { y: 390, w: 840, text: "стеклянный звон задом наперёд", t: L(W("если", 32.5)), dur: 0.8,
     send: L(W("звука", 33)), reply: { t: L(W("нет", 33.3)), text: "Openverse · 0 результатов" }, tout: L(W("третий", 34.4)) - 0.1 },
   items: [{ id: "ear", kind: "ear", x: 540, y: 760, size: 220, tin: L(W("третий", 34.4)), label: { text: "earshot", tin: L(W("earshot", 34.8)) },
     states: [[L(W("earshot", 34.8)), { play: 1 }]], active: [[L(W("earshot", 34.8)), 1]] }],
