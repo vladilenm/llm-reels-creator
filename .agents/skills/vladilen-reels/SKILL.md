@@ -308,7 +308,7 @@ With `look: "night"` the base is `python3 scripts/ru/wide/night_base.py $P --pre
 speaker by the mask ×1.1 from the bottom with a halo (a soft shadow on light accents), punch-ins 1.00 ↔ 1.05 on the
 joins, accents from `work/accents.json` under him — the word is always behind the head. `obs_base.py` and `obs_swaps.py`
 stay for the light look.
-Background swaps depend on the wall:
+In the light look, background swaps depend on the wall:
 - **plain wall, nothing at the shoulder → swaps with the mask** (customer twice on 2026-10-25, claude-sfx and
   harness2: «с маской, чтоб фон вырезать»): render each swap as a full dark `.mp4` (background, glow behind
   the speaker, text; no hole for the card), list them in `work/swaps.json` and leave them out of
