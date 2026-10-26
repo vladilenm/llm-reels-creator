@@ -74,34 +74,47 @@ export function composite(project, out, { scale = 1, video } = {}) {
   const W = Math.round(1080 * scale), H = Math.round(1920 * scale);
   const f = [`[0:v]scale=${W}:${H},setsar=1,format=yuva444p[b0]`];
   let last = "b0";
+  // cine: overlay keeps 4:4:4 (its default 4:2:0 output shifts levels once the frame goes through RGB)
+  const ov = cine ? ":format=yuv444" : "";
+  const glows = [];   // night clips that glow: { k, in, out }
   clips.forEach((c, i) => {
     const k = i + 1, en = `enable='between(t,${c.in},${c.out})'`;
     const src = `[${k}:v]scale=${W}:${H},format=yuva444p,tpad=stop_mode=clone:stop_duration=30`;
-    if (!(cine && c.theme !== "light" && c.glow !== false)) {
-      f.push(`${src},setpts=PTS-STARTPTS+${c.in}/TB[c${k}]`);
-      f.push(`[${last}][c${k}]overlay=0:0:${en}:eof_action=pass[b${k}]`);
-    } else {
-      // glow: the clip blurred (alpha premultiplied, black where it is empty), padded with black up to its start,
-      // screened over the frame while the clip plays; shortest=1 keeps the base's length.
-      // overlay's default output is 4:2:0; going yuva420p -> gbrp -> yuva444p shifts every level by 2-3, so the
-      // overlay keeps 4:4:4 here (the frame without cine and the frame with it then match to about a level)
+    if (!(cine && c.theme !== "light" && c.glow !== false)) f.push(`${src},setpts=PTS-STARTPTS+${c.in}/TB[c${k}]`);
+    else {
+      // the glow branch: only the clip's own window (+0.1 s: the window is inclusive of its last frame), the clip blurred
+      // with its alpha premultiplied (black where it is empty), moved to its start; a clip shorter than the window holds its last frame
+      glows.push({ k, in: c.in, out: c.out });
       f.push(`${src},split[s${k}][h${k}]`, `[s${k}]setpts=PTS-STARTPTS+${c.in}/TB[c${k}]`,
-        `[h${k}]format=gbrap,premultiply=inplace=1,format=gbrp,gblur=sigma=${+(GLOW.sigma * scale).toFixed(2)},setpts=PTS-STARTPTS,tpad=start_duration=${c.in}:color=black[g${k}]`,
-        `[${last}][c${k}]overlay=0:0:${en}:eof_action=pass:format=yuv444,format=gbrp[o${k}]`,
-        `[o${k}][g${k}]blend=all_mode=screen:all_opacity=${GLOW.opacity}:shortest=1:${en},format=yuva444p[b${k}]`);
+        `[h${k}]trim=duration=${+(c.out - c.in + 0.1).toFixed(3)},format=gbrap,premultiply=inplace=1,format=gbrp,gblur=sigma=${+(GLOW.sigma * scale).toFixed(2)},setpts=PTS-STARTPTS+${c.in}/TB[g${k}]`);
     }
+    f.push(`[${last}][c${k}]overlay=0:0:${en}:eof_action=pass${ov}[b${k}]`);
     last = `b${k}`;
   });
   if (cine) {
+    if (glows.length) {
+      // one glow for the whole frame: a black plate with the frame's timing gets every blurred branch in its window,
+      // then ONE screen blend of the frame with the plate (black = no change), so the frame makes a single RGB round
+      // trip however many night clips there are. Where two glow windows overlap, the later clip's glow wins
+      // (an RGB overlay replaces; screen-blending the branches onto the plate instead shifted the frame's levels again).
+      f.push(`[${last}]split[m][pl]`, `[pl]format=gbrp,colorchannelmixer=rr=0:gg=0:bb=0[p0]`);
+      let plate = "p0";
+      for (const g of glows) {
+        f.push(`[${plate}][g${g.k}]overlay=0:0:enable='between(t,${g.in},${g.out})':eof_action=pass:format=gbrp[p${g.k}]`);
+        plate = `p${g.k}`;
+      }
+      f.push(`[m]format=gbrp[mr]`, `[mr][${plate}]blend=all_mode=screen:all_opacity=${GLOW.opacity}:shortest=1,format=yuva444p[glow]`);
+      last = "glow";
+    }
     f.push(`[${last}]format=yuv444p,vignette=angle=${FINISH.vignette},noise=c0s=${FINISH.grain}:c0f=t:all_seed=${FINISH.seed},format=yuva444p[fin]`);
     last = "fin";
   }
   if (existsSync(captions)) {
     const k = inputs.length - 1;
     f.push(`[${k}:v]scale=${W}:${H},format=yuva444p[cap]`);
-    // with the glow in the graph ffmpeg's 4:2:0 overlay would scale the captions' white down to ~233 (a range quirk):
-    // under cine the captions go on in 4:4:4
-    f.push(`[${last}][cap]overlay=0:0:eof_action=pass${cine ? ":format=yuv444" : ""}[bc]`);
+    // empirical workaround: after the RGB path ffmpeg's default 4:2:0 overlay brings the white captions out at ~218
+    // (a range quirk); in 4:4:4 they stay at full white
+    f.push(`[${last}][cap]overlay=0:0:eof_action=pass${ov}[bc]`);
     last = "bc";
   }
   f.push(`[${last}]format=yuv420p[v]`);

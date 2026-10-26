@@ -1143,3 +1143,39 @@ test("assemble cine finish: glow on night clips only while they play, none on li
   writeFileSync(join(P, "fx/fx.json"), "{ nope");
   assert.throws(() => composite(P, join(P, "work/x.mov")), /fx\/fx\.json: /);
 });
+
+function patchRGB(get, x, y, r = 4) {
+  const s = [0, 0, 0]; let n = 0;
+  for (let j = -r; j <= r; j++) for (let i = -r; i <= r; i++) { const p = get(x + i, y + j); for (let c = 0; c < 3; c++) s[c] += p[c]; n++; }
+  return s.map((v) => v / n);
+}
+
+test("assemble cine finish: the frame's colours stay put however many night clips there are, and every clip still glows", { timeout: 240000 }, async () => {
+  const { composite } = await import(new URL("../scripts/ru/assemble.mjs", import.meta.url));
+  const squares = [[100, 300], [800, 300], [100, 1500]], windows = [[0.2, 0.4], [0.4, 0.6], [0.6, 0.8]];
+  for (const base of ["0x3C1E78", "0x0E0B14"]) {
+    const P = tmp("drift-");
+    for (const d of ["renders/kit", "broll", "work", "fx"]) mkdirSync(join(P, d), { recursive: true });
+    ff("-f", "lavfi", "-i", `color=c=${base}:s=1080x1920:r=25:d=1`, "-c:v", "libx264", "-pix_fmt", "yuv420p", join(P, "renders/picture.mp4"));
+    squares.forEach(([x, y], i) => ff("-f", "lavfi", "-i", `color=c=black@0.0:s=1080x1920:r=25:d=0.4,format=rgba,drawbox=x=${x}:y=${y}:w=80:h=80:color=white@1:t=fill:replace=1`,
+      "-c:v", "prores_ks", "-profile:v", "4", "-pix_fmt", "yuva444p10le", join(P, `broll/sq${i}.mov`)));
+    writeFileSync(join(P, "broll/plan.json"), JSON.stringify({ video: "../renders/picture.mp4",
+      clips: windows.map(([a, b], i) => ({ id: `sq${i}`, in: a, out: b, kind: "panel", file: `sq${i}.mov` })) }));
+    composite(P, join(P, "work/plain.mov"));
+    writeFileSync(join(P, "fx/fx.json"), JSON.stringify({ cine: true }));
+    composite(P, join(P, "work/cine.mov"));
+    const mids = windows.map(([a, b]) => Math.round((a + b) / 2 * 25));   // frames 7, 12, 17
+    // before the first clip and inside each of the three: the middle of the frame is where the finish does nothing but the RGB round trip
+    for (const n of [3, ...mids]) {
+      const a = patchRGB(frameRGB(join(P, "work/plain.mov"), n), 540, 960), b = patchRGB(frameRGB(join(P, "work/cine.mov"), n), 540, 960);
+      a.forEach((v, c) => assert.ok(Math.abs(v - b[c]) <= 2, `${base} frame ${n} channel ${c}: plain ${a.map((q) => q.toFixed(1))} cine ${b.map((q) => q.toFixed(1))}`));
+    }
+    // every clip glows next to its square while it plays (against the same spot after all of them are gone)
+    const after = frameRGB(join(P, "work/cine.mov"), 23);
+    squares.forEach(([x, y], i) => {
+      const on = patchRGB(frameRGB(join(P, "work/cine.mov"), mids[i]), x + 86, y + 40, 2), off = patchRGB(after, x + 86, y + 40, 2);
+      const d = (on[0] + on[1] + on[2] - off[0] - off[1] - off[2]) / 3;
+      assert.ok(d > 10, `${base} clip ${i} glow ${d.toFixed(1)}`);
+    });
+  }
+});
