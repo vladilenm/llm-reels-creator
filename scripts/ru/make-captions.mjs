@@ -150,7 +150,16 @@ export function kineticConfig(brand, overrides = {}) {
   return k;
 }
 
+const keyAt = (keys = [], t, field, base) => {
+  let v = base;
+  for (const k of [...keys].sort((a, b) => a.at - b.at)) if (t >= k.at) v = k[field];
+  return v;
+};
+// the caption theme at time t ("light" | "dark"): theme_keys, else theme_default, else light
+const themeAtFn = (o = {}) => (t) => (keyAt(o.theme_keys, t, "theme", o.theme_default ?? "light") === "dark" ? "dark" : "light");
+
 export function kineticGroups(transcript, k, overrides = {}) {
+  const themeAt = themeAtFn(overrides.kinetic);
   const words = transcript.words.filter((w) => (w.type ? w.type === "word" : true) && String(w.text ?? "").trim());
   const acc = new Set((overrides.kinetic?.accent_words ?? []).map(kKey));
   const accT = overrides.kinetic?.accent ?? [], brk = overrides.kinetic?.breaks ?? [];
@@ -160,7 +169,9 @@ export function kineticGroups(transcript, k, overrides = {}) {
     const text = kText(w.text);
     const len = [...cur.map((x) => x.text), text].join(" ").length;
     const gapBefore = cur.length ? w.start - cur.at(-1).end : 0;
-    const forced = brk.some((t) => Math.abs(t - w.start) <= 0.06);
+    // a group has one theme, taken at its first word: a theme edge between two words ends the group
+    const themeCut = cur.length > 0 && themeAt(w.start) !== themeAt(cur[0].start);
+    const forced = themeCut || brk.some((t) => Math.abs(t - w.start) <= 0.06);
     if (cur.length && (forced || cur.length >= k.max_words || len > k.max_chars || gapBefore > k.gap)) {
       // a preposition or conjunction never ends a group: it moves on with the word it belongs to
       const carry = !forced && gapBefore <= k.gap && cur.length > 1 && DANGLING.has(kKey(cur.at(-1).text)) ? [cur.pop()] : [];
@@ -178,32 +189,29 @@ export function kineticGroups(transcript, k, overrides = {}) {
   });
 }
 
-const keyAt = (keys = [], t, field, base) => {
-  let v = base;
-  for (const k of [...keys].sort((a, b) => a.at - b.at)) if (t >= k.at) v = k[field];
-  return v;
-};
-
 export function kineticHtml(groups, { duration, brand, fontUrl, accentUrl, fps = 30, overrides = {} }) {
   const k = kineticConfig(brand, overrides), o = overrides.kinetic ?? {};
   const lineH = Math.round(k.font_px * 1.25);
   const yKeys = (o.y_keys ?? []).map((x) => ({ at: x.at, baseline_y: x.y }));
-  // a group's height is fixed at its start: end it where the height changes, or it lands on the face
-  // for the frames between a card's exit and the next group (2026-10-24 youtube-skills)
+  const themeAt = themeAtFn(o);
+  // a group's height and theme are fixed at its start: end it where the height or the theme changes, or it lands
+  // on the face for the frames between a card's exit and the next group (2026-10-24 youtube-skills), or its
+  // tail spills white over a light window / dark over the night background
   groups = groups.map((g) => {
-    const y0 = baselineAt(yKeys, g.start, k.y);
-    const change = yKeys.filter((x) => x.at > g.start + 0.05 && baselineAt(yKeys, x.at, k.y) !== y0).map((x) => x.at);
+    const y0 = baselineAt(yKeys, g.start, k.y), t0 = themeAt(g.lines[0][0].start);
+    const change = [...yKeys.filter((x) => x.at > g.start + 0.05 && baselineAt(yKeys, x.at, k.y) !== y0),
+      ...(o.theme_keys ?? []).filter((x) => x.at > g.start + 0.05 && themeAt(x.at) !== t0)].map((x) => x.at);
     return change.length ? { ...g, end: Math.min(g.end, Math.min(...change)) } : g;
   });
   const clips = groups.map((g, i) => {
     const d = Math.max(0.05, g.end - g.start);
-    const th = keyAt(o.theme_keys, g.start, "theme", o.theme_default ?? "light") === "dark" ? "dark" : "light";
+    const th = themeAt(g.lines[0][0].start);
     const top = Math.round(baselineAt(yKeys, g.start, k.y) - lineH / 2);
     const ws = g.lines[0].map((w, j) => `<span class="w${w.accent ? " acc" : ""}" id="k${i}_${j}">${esc(w.text)}</span>`).join(" ");
     return `<div id="c${i}" class="kg ${th} clip" data-start="${r3(g.start)}" data-duration="${r3(d)}" data-track-index="0" style="top:${top}px">${ws}</div>`;
   }).join("\n");
   const tl = groups.map((g, i) => {
-    const th = keyAt(o.theme_keys, g.start, "theme", o.theme_default ?? "light") === "dark" ? k.dark : k.light;
+    const th = themeAt(g.lines[0][0].start) === "dark" ? k.dark : k.light;
     const out = g.start < 0.25 ? [`tl.set("#c${i}",{opacity:1,y:0},0);`]
       : [`tl.fromTo("#c${i}",{opacity:0,y:10},{opacity:1,y:0,duration:0.16,ease:"power2.out"},${r3(g.start)});`];
     g.lines[0].forEach((w, j) => {
@@ -244,19 +252,36 @@ window.__timelines=window.__timelines||{};window.__timelines["captions"]=tl;
 `;
 }
 
+// A project JSON file or null; a broken file is reported with its name.
+export function readJson(project, rel) {
+  const f = join(project, rel);
+  if (!existsSync(f)) return null;
+  try { return JSON.parse(readFileSync(f, "utf8")); } catch (e) { throw new Error(`${rel}: ${e.message}`); }
+}
+
+// The light windows of the night look as [{in, out}]: light accents (work/accents.json kind "light") and full clips with
+// theme "light" (broll/plan.json), sorted by start. Overlapping or touching windows are merged into one unless
+// { merge: false } (motion-check counts the source windows).
+export function lightWindows(project, { merge = true } = {}) {
+  const src = [...(readJson(project, "work/accents.json")?.accents ?? []).filter((a) => a.kind === "light"),
+    ...(readJson(project, "broll/plan.json")?.clips ?? []).filter((c) => c.kind === "full" && c.theme === "light")]
+    .map((w) => ({ in: w.in, out: w.out })).sort((a, b) => a.in - b.in);
+  if (!merge) return src;
+  const out = [];
+  for (const w of src) {
+    if (out.length && w.in <= out.at(-1).out) out.at(-1).out = Math.max(out.at(-1).out, w.out);
+    else out.push({ ...w });
+  }
+  return out;
+}
+
 // The night look (fx/fx.json "look": "night"): kinetic captions are dark by default and switch to the light theme over
-// light windows by themselves — light accents (work/accents.json kind "light") and full clips with theme "light" in
-// broll/plan.json. Explicit theme_default / theme_keys in PLAN.json win.
+// light windows by themselves (lightWindows). Explicit theme_default / theme_keys in PLAN.json win.
 export function nightCaptions(project, overrides = {}) {
-  const read = (p) => (existsSync(join(project, p)) ? JSON.parse(readFileSync(join(project, p), "utf8")) : null);
-  if (read("fx/fx.json")?.look !== "night") return overrides;
+  if (readJson(project, "fx/fx.json")?.look !== "night") return overrides;
   const k = { ...(overrides.kinetic ?? {}) };
   k.theme_default ??= "dark";
-  if (k.theme_keys == null) {
-    const win = [...(read("work/accents.json")?.accents ?? []).filter((a) => a.kind === "light"),
-      ...(read("broll/plan.json")?.clips ?? []).filter((c) => c.kind === "full" && c.theme === "light")];
-    k.theme_keys = win.sort((a, b) => a.in - b.in).flatMap((w) => [{ at: w.in, theme: "light" }, { at: w.out, theme: k.theme_default }]);
-  }
+  k.theme_keys ??= lightWindows(project).flatMap((w) => [{ at: w.in, theme: "light" }, { at: w.out, theme: k.theme_default }]);
   return { ...overrides, kinetic: k };
 }
 

@@ -445,6 +445,49 @@ test("kinetic captions in the night look: dark by default, light over light acce
   assert.deepEqual(nightCaptions(P, { kinetic: { theme_keys: [{ at: 5, theme: "light" }] } }).kinetic.theme_keys, [{ at: 5, theme: "light" }], "explicit keys win");
 });
 
+test("lightWindows: accents and light full clips, sorted, overlapping and touching windows merged; nightCaptions emits one pair per merged window", async () => {
+  const { lightWindows, nightCaptions } = await import("../scripts/ru/make-captions.mjs");
+  const P = tmp("lw-");
+  for (const d of ["fx", "work", "broll"]) mkdirSync(join(P, d));
+  assert.deepEqual(lightWindows(P), [], "no files: no windows");
+  writeFileSync(join(P, "fx/fx.json"), JSON.stringify({ look: "night" }));
+  writeFileSync(join(P, "work/accents.json"), JSON.stringify({ accents: [{ id: "n", in: 1, out: 2, kind: "night", file: "a" }, { id: "b", in: 20, out: 22, kind: "light", file: "b" }, { id: "a", in: 10, out: 14, kind: "light", file: "a" }] }));
+  writeFileSync(join(P, "broll/plan.json"), JSON.stringify({ clips: [{ id: "c", in: 12, out: 13, kind: "full", theme: "light", file: "c.mp4" }, { id: "t", in: 22, out: 25, kind: "full", theme: "light", file: "t.mp4" }, { id: "p", in: 40, out: 41, kind: "panel", theme: "light", file: "p.mov" }] }));
+  assert.deepEqual(lightWindows(P), [{ in: 10, out: 14 }, { in: 20, out: 25 }]);
+  assert.equal(lightWindows(P, { merge: false }).length, 4, "unmerged: every source window");
+  assert.deepEqual(nightCaptions(P, {}).kinetic.theme_keys,
+    [{ at: 10, theme: "light" }, { at: 14, theme: "dark" }, { at: 20, theme: "light" }, { at: 25, theme: "dark" }]);
+  writeFileSync(join(P, "work/accents.json"), "{ not json");
+  assert.throws(() => lightWindows(P), /work\/accents\.json: /, "a broken JSON names its file");
+});
+
+test("kinetic captions: a theme edge ends a group and starts another, a group never spills across it", async () => {
+  const { kineticGroups, kineticConfig, kineticHtml } = await import("../scripts/ru/make-captions.mjs");
+  const { loadBrand } = await import("../scripts/ru/lib/brand.mjs");
+  const brand = loadBrand();
+  const words = "Раз два три четыре пять шесть семь".split(" ").map((text, i) => ({ text, start: i * 0.4, end: i * 0.4 + 0.3 }));
+  const run = (edges) => {
+    const ov = { style: "kinetic", kinetic: { theme_default: "dark", theme_keys: [{ at: edges[0], theme: "light" }, { at: edges[1], theme: "dark" }] } };
+    const g = kineticGroups({ words }, kineticConfig(brand, ov), ov);
+    const html = kineticHtml(g, { duration: 4, brand, fontUrl: "a.ttf", accentUrl: "b.ttf", overrides: ov });
+    const clips = [...html.matchAll(/id="c(\d+)" class="kg (light|dark) clip" data-start="([\d.]+)" data-duration="([\d.]+)"/g)]
+      .map((m) => ({ theme: m[2], start: Number(m[3]), end: Number(m[3]) + Number(m[4]) }));
+    assert.equal(clips.length, g.length);
+    const inside = (t) => t >= edges[0] && t < edges[1];
+    g.forEach((grp, i) => {
+      const w = grp.lines[0];
+      assert.ok(w.every((x) => inside(x.start) === inside(w[0].start)), `group ${i} straddles an edge: ${w.map((x) => x.text)}`);
+      assert.equal(clips[i].theme, inside(w[0].start) ? "light" : "dark", `group ${i} theme`);
+      for (const e of edges) assert.ok(!(clips[i].start < e && clips[i].end > e + 1e-6), `group ${i} (${clips[i].start}–${clips[i].end}) crosses ${e}`);
+    });
+    return g;
+  };
+  // edges on word starts: Раз два | три четыре | пять шесть семь
+  assert.deepEqual(run([0.8, 1.6]).map((x) => x.lines[0].map((w) => w.text).join(" ")), ["Раз два", "три четыре", "пять шесть семь"]);
+  // edges between word starts: a word belongs to the side its start is on
+  assert.deepEqual(run([0.9, 1.7]).map((x) => x.lines[0].map((w) => w.text).join(" ")), ["Раз два три", "четыре пять", "шесть семь"]);
+});
+
 test("motion-check: known verbs, none twice in a row, at least 5 verbs, each on its word, 1–2 light accents", async () => {
   const { checkMotion, VERBS } = await import("../scripts/ru/motion-check.mjs");
   assert.equal(Object.keys(VERBS).length, 16);
@@ -461,6 +504,40 @@ test("motion-check: known verbs, none twice in a row, at least 5 verbs, each on 
   assert.ok(checkMotion(ok.slice(0, 4), words, 1).errors.some((e) => /не меньше 5/.test(e)));
   assert.ok(checkMotion(ok, words, 3).errors.some((e) => /светлых акцентов 3/.test(e)));
   assert.equal(checkMotion(ok, words, 0).warnings.length, 1);
+});
+
+test("motion-check: malformed entries are errors, ё folds to е, table cells are escaped", async () => {
+  const { checkMotion } = await import("../scripts/ru/motion-check.mjs");
+  const words = [{ text: "Всё", start: 1 }, { text: "дерево", start: 2 }, { text: "три", start: 3 }].map((w) => ({ ...w }));
+  const good = [{ at: 1, word: "все", verb: "fly", what: "a | b\nc" }, { at: 2, word: "дерево", verb: "tree" }, { at: 3, word: "три", verb: "chapter" }];
+  const r = checkMotion(good, words, 1);
+  assert.deepEqual(r.errors.filter((e) => !/не меньше 5/.test(e)), [], "«все» matches «Всё»");
+  assert.match(r.table, /\| 1,00 \| все \| сквозной пролёт \| a \\\| b c \|/, "the pipe is escaped, the newline is a space");
+  const bad = checkMotion([{ at: "1", word: "Всё", verb: "fly" }, { at: 2, verb: "tree" }, { at: 2.5, word: 7, verb: "tree" }, null,
+    { at: 3, word: "три", verb: "toString" }, { at: 3, word: "три", verb: "__proto__" }], words, 1);
+  for (const n of [1, 2, 3, 4]) assert.ok(bad.errors.some((e) => e.startsWith(`запись ${n}: `)), `запись ${n}: ${bad.errors}`);
+  assert.equal(bad.errors.filter((e) => /неизвестный глагол/.test(e)).length, 2, "toString and __proto__ are not verbs");
+  assert.doesNotThrow(() => checkMotion("nope", words, 1));
+  assert.ok(checkMotion("nope", words, 1).errors.some((e) => /motion.*списком/.test(e)));
+});
+
+test("motionCheck(project): counts accents and light full clips, writes MOTION.md, names a broken JSON", async () => {
+  const { motionCheck } = await import("../scripts/ru/motion-check.mjs");
+  const P = tmp("mc-");
+  for (const d of ["work", "broll"]) mkdirSync(join(P, d));
+  writeFileSync(join(P, "transcript.clean.json"), JSON.stringify({ words: [{ text: "Раз", start: 1, type: "word" }, { text: " ", start: 1.2, type: "spacing" }, { text: "два.", start: 2, type: "word" }] }));
+  writeFileSync(join(P, "PLAN.json"), JSON.stringify({ motion: [{ at: 1, word: "Раз", verb: "fly", what: "пролёт" }, { at: 2, word: "два", verb: "lens" }] }));
+  writeFileSync(join(P, "work/accents.json"), JSON.stringify({ accents: [{ id: "l", in: 5, out: 6, kind: "light", file: "a" }, { id: "n", in: 7, out: 8, kind: "night", file: "b" }] }));
+  writeFileSync(join(P, "broll/plan.json"), JSON.stringify({ clips: [{ id: "c", in: 5.5, out: 6.5, kind: "full", theme: "light", file: "c.mp4" }, { id: "p", in: 9, out: 10, kind: "panel", file: "p.mov" }] }));
+  const r = motionCheck(P);
+  assert.equal(r.lights, 2, "source windows are counted, not merged ones");
+  assert.ok(r.errors.some((e) => /не меньше 5/.test(e)));
+  const md = readFileSync(join(P, "MOTION.md"), "utf8");
+  assert.match(md, /^# Раскадровка движений/);
+  assert.match(md, /\| Время \| Слово \| Глагол \| Что в кадре \|/);
+  assert.match(md, /\| 2,00 \| два \| линза \| *\|/);
+  writeFileSync(join(P, "PLAN.json"), "{ nope");
+  assert.throws(() => motionCheck(P), /PLAN\.json: /);
 });
 
 // ---------- night base ----------

@@ -6,9 +6,10 @@
 // светлых акцентов (work/accents.json kind "light" и полные клипы broll/plan.json с theme "light") 1–2.
 // Пишет MOTION.md — таблицу для отчёта на превью.
 //   node scripts/ru/motion-check.mjs <project>      код выхода 1, если правило нарушено
-import { readFileSync, writeFileSync, existsSync } from "node:fs";
+import { writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { readJson, lightWindows } from "./make-captions.mjs";
 
 export const VERBS = {
   fly: "сквозной пролёт", pull: "вытягивание", live: "живой интерфейс", layers: "слои в глубину", lens: "линза",
@@ -16,13 +17,26 @@ export const VERBS = {
   physics: "физика предмета", callouts: "выноски", active: "активный пункт", chapter: "глава", return: "возврат",
   morph: "морф значка", prompt: "строка ввода",
 };
-const norm = (s) => s.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, "");
+const norm = (s) => String(s ?? "").toLowerCase().replace(/ё/g, "е").replace(/[^\p{L}\p{N}]+/gu, "");
+const cell = (s) => String(s ?? "").replace(/\|/g, "\\|").replace(/[\r\n]+/g, " ");
 
 export function checkMotion(motion = [], words = [], lights = 0) {
-  const errors = [], warnings = [], list = [...motion].sort((a, b) => a.at - b.at);
+  const errors = [], warnings = [], list = [];
+  if (!Array.isArray(motion)) { errors.push("motion в PLAN.json должен быть списком записей {at, word, verb, what}"); motion = []; }
+  motion.forEach((m, i) => {
+    const bad = [];
+    if (m == null || typeof m !== "object") bad.push("это не запись {at, word, verb, what}");
+    else {
+      if (typeof m.at !== "number" || !Number.isFinite(m.at)) bad.push(`at должно быть числом секунд, а не ${JSON.stringify(m.at)}`);
+      if (typeof m.word !== "string" || !m.word.trim()) bad.push(`word должно быть словом из расшифровки, а не ${JSON.stringify(m.word)}`);
+    }
+    if (bad.length) errors.push(`запись ${i + 1}: ${bad.join("; ")}`); else list.push(m);
+  });
+  list.sort((a, b) => a.at - b.at);
   list.forEach((m, i) => {
-    if (!VERBS[m.verb]) errors.push(`${m.at} «${m.word}»: неизвестный глагол «${m.verb}» (есть: ${Object.keys(VERBS).join(", ")})`);
-    if (i && list[i - 1].verb === m.verb) errors.push(`${m.at} «${m.word}»: «${VERBS[m.verb] ?? m.verb}» второй раз подряд`);
+    const known = Object.hasOwn(VERBS, m.verb);
+    if (!known) errors.push(`${m.at} «${m.word}»: неизвестный глагол «${m.verb}» (есть: ${Object.keys(VERBS).join(", ")})`);
+    if (i && list[i - 1].verb === m.verb) errors.push(`${m.at} «${m.word}»: «${known ? VERBS[m.verb] : m.verb}» второй раз подряд`);
     if (!words.some((w) => norm(w.text) === norm(m.word) && Math.abs(w.start - m.at) <= 0.25)) errors.push(`${m.at}: слова «${m.word}» нет в ±0,25 с`);
   });
   const kinds = new Set(list.map((m) => m.verb));
@@ -31,24 +45,23 @@ export function checkMotion(motion = [], words = [], lights = 0) {
   if (lights === 0) warnings.push("светлых акцентов нет: обычно 1–2 на самые сильные места");
   const fmt = (s) => s.toFixed(2).replace(".", ",");
   const table = ["| Время | Слово | Глагол | Что в кадре |", "|---|---|---|---|",
-    ...list.map((m) => `| ${fmt(m.at)} | ${m.word} | ${VERBS[m.verb] ?? m.verb} | ${m.what ?? ""} |`)].join("\n");
+    ...list.map((m) => `| ${fmt(m.at)} | ${cell(m.word)} | ${cell(Object.hasOwn(VERBS, m.verb) ? VERBS[m.verb] : m.verb)} | ${cell(m.what)} |`)].join("\n");
   return { errors, warnings, table, verbs: kinds.size };
 }
 
 export function motionCheck(project) {
   project = resolve(project);
-  const read = (p) => (existsSync(join(project, p)) ? JSON.parse(readFileSync(join(project, p), "utf8")) : null);
-  const words = (read("transcript.clean.json")?.words ?? []).filter((w) => (w.type ?? "word") === "word");
-  const lights = (read("work/accents.json")?.accents ?? []).filter((a) => a.kind === "light").length
-    + (read("broll/plan.json")?.clips ?? []).filter((c) => c.kind === "full" && c.theme === "light").length;
-  const r = checkMotion(read("PLAN.json")?.motion ?? [], words, lights);
+  const words = (readJson(project, "transcript.clean.json")?.words ?? []).filter((w) => (w.type ?? "word") === "word");
+  const lights = lightWindows(project, { merge: false }).length;
+  const r = checkMotion(readJson(project, "PLAN.json")?.motion ?? [], words, lights);
   writeFileSync(join(project, "MOTION.md"), `# Раскадровка движений\n\nГлаголов: ${r.verbs} · светлых акцентов: ${lights}\n\n${r.table}\n`);
   return { ...r, lights };
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   if (!process.argv[2]) { console.log("Usage: node scripts/ru/motion-check.mjs <project>"); process.exit(1); }
-  const r = motionCheck(process.argv[2]);
+  let r;
+  try { r = motionCheck(process.argv[2]); } catch (e) { console.log("✗ " + (e.message || e)); process.exit(1); }
   for (const w of r.warnings) console.log("⚠ " + w);
   for (const e of r.errors) console.log("✗ " + e);
   console.log(r.errors.length ? `FAIL · ${r.errors.length}` : `PASS · глаголов ${r.verbs}, светлых акцентов ${r.lights} → MOTION.md`);
