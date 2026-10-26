@@ -287,3 +287,63 @@ test("sound.py --plan writes only the aligned music; --sfx mixes another SFX tra
   assert.equal(JSON.parse(readFileSync(join(P, "fx/sound.q.json"), "utf8")).sfx.src, "fx/sfx.alt.wav");
   assert.ok(existsSync(join(P, "fx/mix.q.wav")));
 });
+
+// ---------- reel: sfx_real ----------
+
+test("sfx_real: events, brand density rules, one hero hit, signature cue, the trim against the voice", () => {
+  const r = py(`
+import sys, numpy as np
+sys.path.insert(0, "scripts/ru/fx"); import sfx_real as R
+words = [{"text": "Привет,", "start": 0.2, "end": 0.9}, {"text": "мир.", "start": 1.05, "end": 1.5}]
+ev = R.resolve_events({"location_joins": [1.55], "sfx": [{"name": "клик", "kind": "click", "word": "мир", "offset": 0.1, "gain": 0.045}]}, words)
+assert [e["kind"] for e in ev] == ["click", "whoosh"], ev
+assert abs(ev[0]["t"] - 1.15) < 1e-6 and abs(ev[1]["t"] - 1.53) < 1e-6, ev
+cfg = dict(R.DEFAULTS)
+ticks = [{"name": f"t{i}", "kind": "tick", "t": 10 + 0.5 * i, "gain": 0.03} for i in range(6)]
+kept, dropped = R.thin(ticks, 60, cfg)
+assert [e["name"] for e in kept] == ["t0", "t1", "t2"] and {e["why"] for e in dropped} == {"run"}, (kept, dropped)
+kept, dropped = R.thin([{"name": "pop", "kind": "pop", "t": 5.0, "gain": 0.05}, {"name": "wh", "kind": "whoosh", "t": 5.2, "gain": 0.09}], 60, cfg)
+assert [e["name"] for e in kept] == ["wh"] and dropped[0]["why"] == "merged"
+many = sorted([{"name": f"c{i}", "kind": "click", "t": float(i), "gain": 0.045} for i in range(10)]
+              + [{"name": "sig", "kind": "whoosh_big", "t": 4.5, "gain": 0.12}], key=lambda e: e["t"])
+kept, dropped = R.thin(many, 10, cfg)
+assert sum(e["kind"] == "click" for e in kept) == 5 and any(e["name"] == "sig" for e in kept), kept
+h = R.hero([{"name": "a", "kind": "hit", "t": 1, "gain": 0.2}, {"name": "b", "kind": "hit", "t": 5, "gain": 0.3}])
+assert [e["kind"] for e in h] == ["thump", "hit"] and h[1]["hero"] and not h[0]["hero"]
+sig = {"chosen": "B", "layers": [{"file": "brand/sfx/library/whoosh/w.mp3", "role": "whoosh", "dt": 0, "gain_db": 0},
+                                 {"file": "brand/sfx/library/subdrop/s.mp3", "role": "sub_drop", "dt": 0, "gain_db": -3}]}
+lst, cues = R.typed([{"name": "смена", "kind": "whoosh_big", "t": 3.0, "gain": 0.12, "hero": True},
+                     {"name": "тик", "kind": "tick", "t": 4.0, "gain": 0.06, "hero": False}], sig)
+assert lst == [{"t": 4.0, "type": "tick", "g": 1.5}], lst
+assert cues[0]["file"].startswith("/") and cues[0]["file"].endswith("brand/sfx/library/whoosh/w.mp3")
+assert cues[0]["gain_db"] == 2.0 and cues[0]["layers"][0]["gain_db"] == -1.0 and cues[0]["layers"][0]["role"] == "sub_drop"
+lst2, cues2 = R.typed([{"name": "смена", "kind": "whoosh_big", "t": 3.0, "gain": 0.12, "hero": False}], None)
+assert lst2 == [{"t": 3.0, "type": "whoosh", "g": 1.0, "len": 0.8}] and cues2 == [], lst2
+voice = np.zeros((48000, 2)); voice[100] = 0.5
+sfx = np.zeros((48000, 2)); sfx[200] = 0.5
+out, trim = R.fit_to_voice(sfx, voice, 9.0)
+assert trim == -9.0 and abs(R.S.db(np.abs(out).max()) - (R.S.db(0.5) - 9)) < 0.01
+quiet = np.zeros((48000, 2)); quiet[200] = 0.01
+assert R.fit_to_voice(quiet, voice, 9.0)[1] == 0.0
+print("ok")
+`);
+  assert.equal(r.status, 0, r.stderr + r.stdout);
+});
+
+test("sfx_real --dry writes the kept and dropped events without running Real SFX; sfx.py refuses the real engine", () => {
+  const P = tmp("sfxr-");
+  mkdirSync(join(P, "fx"));
+  writeFileSync(join(P, "transcript.clean.json"), JSON.stringify({ audio_duration_secs: 4, words: [{ text: "раз", start: 0.2, end: 0.9 }] }));
+  writeFileSync(join(P, "fx/fx.json"), JSON.stringify({ sfx_engine: "real", sfx: [
+    { name: "a", kind: "tick", t: 1.0, gain: 0.03 }, { name: "b", kind: "pop", t: 1.1, gain: 0.05 }, { name: "c", kind: "hit", t: 2.5, gain: 0.22 }] }));
+  let r = spawnSync("python3", ["scripts/ru/fx/sfx_real.py", P, "--dry"], { cwd: ROOT, encoding: "utf8" });
+  assert.equal(r.status, 0, r.stderr);
+  const rep = JSON.parse(readFileSync(join(P, "fx/sfx.real.json"), "utf8"));
+  assert.deepEqual(rep.kept.map((e) => e.name), ["b", "c"]);      // tick «a» and pop «b» are 0.1 s apart: the pop has priority
+  assert.equal(rep.dropped[0].why, "merged");
+  assert.ok(rep.kept[1].hero);
+  assert.ok(existsSync(join(P, "work/sfx-real/events.json")));
+  r = spawnSync("python3", ["scripts/ru/fx/sfx.py", P], { cwd: ROOT, encoding: "utf8" });
+  assert.equal(r.status, 2);
+  assert.match(r.stdout + r.stderr, /sfx_real\.py/);
+});

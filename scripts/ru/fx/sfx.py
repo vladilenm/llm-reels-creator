@@ -112,6 +112,9 @@ def main():
         print("usage: sfx.py <project>"); sys.exit(1)
     P = os.path.abspath(sys.argv[1])
     cfg = json.load(open(os.path.join(P, "fx", "fx.json")))
+    if cfg.get("sfx_engine") == "real":
+        print("fx.json sfx_engine is \"real\": run python3 scripts/ru/fx/sfx_real.py <project> (brand library, no synthesis)")
+        sys.exit(2)
     tr = json.load(open(os.path.join(P, "transcript.clean.json")))
     words, dur = tr["words"], float(tr["audio_duration_secs"])
     kit = os.path.join(ROOT, cfg.get("sfx_kit", "brand/sfx"))
