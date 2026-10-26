@@ -200,6 +200,7 @@ test("object scene: drops fall into a folder, the morph grows a timeline the pla
       { id: "tt", kind: "turntable", x: 540, y: 1100, size: 220, tin: 0 },
       { id: "g", kind: "gear", x: 800, y: 700, size: 160, tin: 9 }],
     drops: [{ into: "f", kind: "document", n: 2, t: 0.3, gap: 0.2, size: 70 }],
+    links: [{ from: "f", to: "tt", tin: 0.1, dur: 0.3 }],
     morph: { from: "tt", t: 1.5, dur: 0.6, y: 1150, w: 700, dots: [{ at: 0.2, t: 2.2 }, { at: 0.8, t: 2.3 }], head: { t0: 2.4, t1: 3.0 } },
     prompt: { y: 300, w: 860, text: "стеклянный звон", t: 0.5, dur: 0.6, send: 1.4, reply: { t: 1.6, text: "0 результатов" } },
     assemble: { rect: [720, 560, 168, 168], t: 3.2, dur: 0.6, then: "g" } }));
@@ -210,6 +211,9 @@ test("object scene: drops fall into a folder, the morph grows a timeline the pla
     assert.equal(await c.at(1.3, box, "ok-drop-0-0"), null, "and sinks into the folder");
     assert.equal(await c.at(0.35, box, "ok-drop-0-1"), null, "the second waits for its gap");
     assert.ok(await c.at(2.2, () => +document.getElementById("ok-item-tt").style.opacity) < 0.05, "the turntable folds away");
+    const away = (id) => { const s = getComputedStyle(document.getElementById(id)); return s.display === "none" || +s.opacity < 0.05; };
+    assert.equal(await c.at(1.0, away, "ok-link-0"), false, "the link to the turntable is drawn");
+    assert.equal(await c.at(2.2, away, "ok-link-0"), true, "and leaves with the folded turntable");
     const tl = () => { const l = document.getElementById("ok-tl"); return +l.getAttribute("x2") - +l.getAttribute("x1"); };
     assert.ok(Math.abs(await c.at(2.6, tl) - 700) < 2, "the timeline reaches its width");
     const fill = (i) => document.getElementById("ok-tl-dot-" + i).getAttribute("fill");
@@ -228,6 +232,26 @@ test("object scene: drops fall into a folder, the morph grows a timeline the pla
     assert.ok(await c.at(3.95, () => +document.getElementById("ok-item-g").style.opacity) > 0.8, "the gear is assembled");
     assert.deepEqual(c.errors, []);
   } finally { await c.browser.close(); }
+});
+
+test("object scene: assemble cells sit on the light theme's own grid (84·n + 2), only cells whose centre is in the rect light; panel mode throws", { timeout: 60000 }, async () => {
+  const c = await openClip(scene({ T: 2, mode: "full", theme: "light", bg: { flip: [0, 0.3] },
+    assemble: { rect: [756, 588, 168, 168], t: 0.5, dur: 0.6 } }));
+  try {
+    const cells = () => [...document.querySelectorAll("#ok-cells > div")].map((e) => ({ left: parseFloat(e.style.left), top: parseFloat(e.style.top), on: +e.style.opacity > 0.3 }));
+    const cs = await c.at(0.75, cells);
+    assert.equal(cs.length, 4, "a 168 px rect on the grid holds four cells");
+    assert.ok(cs.every((e) => e.on), "all four are lit");
+    assert.ok(cs.every((e) => e.left % 84 === 2 && e.top % 84 === 2), JSON.stringify(cs));
+    assert.deepEqual(c.errors, []);
+  } finally { await c.browser.close(); }
+  const q = await openClip(scene({ T: 2, mode: "full", theme: "night", assemble: { rect: [100, 100, 10, 10], t: 0.5, dur: 0.6 } }));
+  try {
+    const lone = await q.at(0.8, () => [...document.querySelectorAll("#ok-cells > div")].map((e) => [e.style.left, e.style.top, +e.style.opacity > 0.3]));
+    assert.deepEqual(lone, [["54px", "54px", true]], "a rect too small for a cell centre keeps the cell under its centre, lit");
+  } finally { await q.browser.close(); }
+  const p = await openClip(scene({ T: 2, mode: "panel", theme: "night", assemble: { rect: [756, 588, 168, 168], t: 0.5 } }));
+  try { assert.ok(p.errors.some((m) => /assemble needs mode 'full'/.test(m)), p.errors.join("|")); } finally { await p.browser.close(); }
 });
 
 test("object scene full: light canvas wipes over the night, counter counts, objects drawn in the dark line", { timeout: 60000 }, async () => {

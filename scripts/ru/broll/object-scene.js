@@ -14,8 +14,8 @@
      returns:{to, from:[ids], t, gap:0.12, dur:0.5, bend:0.25, tout},  «возврат»: arrows back to the first item
      drops:[{into:'id'|[x, y], kind:'document', n:1, t, gap:0.22, size:70, from:-320|[x, y]}],   «физика предмета»
      morph:{from, t, dur:0.8, x:540, y, w:760, dots:[{at:0..1, t, on}], head:{t0, t1}},          «морф значка»
-     prompt:{x:540, y, w:900, text, t, dur:0.9, send, reply:{t, text}, tout},                      «строка ввода»
-     assemble:{rect:[x, y, w, h], t, dur:0.8, then:'id'},      «сборка из сетки» (full mode: cells match the clip's grid)
+     prompt:{x:540, y, w:840, text, t, dur:0.9, send, reply:{t, text}, tout},                      «строка ввода»
+     assemble:{rect:[x, y, w, h], t, dur:0.8, then:'id'},      «сборка из сетки» (full mode only: cells match the clip's grid)
      links:[{from, to, tin, dur:0.5, dash:false}],                    «дерево и связи»: an elbow from → to
      fly:{id, t, dur:0.4},                                            «сквозной пролёт» into an item
      words:[{text, font:'display'|'serif'|'sans'|'mono', size, y, x:540, t, color}],   accent words: a wipe
@@ -24,7 +24,8 @@
      terminal:{x, y, w, h, title, tin:-1, lines:[{t, text, kind:'cmd'|'out'|'ok', dur:0.55}]},   «живой интерфейс»
    })
    OK.gridCells(parent, rect, {t, dur, step:84, ox:52, oy:52, drift:0, color, id:'ok-cells'}) → {el, draw(t)}: the grid's
-   cells inside rect light in a sweep from its centre and fade (screen-kit win.enter:'grid' uses it too).
+   cells whose centre lies inside rect (at least the one under its centre) light in a sweep from the centre and fade
+   (screen-kit win.enter:'grid' uses it too). The night grid starts at 52, the light grid at 0: pass ox, oy to match.
    Items: x, y = frame px of the object's floor centre, size = drawn width. DOM ids (tests, debugging): ok-scene,
    ok-item-<id>, ok-label-<id>, ok-check-<id>, ok-link-<n>, ok-idx, ok-flip, ok-grid, ok-count, ok-term, ok-row-<n>,
    ok-co-<n>, ok-co-line-<n>, ok-ret-<n>, ok-ret-head-<n>, ok-drop-<n>-<j>, ok-tl, ok-tl-dot-<i>, ok-tl-head, ok-prompt,
@@ -40,22 +41,29 @@ const mix = (a, b, u) => { const A = M.hex(a), B = M.hex(b); return `rgb(${A.map
 const groups = (n) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
 const wipe = (u, pad = '-20%') => `inset(${pad} ${(100 - 100 * u).toFixed(2)}% ${pad} 0)`;
 
-// «сборка из сетки»: the cells of the background grid inside rect light up in a sweep from its centre, then fade.
-// Cells sit on the clip grid (OK and SK grids start at −200 px: lines at 52 + 84·n), drift follows a drifting grid.
+// «сборка из сетки»: the cells of the background grid whose centre lies inside rect light up in a sweep from its centre,
+// then fade; a rect too small to hold a centre keeps the one cell under its centre. Cells sit on the clip grid (night: OK
+// and SK grids start at −200 px, lines at 52 + 84·n; light: lines at 84·n, pass ox/oy 0), drift follows a drifting grid.
 OK.gridCells = (parent, rect, o = {}) => {
   const step = o.step ?? 84, ox = o.ox ?? 52, oy = o.oy ?? 52, [rx, ry, rw, rh] = rect, color = o.color || '183,156,255';
   const box = document.createElement('div'); box.id = o.id || 'ok-cells';
   Object.assign(box.style, {position: 'absolute', left: '0', top: '0', width: W + 'px', height: H + 'px', pointerEvents: 'none'});
   parent.appendChild(box);
-  const cells = [], cx = rx + rw / 2, cy = ry + rh / 2, R = Math.hypot(rw / 2, rh / 2) || 1;
+  const cells = [], cx = rx + rw / 2, cy = ry + rh / 2, R = Math.hypot(rw / 2, rh / 2) || 1, spots = [];
   for (let gx = ox + Math.floor((rx - ox) / step) * step; gx < rx + rw; gx += step)
     for (let gy = oy + Math.floor((ry - oy) / step) * step; gy < ry + rh; gy += step) {
-      const e = document.createElement('div');
-      Object.assign(e.style, {position: 'absolute', left: (gx + 2) + 'px', top: (gy + 2) + 'px', width: (step - 2) + 'px', height: (step - 2) + 'px',
-        background: `rgba(${color},.34)`, boxShadow: `0 0 18px rgba(${color},.45)`, opacity: '0'});
-      box.appendChild(e);
-      cells.push({e, d: Math.hypot(gx + step / 2 - cx, gy + step / 2 - cy) / R});
+      const mx = gx + step / 2, my = gy + step / 2;
+      if (mx >= rx && mx < rx + rw && my >= ry && my < ry + rh) spots.push([gx, gy]);     // a 4 px overlap does not light a whole column
     }
+  const lone = !spots.length;
+  if (lone) spots.push([ox + Math.floor((cx - ox) / step) * step, oy + Math.floor((cy - oy) / step) * step]);
+  for (const [gx, gy] of spots) {
+    const e = document.createElement('div');
+    Object.assign(e.style, {position: 'absolute', left: (gx + 2) + 'px', top: (gy + 2) + 'px', width: (step - 2) + 'px', height: (step - 2) + 'px',
+      background: `rgba(${color},.34)`, boxShadow: `0 0 18px rgba(${color},.45)`, opacity: '0'});
+    box.appendChild(e);
+    cells.push({e, d: lone ? 0 : Math.hypot(gx + step / 2 - cx, gy + step / 2 - cy) / R});     // a lone cell is the centre: it lights first
+  }
   const dur = o.dur ?? 0.8;
   return {el: box, draw: (t) => {
     const a = (t - o.t) / dur, live = a >= 0 && a <= 1.05;
@@ -267,7 +275,7 @@ OK.run = (cfg) => {
   // prompt («строка ввода»): a glass input bar over the head; the query types, the send button lights, the reply comes
   let prompt = null;
   if (cfg.prompt) {
-    const c = cfg.prompt, w = c.w ?? 900, x = (c.x ?? 540) - w / 2;
+    const c = cfg.prompt, w = c.w ?? 840, x = (c.x ?? 540) - w / 2;
     const bar = el('a okpr', root, 'div', 'ok-prompt');
     Object.assign(bar.style, {left: x + 'px', top: c.y + 'px', width: w + 'px', color: TH.ink,
       background: theme === 'night' ? 'rgba(24,18,38,.94)' : '#FFFFFF', boxShadow: `0 0 0 3px rgba(${TH.glow},.45),0 0 40px 2px rgba(124,58,237,.22)`});
@@ -286,8 +294,10 @@ OK.run = (cfg) => {
   let cellsA = null;
   if (cfg.assemble) {
     const A = cfg.assemble;
+    if (!full) throw new Error("OK: assemble needs mode 'full' (its cells sit on the clip's own grid)");
     if (A.then) need(A.then, 'assemble.then');
-    cellsA = OK.gridCells(scene, A.rect, {t: A.t, dur: A.dur, drift: full && theme === 'night' ? 6 : 0, color: TH.glow});
+    const g0 = theme === 'light' ? 0 : 52;                                  // the light grid starts at 0, the night grid at 52
+    cellsA = OK.gridCells(scene, A.rect, {t: A.t, dur: A.dur, ox: g0, oy: g0, drift: theme === 'night' ? 6 : 0, color: TH.glow});
     scene.insertBefore(cellsA.el, scene.firstChild);
     if (A.then) { items[A.then].it.tin = A.t + (A.dur ?? 0.8) * 0.55; items[A.then].it.ghost = false; }
   }
