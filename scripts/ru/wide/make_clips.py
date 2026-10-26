@@ -9,7 +9,8 @@
   swaps — смена фона для OBS-карточки: всё вокруг карточки камеры уходит в тёмный фирменный фон (#0E0B14,
           фиолетовое свечение), карточка — прозрачное окно, крупный текст над ней. Без маски.
           items: ln (Golos 600) · big (Spectral курсив, свечение) · num (Plex Mono) · pill (ссылка);
-          kind: line — мягкое появление, pop — пружина, count — счётчик 0 → число; fade_out: false — до конца.
+          kind: line — мягкое появление, pop — пружина, count — счётчик 0 → число; fade_out: false — до конца;
+          fade_in: false — тёмный слой сразу (вплотную после тёмной врезки, иначе в карточке видна врезка).
 В plan.json смены фона идут последними: assemble.mjs кладёт их поверх окон, перекрытие на 0,15–0,3 с даёт
 плавный уход окна под тёмный слой. Рендер: scripts/ru/wide/render-clips.sh <project>."""
 import json, sys, pathlib
@@ -68,11 +69,11 @@ def swap(s):
   const bg = [mk("hole"), mk("glow"), mk("edge")];
   const IT = {json.dumps(items, ensure_ascii=False)};
   const els = IT.map(it => mk(it.cls, it.kind === "count" ? "" : it.text, it.top, it.size));
-  const T = {T}, OUT0 = {"T - 0.3" if s.get("fade_out", True) else "1e9"};
+  const T = {T}, OUT0 = {"T - 0.3" if s.get("fade_out", True) else "1e9"}, IN0 = {0.25 if s.get("fade_in", True) else 0};
   M.scene({{W:1080, H:1920, T, bg:null, center:[540, 960], intro:null,
     SH:{{none:{{w:0, h:0, r:0, bg:"#FFFFFF", cam:1}}}}, start:"none", SEQ:[], layers:[],
     extra:(t)=>{{
-      const k = M.eo(t / 0.25) * (1 - M.eo((t - OUT0) / 0.3));
+      const k = (IN0 ? M.eo(t / IN0) : 1) * (1 - M.eo((t - OUT0) / 0.3));
       bg.forEach(e => {{ e.style.opacity = k.toFixed(4); }});
       IT.forEach((it, i) => {{
         const e = els[i], v = M.vis(t, it.t - 0.07, OUT0 - 0.05, {{lin:0.3}});

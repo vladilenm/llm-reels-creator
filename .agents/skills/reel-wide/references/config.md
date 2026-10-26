@@ -23,7 +23,7 @@ screen pixels (3024×1964, the right part of the wide frame): read them from
 | `url` | text in the window's address pill: a domain, «Claude», a file name |
 | `src` | which source second is shown at clean time t: `{"at": s, "speed": k, "min", "max"}` = s + (t − t0)·k, clamped (`max` holds the last good frame before a scroll or a send); `{"hold": s}` one frame; `{"real": true}` the frame recorded under these words (EDL map); `{"lin": [[t, s], …]}` piecewise |
 | `cams` | `[t, [x, y, w], dur]`: the screen rectangle shown (h = w / 2.103); each key eases (in-out cubic) from where the camera is; y is clamped above the dock (1830) |
-| `marks` | `hl` — purple marker under words, sweeps in 0.28 s, stays to the end of the shot (or `t1`); `ring` — spring ring with glow, `t0`–`t1`; `rect` = `[x, y, w, h]` of the words |
+| `marks` | `hl` — marker under words, sweeps in 0.28 s, stays to the end of the shot (or `t1`): purple screen blend on dark, lavender multiply on light pages; `ring` — spring ring with glow, `t0`–`t1`; `blur` — mosaic + blur over a secret (an API key value in .env), `t0` = the shot's `t0`, no `t1`; `rect` = `[x, y, w, h]` of the words |
 
 Camera widths that read well at 1080 px: text 600–1150, a whole UI 1300–1600, a figure as a whole
 1300–1560. A typing shot: `{"at": <typing start>, "speed": 2–2.5}` ending before the send (the layout jumps).
@@ -51,6 +51,8 @@ A long agent log: `{"at": …, "speed": 3–3.5}` on a wide camera — reads as 
 - Kit clip: the first shot starts at the clip's `in`; `titles[].tin/tout` in clean seconds; transitions
   `cut` (first shot), `whip` (another app or page), `blur` (another state of the same app).
 - Swap: dark layer fades in 0.25 s from `in`, out over the last 0.3 s (`fade_out: false` holds to the end).
+  Right after a dark full-frame insert use `fade_in: false` and start the swap on the insert's last frame:
+  the dark layer is there at once, and the card hole never shows the insert.
   Overlap the neighbouring kit clips by 0.15–0.3 s on both sides: the window slides under the dark layer.
   Text block between y 430 and 1000 (the card starts at 1100); widths ≤ 960 px: `big` 100–130 px for
   15–17 characters, `ln` 50–66 px. Item `t` = the start of the word it shows.

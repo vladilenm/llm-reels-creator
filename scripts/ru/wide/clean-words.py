@@ -49,5 +49,9 @@ for k in range(1, len(out)):
 edl_copy = work / "transcript.clean.edl.json"
 if not edl_copy.exists() and (P / "transcript.clean.json").exists(): shutil.copy(P / "transcript.clean.json", edl_copy)
 res = dict(src, words=out, text=" ".join(w["text"] for w in out), timeline="clean", source="whisper-1 по renders/clean.mp4 + work/clean-fixes.json")
+# длительность — по текущему clean.mp4: с --no-transcribe расшифровка могла остаться от прошлой сборки (другой хвост)
+dur = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", str(P / "renders/clean.mp4")],
+                     capture_output=True, text=True, check=True).stdout.strip()
+res["audio_duration_secs"] = round(float(dur), 3)
 (P / "transcript.clean.json").write_text(json.dumps(res, ensure_ascii=False, indent=1))
 print(len(out), "слов, сдвинуто начал:", moved); print(res["text"])

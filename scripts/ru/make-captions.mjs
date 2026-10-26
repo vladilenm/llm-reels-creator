@@ -186,6 +186,13 @@ export function kineticHtml(groups, { duration, brand, fontUrl, accentUrl, fps =
   const k = kineticConfig(brand, overrides), o = overrides.kinetic ?? {};
   const lineH = Math.round(k.font_px * 1.25);
   const yKeys = (o.y_keys ?? []).map((x) => ({ at: x.at, baseline_y: x.y }));
+  // a group's height is fixed at its start: end it where the height changes, or it lands on the face
+  // for the frames between a card's exit and the next group (2026-10-24 youtube-skills)
+  groups = groups.map((g) => {
+    const y0 = baselineAt(yKeys, g.start, k.y);
+    const change = yKeys.filter((x) => x.at > g.start + 0.05 && baselineAt(yKeys, x.at, k.y) !== y0).map((x) => x.at);
+    return change.length ? { ...g, end: Math.min(g.end, Math.min(...change)) } : g;
+  });
   const clips = groups.map((g, i) => {
     const d = Math.max(0.05, g.end - g.start);
     const th = keyAt(o.theme_keys, g.start, "theme", "light") === "dark" ? "dark" : "light";

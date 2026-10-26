@@ -59,3 +59,14 @@ fixtures/out/
 
 # Guide images: frames of personal footage
 guide/
+
+# Third-party tools installed locally (earshot venv, clipwing clone) — see vendor/SOURCES.md
+tools/
+
+# Real SFX local state (paths to this machine, index of brand/sfx/library)
+.claude/skills/real-sfx/config.json
+.claude/skills/real-sfx/library_index.json
+.claude/skills/real-sfx/work/
+.claude/skills/real-sfx/result/
+.agents/skills/real-sfx/config.json
+.agents/skills/real-sfx/library_index.json

@@ -94,31 +94,52 @@ key in chat. Sanity check: `cyrillic_share` ≥ 0.6 and the text reads as the to
 of the brief; otherwise stop and show the first lines. Note in STATUS whether the
 result came from cache.
 
+**Speech whisper missed** (lessons voice-studio, senior-ai, gpt-watermarks, fake-customers, claude-phone,
+harness2): whisper skips a repeated phrase, glues coughs and «кхм» to words, invents «Спасибо за просмотр» in
+noise and garbles fast speech. Right after S1:
+
+```bash
+python3 scripts/ru/wide/gaps.py $P [t0-t1 …]      # wide recordings: scan.py $P --gaps --transcribe
+```
+
+`work/GAPS.md` lists every sound > −45 dB with no word on it (f0, voicing; voiced chunks re-transcribed) and
+re-transcribes the src ranges you pass — every phrase that reads as garbage or carries a number. Speech is
+f0 95–180 Hz with voicing ≳ 40 %; a 290 Hz tone or 0 % voicing is a click or hum. Cached, so a rerun is free.
+
 ### S2 Чистка — stop only with --review-cuts (ГЕЙТ A)
 
 ```bash
 P=<project>
-node .claude/skills/cut-silences/scripts/cut-silences.mjs $P/transcript.words.json --out-dir $P/work
 node .claude/skills/cut-mistakes/scripts/find-cut-candidates.mjs $P/transcript.words.json --out-dir $P/work
 ```
 
 Then **read the whole transcript yourself** (`transcript.words.json` text, with
-times) — mandatory even if the detector reports nothing. Decide every candidate:
+times, plus `work/GAPS.md`) — mandatory even if the detector reports nothing. Decide every candidate:
 `hesitation` cut; `retake_marker` cut when the restart repeats the fragment;
 `filler` only when it is padding; add any missed retake, false start or broken
-phrase by hand. Rules: `references/ru-fillers.md`. Write the decisions to
-`$P/work/cuts.approved.json` (`{ "cuts": [{ "start", "end", "reason" }] }`, source
-seconds; reasons in Russian, mark manual ones `вручную: …`). Then:
+phrase by hand, and every click, cough or mumble from `GAPS.md`. Rules: `references/ru-fillers.md`.
+
+**Pauses come from the audio envelope, not from whisper word times** (folded from ten reels'
+lessons, 2026-10-12…25: whisper stretches words over pauses and hides silence inside them; the
+customer asked for shorter joins on almost every reel). Write only the content cuts to
+`$P/work/cuts.manual.json` (`{ "cuts": [{ "start", "end", "reason" }] }`, source seconds, reasons in
+Russian, manual ones `вручную: …`), including the head up to the first word and the tail after the
+last one. Then:
 
 ```bash
-node scripts/ru/build-edl.mjs --transcript $P/transcript.words.json --silence-edl $P/work/source.silence-edl.json \
-  --approved $P/work/cuts.approved.json --video $P/assets/raw.<ext> --project $P --max-pause 0.12
+python3 scripts/ru/wide/env-cuts.py $P             # + every pause inside kept pieces → 0.08 s → work/cuts.approved.json
+node scripts/ru/build-edl.mjs --transcript $P/transcript.words.json --approved $P/work/cuts.approved.json \
+  --video $P/assets/raw.<ext> --project $P --snap-fps <source fps>     # no --silence-edl, no --max-pause
+python3 scripts/ru/wide/clean-words.py $P          # whisper on clean.mp4 + work/clean-fixes.json → transcript.clean.json
 ```
 
 Outputs `EDL.json` (source timeline), `CUTS.md`, `renders/clean.mp4`,
-`transcript.clean.json` (clean timeline — everything after S2 uses only this).
+`transcript.clean.json` (clean timeline — everything after S2 uses only this; spelling, merged words and
+start times whisper misplaces go to `work/clean-fixes.json`).
 With `--review-cuts`: show `CUTS.md` and wait before building. Check: no kept
-gap > 0.6 s, no cut inside a word, the first word survives.
+gap > 0.6 s, no cut inside a word, the first word survives, and **frame 0 is the first word** with the
+eyes open — no silent lead-in (youtube-skills, geo-sleuth, voice-studio). Read the envelope around every
+manual cut (`work/env10ms.npy`) before trusting a word edge.
 
 ### S3 Драматургия — ГЕЙТ B, always stop
 
@@ -178,6 +199,10 @@ room) and run `fx_picture.py $P --prep-relocate` first; close-ups stay the plain
   timeline − clip in-point (`transcript.clean.json`).
 - Only real figures from the speech or the customer; otherwise relative bars,
   skeleton lines or labels from the transcript.
+- **Every clip is complete on its first frame** (senior-ai, fake-customers, harness2): window, title and
+  cards enter at `tin −0.3`, so a clip that follows another never shows 0.1–0.25 s of an empty window or a
+  blank title plate at the join. A background-swap layer ends with a cut, not a fade: a fade shows the
+  empty light canvas before the next window.
 
 ```bash
 SK=.claude/skills/motion-broll
@@ -258,10 +283,31 @@ Default (customer, 2026-10-12): background-swap title moments almost every reel 
 the strongest claims and the ending (usually 2–4 per reel, ≥ 1.2 s each, each on its own
 phrase), with person masks so the text sits behind the head, plus zoom-blur on every
 location change. Propose them in the S3 plan as `fx` events.
+**OBS-template takes** (1080×1920 from his OBS scene: placeholders on top, the camera as a rounded card
+from y 1098). The base is `python3 scripts/ru/wide/obs_base.py $P [--mix]` — brand canvas, the card as
+recorded, punch-ins 1.00 ↔ 1.07 on the joins — not `fx_picture.py`. Background swaps depend on the wall:
+- **plain wall, nothing at the shoulder → swaps with the mask** (customer twice on 2026-10-25, claude-sfx and
+  harness2: «с маской, чтоб фон вырезать»): render each swap as a full dark `.mp4` (background, glow behind
+  the speaker, text; no hole for the card), list them in `work/swaps.json` and leave them out of
+  `broll/plan.json`, then `python3 scripts/ru/wide/obs_swaps.py $P --prep` and `obs_swaps.py $P` → the room and
+  the card frame go, he stays in place on the dark background. Check stills on every swap frame range.
+- **a chair or clutter at the shoulder → no mask**: the swap is a `.mov` layer that darkens everything around
+  the card (geo-sleuth, voice-studio: the Vision mask flickered on the chair back).
+Captions are hidden (`captions.hide`) over a swap whose big text repeats the words.
+
 Also default (customer, 2026-10-12): quiet SFX on every visual event (`scripts/ru/fx/sfx.py`:
 whoosh on transitions, click on presses, pop on appearances, one hit on the key word) and
 small smooth animated transitions on every card — spring in/out with a short blur, morph
 between states (motion-broll `M.vis` / `SEQ`), never a hard pop-in.
+
+**Real sounds instead of the synth (since 2026-10-25).** `sfx.py` plays `brand/sfx/<kind>.wav`
+when it exists. The kit comes from `node scripts/ru/sfx-kit.mjs` (earshot bank: sounds made in
+code, rendered by id, audited by `earshot sfx check`; choice in `brand/sfx/kit.json`) or, per kind,
+from a CC0 Freesound recording fetched from Openverse (`sfx-fetch.mjs` → `brand/sfx/library/`,
+`sfx-kit.mjs --source openverse`). Check that `sfx.py` prints `kit: brand/sfx`, not `none (synth)`.
+When the customer asks for real recorded sounds on a finished render («озвучь настоящими
+звуками»), use the `real-sfx` skill on `renders/final.mp4` with `--voice-safe`; its library is
+`brand/sfx/library`. Never both on one reel: Real SFX takes the baked-in layer out, not doubles it.
 
 ### S5 Субтитры — no stop
 
@@ -288,6 +334,17 @@ node scripts/ru/assemble.mjs $P --preview
 node scripts/ru/contact-sheet.mjs $P/renders/preview.mp4 --plan $P/PLAN.json --every 2 --out $P/review/sheet-1.png
 ```
 
+Then let earshot listen for you (since 2026-10-25; ~20 s, models cached in `tools/earshot/.cache`):
+
+```bash
+tools/earshot/.venv/bin/earshot timeline $P/renders/preview.mp4 --video $P/renders/preview.mp4 --out $P/review/earshot-timeline.json
+```
+
+Read its summary: every SFX tagged near a cut should say `OK` (within 1 frame); `near` with more
+than ±60 ms means the whoosh or hit missed its cut — move it in `fx.json` and re-run `sfx.py`.
+Also look for a whoosh or pop tagged inside speech and for a strong accent where the plan has
+none. These are measurements, not listening: the customer still checks by ear.
+
 Look at every sheet yourself (Read the PNG). Go through
 `references/review-checklist.md` item by item. Fix, re-render what changed,
 re-sheet (`sheet-2`, `sheet-3`). After 3 iterations stop fixing and list what
@@ -296,7 +353,16 @@ what remains. Never claim a fix that was not re-rendered and looked at.
 
 ### S7 Сборка — ГЕЙТ C, always stop
 
-`renders/preview.mp4` (540×960) is the review copy. **ГЕЙТ C:** give the path
+`renders/preview.mp4` (540×960) is the review copy. **Speed:** he asks for a faster cut on almost
+every reel; show the preview at normal speed and at **F = clamp(3.45 ÷ words per second of the clean
+timeline, 1.05, 1.12)**, rounded to 0.01 (words of `transcript.clean.json` ÷ `EDL.json` clean_duration).
+Calibrated on 18 approved reels (2026-10-19…25): dense takes land at ≈ 3.45 words/s after the speed-up —
+2.6–3.0 w/s → ×1.1–1.12, 3.1–3.15 → ×1.1, 3.28 (harness2) → ×1.05; on slow takes (≈ 2.5 w/s, voice-studio,
+replica) he once asked for up to ×1.2 after the final. Preview copy:
+`ffmpeg -i renders/preview.mp4 -filter_complex "[0:v]setpts=PTS/F,fps=<fps>[v];[0:a]atempo=F[a]" … renders/preview.xF.mp4`;
+the final variant: `node scripts/ru/speed-variant.mjs $P --factor F`. His number always wins.
+
+**ГЕЙТ C:** give the path
 (`open video-projects/<slug>/renders/preview.mp4`), the sheet paths and a short
 list of what to look at; say «Звук мной не прослушан: громкость, музыку и склейки
 по интонации проверь на слух». Wait. Apply the corrections (count them for

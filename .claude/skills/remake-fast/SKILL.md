@@ -13,7 +13,7 @@ nothing can work around: an unusable transcript, a missing API key, no take in t
 ```
 /remake-fast <reference> [— brief] [--principles]  → F1: text to say + what to record → stop «снимай»
 /remake-fast <remake project>                       → F2: footage → preview → stop «ок или правки?»
-«ок» / «да» on the preview                          → F3: final + ×1.1 + Instagram caption
+«ок» / «да» on the preview                          → F3: final + ×F + Instagram caption
 ```
 
 Engines: `reel-remake` (R0–R3) and `vladilen-reels` (S0–S8). Read both SKILL.md files and run
@@ -95,10 +95,11 @@ remake BRIEF.md>" --mode full --remake <remake project>`, then `vladilen-reels` 
 S2 — keep the last complete take of each line; S3 — `PLAN.json` straight from `SCRIPT.md`,
 hook = the script's hook, no ГЕЙТ B (alternatives go to `DESIGN.md`); recordings with private
 data (notes, names, messengers) get `blur` marks; captions `kinetic` for window-above-head
-remakes. S6 self-review is mandatory (2–3 sheets), then `assemble.mjs <reel> --preview`.
+remakes. S6 self-review is mandatory (2–3 sheets), then `assemble.mjs <reel> --preview` and the
+fast copy `renders/preview.x<F>.mp4` at the speed F from `vladilen-reels` S7 (by words per second).
 
-**Preview — stop.** Show `renders/preview.mp4` to the customer (SendUserFile, plus the
-path), what differs from `SCRIPT.md`, the automatic decisions, one line from `REVIEW.md`,
+**Preview — stop.** Show `renders/preview.x<F>.mp4` and `renders/preview.mp4` to the customer (SendUserFile,
+plus the paths), what differs from `SCRIPT.md`, the automatic decisions, one line from `REVIEW.md`,
 the sound line. One question: «Ок или правки?» Corrections → apply, re-render what changed,
 show the preview again.
 
@@ -106,7 +107,7 @@ show the preview again.
 
 ```bash
 node scripts/ru/assemble.mjs <reel> --final              # renders/final.mp4 + check-reel
-node scripts/ru/speed-variant.mjs <reel> --factor 1.1    # renders/final.x1.1.mp4 (lessons 2026-10-19)
+node scripts/ru/speed-variant.mjs <reel> --factor <F>    # renders/final.x<F>.mp4: the approved preview speed or his number
 ```
 
 Write `<reel>/CAPTION.md` and give it in chat: line 1 — the CTA keyword («Напиши «…» в

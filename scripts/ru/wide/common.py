@@ -20,7 +20,8 @@ def project(p):
 
 
 def raw(P):
-    return P / "assets" / "raw.mp4"
+    p = P / "assets" / "raw.mp4"                # intake.mjs keeps the source extension: a vertical take may be raw.mov
+    return p if p.exists() else next(iter(sorted((P / "assets").glob("raw.*"))), p)
 
 
 def fps(P):

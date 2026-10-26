@@ -16,12 +16,21 @@ root `LICENSE`.
 | `charlie947/motion-graphics-skills` | `229022ebca76972e119e36ada23a1648d51665ab` (2026-10-11) | MIT | `skills/reel-export` | `.claude/skills/reel-export/` |
 | `aiwithremy/content-principles` | `18f96703c98763b9c3bd647a46f2e031bda4a29d` (2026-10-13) | none (no `LICENSE`) | Ideas only, retold in Russian in our own words; no text copied, not installed as a skill | `.claude/skills/reel-remake/references/script-principles.md` |
 | `whaleyxbt/claude-motion` | `e627941543d9988b155dc610bb9cc0115a5e365e` (2026-10-09) | MIT | Text of the `review-loop` checklist and `sound-design` rules, adapted (not installed as skills) | `.claude/skills/vladilen-reels/references/` |
+| `Clipwing/skills` | `edbefcbc3474869e6cc1e8a7ca583b0efd0dab7e` (2026-10-21) | MIT per `skills/real-sfx/README.md` § Licences (no root `LICENSE`); uisfx sounds CC0 | `skills/real-sfx` (Real SFX: real recorded SFX placed on the exact frame) | `.claude/skills/real-sfx/` (its `vendor/node_modules/uisfx`, `config.json`, `library_index.json` stay local) |
+| `Leonxlnx/earshot` | `591fa3e028032e6dce56620a20e932e35667e8d8` (2026-10-22) | MIT | CLI in its own venv: `sfx render` / `sfx check` for the brand kit, `timeline` for the sound-to-cut check | `tools/earshot/` (gitignored; Python 3.12 venv via `uv`) |
 
 Copyright notices: Nate Herk (2026), Bart (2026), HeyGen (Apache-2.0, see
 `.claude/skills/talking-head-recut/NOTICE.md`), LottieFiles (2025), Charlie Hills
 (2026), whaleyxbt (2026).
 
 ## How each was installed
+
+- **earshot.** `git clone --depth 1` into `tools/earshot`, then `uv venv --python 3.12 .venv`,
+  `uv pip install torch --index-url https://download.pytorch.org/whl/cpu`, `uv pip install -e ".[mcp]"`.
+  `sfx`/`kit`/`measure` need no models; `timeline`, `describe`, `match` download them on first use.
+- **Real SFX.** Copied `skills/real-sfx` from a shallow clone (`tools/clipwing-skills`), then
+  `python3 scripts/setup.py init --library main=<repo>/brand/sfx/library --index` from the skill folder.
+  Library: CC0 Freesound recordings fetched from Openverse by `scripts/ru/sfx-fetch.mjs`.
 
 - **Chassis.** The repo is ~420 MB, almost all of it finished example MP4s. On a
   slow link a full clone was impractical, so it was fetched with

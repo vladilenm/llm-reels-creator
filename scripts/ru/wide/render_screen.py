@@ -12,8 +12,10 @@ broll/screen.json — схема в .claude/skills/reel-wide/references/config.m
   {"shots": [{"id", "t0", "t1" (чистое время), "url",
               "src": {"at": s, "speed"?: 1, "min"?, "max"?} | {"hold": s} | {"real": true} | {"lin": [[t, s], …]},
               "cams": [[t, [x, y, w], dur], …]          прямоугольник экрана (px нативного экрана), h = w/2.103
-              "marks": [{"kind": "hl"|"ring", "rect": [x, y, w, h], "t0", "t1"?}]}]}
-hl — маркер слева направо, экранное смешение (текст на тёмном остаётся белым), висит до конца шота без t1;
+              "marks": [{"kind": "hl"|"ring"|"blur", "rect": [x, y, w, h], "t0", "t1"?}]}]}
+blur — мозаика + размытие поверх прямоугольника (секреты: значение ключа в .env); ставить t0 = t0 шота без t1;
+hl — маркер слева направо, висит до конца шота без t1; на тёмном — экранное смешение (текст остаётся белым),
+на светлом (яркость под словами > 140) — лавандовый маркер умножением (тёмный текст остаётся тёмным);
 ring — пружина + свечение, на светлом фоне тёмный акцент, на тёмном — светлый. Камеры: ключ едет от того,
 где камера в момент ключа (как keyed() в screen-kit); низ кадра не ниже дока macOS."""
 import json, math, subprocess, sys, pathlib
@@ -23,6 +25,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 from common import project, raw, fps, c2s_fn, SCREEN, DOCK, WIN_CANVAS
 
 ACC, ACC_L = (124, 58, 237), (183, 156, 255)
+HL_LIGHT = (206, 188, 255)                        # маркер на светлом фоне (умножение)
 CW, CH = WIN_CANVAS
 R = CW / CH
 SS = 2                                            # суперсэмплинг меток
@@ -76,17 +79,36 @@ def draw_marks(img, t, marks, rect):
     x, y, w = rect; k = CW / w
     live = [m for m in marks if t >= m["t0"] and (m.get("t1") is None or t <= m["t1"] + 0.2)]
     if not live: return img
+    for m in live:
+        if m["kind"] != "blur": continue
+        rx, ry, rw, rh = m["rect"]
+        a0, b0 = max(0, int((rx - x) * k)), max(0, int((ry - y) * k))
+        a1, b1 = min(CW, math.ceil((rx + rw - x) * k)), min(CH, math.ceil((ry + rh - y) * k))
+        if a1 - a0 < 2 or b1 - b0 < 2: continue
+        bs = max(6, round(rh * k / 2))                # блок мозаики — полстроки текста
+        reg = img.crop((a0, b0, a1, b1))
+        reg = reg.resize((max(1, (a1 - a0) // bs), max(1, (b1 - b0) // bs)), Image.BILINEAR)
+        reg = reg.resize((a1 - a0, b1 - b0), Image.NEAREST).filter(ImageFilter.GaussianBlur(bs / 2))
+        img = img.copy(); img.paste(reg, (a0, b0))
+    live = [m for m in live if m["kind"] != "blur"]
+    if not live: return img
     hl = Image.new("RGB", (CW * SS, CH * SS), (0, 0, 0)); dh = ImageDraw.Draw(hl)
+    hl_l = Image.new("RGB", (CW * SS, CH * SS), (255, 255, 255)); dl = ImageDraw.Draw(hl_l)
     ring = Image.new("L", (CW * SS, CH * SS), 0); dr = ImageDraw.Draw(ring)
-    any_hl = any_ring = False
+    gray = np.asarray(img.convert("L"))
+    any_hl = any_hl_l = any_ring = False
     for m in live:
         rx, ry, rw, rh = m["rect"]
         X, Y, Wd, Hd = (rx - x) * k * SS, (ry - y) * k * SS, rw * k * SS, rh * k * SS
         out = 1.0 if m.get("t1") is None else 1 - eio((t - m["t1"]) / 0.2)
         if m["kind"] == "hl":
             p = eio((t - m["t0"]) / 0.28); a = 0.62 * out; pad = 5 * k * SS
-            dh.rounded_rectangle([X - pad, Y - pad * 0.6, X - pad + (Wd + 2 * pad) * p, Y + Hd + pad * 0.6],
-                                 radius=6 * SS, fill=tuple(int(c * a) for c in ACC)); any_hl = True
+            box = [X - pad, Y - pad * 0.6, X - pad + (Wd + 2 * pad) * p, Y + Hd + pad * 0.6]
+            under = gray[max(0, int(Y / SS)):max(0, int((Y + Hd) / SS)) + 1, max(0, int(X / SS)):max(0, int((X + Wd) / SS)) + 1]
+            if under.size and under.mean() > 140:
+                dl.rounded_rectangle(box, radius=6 * SS, fill=tuple(int(255 - (255 - c) * out) for c in HL_LIGHT)); any_hl_l = True
+            else:
+                dh.rounded_rectangle(box, radius=6 * SS, fill=tuple(int(c * a) for c in ACC)); any_hl = True
         else:
             s = 1.16 - 0.16 * spring(t - m["t0"]); a = min(1, (t - m["t0"]) / 0.12) * out
             cx, cy = X + Wd / 2, Y + Hd / 2; pw, ph = (Wd / 2 + 12 * SS) * s, (Hd / 2 + 9 * SS) * s
@@ -94,6 +116,8 @@ def draw_marks(img, t, marks, rect):
             any_ring = True
     if any_hl:
         img = ImageChops.screen(img, hl.resize((CW, CH), Image.LANCZOS))
+    if any_hl_l:
+        img = ImageChops.multiply(img, hl_l.resize((CW, CH), Image.LANCZOS))
     if any_ring:
         r = ring.resize((CW, CH), Image.LANCZOS); ra = np.asarray(r)
         light = ra.max() > 40 and np.asarray(img.convert("L"))[ra > 40].mean() > 140

@@ -23,9 +23,12 @@ const sharp = require("sharp");
 
 const fmt = (t) => { const m = Math.floor(t / 60); return `${m}:${(t - m * 60).toFixed(2).padStart(5, "0")}`; };
 
+// The video stream, not the container: audio often runs a few frames longer, and a
+// seek past the last picture makes ffmpeg exit 0 without writing a frame.
 function duration(video) {
-  const r = spawnSync("ffprobe", ["-v", "error", "-show_entries", "format=duration", "-of", "default=nw=1:nk=1", video], { encoding: "utf8" });
-  return Number(r.stdout.trim());
+  const probe = (args) => Number(spawnSync("ffprobe", ["-v", "error", ...args, "-of", "default=nw=1:nk=1", video], { encoding: "utf8" }).stdout.trim());
+  const stream = probe(["-select_streams", "v:0", "-show_entries", "stream=duration"]);
+  return Number.isFinite(stream) && stream > 0 ? stream : probe(["-show_entries", "format=duration"]);
 }
 
 export function planTimes(plan) {
