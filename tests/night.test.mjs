@@ -431,6 +431,38 @@ test("kinetic captions: theme_default sets the theme where no key says otherwise
   assert.match(html, /id="c1" class="kg light clip"/);
 });
 
+test("kinetic captions in the night look: dark by default, light over light accents and light full clips", async () => {
+  const { nightCaptions } = await import("../scripts/ru/make-captions.mjs");
+  const P = tmp("cap-");
+  for (const d of ["fx", "work", "broll"]) mkdirSync(join(P, d));
+  assert.deepEqual(nightCaptions(P, { hide: [] }), { hide: [] }, "no fx.json look: nothing changes");
+  writeFileSync(join(P, "fx/fx.json"), JSON.stringify({ look: "night" }));
+  writeFileSync(join(P, "work/accents.json"), JSON.stringify({ accents: [{ id: "n", in: 1, out: 2, kind: "night", file: "a" }, { id: "l", in: 30, out: 34, kind: "light", file: "b" }] }));
+  writeFileSync(join(P, "broll/plan.json"), JSON.stringify({ clips: [{ id: "c", in: 10, out: 12, kind: "full", theme: "light", file: "c.mp4" }, { id: "p", in: 12, out: 14, kind: "panel", file: "p.mov" }] }));
+  const k = nightCaptions(P, { style: "kinetic" }).kinetic;
+  assert.equal(k.theme_default, "dark");
+  assert.deepEqual(k.theme_keys, [{ at: 10, theme: "light" }, { at: 12, theme: "dark" }, { at: 30, theme: "light" }, { at: 34, theme: "dark" }]);
+  assert.deepEqual(nightCaptions(P, { kinetic: { theme_keys: [{ at: 5, theme: "light" }] } }).kinetic.theme_keys, [{ at: 5, theme: "light" }], "explicit keys win");
+});
+
+test("motion-check: known verbs, none twice in a row, at least 5 verbs, each on its word, 1–2 light accents", async () => {
+  const { checkMotion, VERBS } = await import("../scripts/ru/motion-check.mjs");
+  assert.equal(Object.keys(VERBS).length, 16);
+  const words = [["Поэтому", 9.01], ["три", 9.70], ["бесплатных", 9.92], ["инструмента", 10.38], ["исправляют", 11.48], ["Openverse", 12.78]].map(([text, start]) => ({ text, start }));
+  const ok = [{ at: 9.01, word: "Поэтому", verb: "materialize" }, { at: 9.70, word: "три", verb: "chapter" }, { at: 9.92, word: "бесплатных", verb: "materialize" },
+    { at: 10.38, word: "инструмента", verb: "tree" }, { at: 11.48, word: "исправляют", verb: "active" }, { at: 11.70, word: "исправляют", verb: "fly" },
+    { at: 12.60, word: "Openverse", verb: "lens" }];
+  const r = checkMotion(ok, words, 1);
+  assert.deepEqual(r.errors, []);
+  assert.match(r.table, /\| 12,60 \| Openverse \| линза \|/);
+  assert.ok(checkMotion([...ok.slice(0, 2), { at: 9.92, word: "бесплатных", verb: "chapter" }, ...ok.slice(3)], words, 1).errors.some((e) => /второй раз подряд/.test(e)));
+  assert.ok(checkMotion([{ ...ok[0], verb: "zoom" }, ...ok.slice(1)], words, 1).errors.some((e) => /неизвестный глагол/.test(e)));
+  assert.ok(checkMotion([{ ...ok[0], at: 9.5 }, ...ok.slice(1)], words, 1).errors.some((e) => /нет в ±0,25/.test(e)));
+  assert.ok(checkMotion(ok.slice(0, 4), words, 1).errors.some((e) => /не меньше 5/.test(e)));
+  assert.ok(checkMotion(ok, words, 3).errors.some((e) => /светлых акцентов 3/.test(e)));
+  assert.equal(checkMotion(ok, words, 0).warnings.length, 1);
+});
+
 // ---------- night base ----------
 
 function pixel(video, n, x, y) {

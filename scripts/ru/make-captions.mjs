@@ -127,6 +127,7 @@ window.__timelines=window.__timelines||{};window.__timelines["captions"]=tl;
 // ---------- «kinetic»: 1–3 words between the window and the head (remakes with a card above) ----------
 // PLAN.json captions: { style: "kinetic", kinetic: { y_keys: [{at, y}], theme_keys: [{at, theme: "light"|"dark"}],
 //                       theme_default: "light"|"dark" (the night look: "dark"),
+//                       (fx/fx.json look "night": dark by default, light over light windows — nightCaptions),
 //                       accent: [word start time], accent_words: ["бесплатно"], breaks: [word start time] } }
 // Defaults below, overridable in brand.md captions.kinetic. Future words of a group wait dimmed and
 // blurred; each lights up on its own start. The accent word is the brand serif italic (font_serif.italic)
@@ -243,6 +244,22 @@ window.__timelines=window.__timelines||{};window.__timelines["captions"]=tl;
 `;
 }
 
+// The night look (fx/fx.json "look": "night"): kinetic captions are dark by default and switch to the light theme over
+// light windows by themselves — light accents (work/accents.json kind "light") and full clips with theme "light" in
+// broll/plan.json. Explicit theme_default / theme_keys in PLAN.json win.
+export function nightCaptions(project, overrides = {}) {
+  const read = (p) => (existsSync(join(project, p)) ? JSON.parse(readFileSync(join(project, p), "utf8")) : null);
+  if (read("fx/fx.json")?.look !== "night") return overrides;
+  const k = { ...(overrides.kinetic ?? {}) };
+  k.theme_default ??= "dark";
+  if (k.theme_keys == null) {
+    const win = [...(read("work/accents.json")?.accents ?? []).filter((a) => a.kind === "light"),
+      ...(read("broll/plan.json")?.clips ?? []).filter((c) => c.kind === "full" && c.theme === "light")];
+    k.theme_keys = win.sort((a, b) => a.in - b.in).flatMap((w) => [{ at: w.in, theme: "light" }, { at: w.out, theme: k.theme_default }]);
+  }
+  return { ...overrides, kinetic: k };
+}
+
 export function makeCaptions(project, { render = false, transcript } = {}) {
   project = resolve(project);
   const brand = loadBrand();
@@ -250,7 +267,7 @@ export function makeCaptions(project, { render = false, transcript } = {}) {
   const duration = Number(t.audio_duration_secs);
   const fps = JSON.parse(readFileSync(join(project, "meta.json"), "utf8")).fps ?? 30;
   const planPath = join(project, "PLAN.json");
-  const overrides = existsSync(planPath) ? (JSON.parse(readFileSync(planPath, "utf8")).captions ?? {}) : {};
+  const overrides = nightCaptions(project, existsSync(planPath) ? (JSON.parse(readFileSync(planPath, "utf8")).captions ?? {}) : {});
   const kinetic = (overrides.style ?? brand.captions.style) === "kinetic";
   const cues = applyHide(kinetic ? kineticGroups(t, kineticConfig(brand, overrides), overrides) : captionCues(t, brand), overrides.hide);
 
