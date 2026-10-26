@@ -161,8 +161,8 @@ OK.run = (cfg) => {
     root.insertBefore(box, scene);                                    // objects draw above the terminal
     Object.assign(box.style, {left: c.x + 'px', top: c.y + 'px', width: c.w + 'px', height: c.h + 'px', color: TH.ink,
       background: theme === 'night' ? 'rgba(24,18,38,.94)' : '#FFFFFF',
-      boxShadow: `0 0 0 2px rgba(${TH.glow},.45),0 0 40px 2px rgba(124,58,237,.22)`});
-    const head = el('', box); head.textContent = c.title || ''; Object.assign(head.style, {color: TH.dim, fontSize: '22px', marginBottom: '8px'});
+      boxShadow: `0 0 0 3px rgba(${TH.glow},.45),0 0 40px 2px rgba(124,58,237,.22)`});
+    const head = el('', box); head.textContent = c.title || ''; Object.assign(head.style, {color: TH.dim, fontSize: '30px', marginBottom: '8px'});
     const rows = c.lines.map((l, i) => {
       const r = el('', box, 'div', 'ok-row-' + i); r.style.color = l.kind === 'ok' ? TH.on : TH.ink;
       if (l.kind !== 'cmd') { r.textContent = l.text; return {l, r}; }
@@ -247,7 +247,8 @@ OK.run = (cfg) => {
     }
 
     if (term) {
-      term.box.style.clipPath = `inset(0 ${(100 - 100 * ex((t - (term.c.tin ?? -1)) / 0.6)).toFixed(2)}% 0 0 round 22px)`;
+      const u = ex((t - (term.c.tin ?? -1)) / 0.6);    // left-to-right wipe: the right clip edge runs from x = -60 to W + 60, so the ring and glow survive and nothing shows before tin
+      term.box.style.clipPath = `inset(-60px calc(${(100 - 100 * u).toFixed(2)}% + ${(60 - 120 * u).toFixed(1)}px) -60px -60px round 22px)`;
       for (const {l, r, tx, car} of term.rows) {
         const b = t - l.t;
         if (l.kind === 'cmd') {

@@ -137,6 +137,8 @@ test("object scene terminal: the command types, output lines arrive on their wor
     const strike = () => +document.querySelector('#ok-item-k [data-p="strike"]').style.strokeDashoffset;
     assert.ok(await c.at(1.9, strike) > 0.95);
     assert.ok(await c.at(2.8, strike) < 0.1);
+    assert.match(await c.at(1.6, () => getComputedStyle(document.getElementById("ok-term")).clipPath), /-60px/, "the glow is not clipped");
+    assert.equal(await c.at(1.6, () => getComputedStyle(document.querySelector("#ok-term > div:first-child")).fontSize), "30px");
     assert.ok(await c.at(1.6, () => !!(document.getElementById("ok-term").compareDocumentPosition(document.getElementById("ok-scene")) & Node.DOCUMENT_POSITION_FOLLOWING)), "scene above the terminal");
     assert.deepEqual(c.errors, []);
   } finally { await c.browser.close(); }
