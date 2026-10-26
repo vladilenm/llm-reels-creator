@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, writeFileSync, readFileSync, mkdirSync } from "node:fs";
+import { mkdtempSync, writeFileSync, readFileSync, mkdirSync, symlinkSync, lstatSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -230,4 +230,77 @@ for i in range(10):
   assert.ok(pixel(out, 7, 540, 1500)[0] > 170, "card shows the camera");
   const sum = (p) => p[0] + p[1] + p[2];
   assert.ok(sum(pixel(out, 7, 47, 1300)) > sum(pixel(out, 7, 20, 1300)) + 60, "card frame line");
+});
+
+test("night_base: masks are found by frame name, a clip shorter than its window is held, a missing accent file stops the run", { timeout: 120000 }, () => {
+  const P = tmp("nb2-");
+  for (const d of ["assets", "renders", "broll", "work", "fx/masks"]) mkdirSync(join(P, d), { recursive: true });
+  writeFileSync(join(P, "assets/raw.mp4"), "");
+  writeFileSync(join(P, "PROBE.json"), JSON.stringify({ summary: { fps: 25 } }));
+  writeFileSync(join(P, "EDL.json"), JSON.stringify({ keep_ranges: [{ start: 0, end: 0.4 }] }));
+  ff("-f", "lavfi", "-i", "color=c=red:s=1080x1920:r=25:d=0.4", "-f", "lavfi", "-i", "sine=f=220:d=0.4:sample_rate=48000",
+    "-shortest", "-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "aac", join(P, "renders/clean.mp4"));
+  // a two-frame accent clip: green, then blue
+  ff("-filter_complex", "color=c=green:s=1080x1920:r=25:d=0.04[a];color=c=blue:s=1080x1920:r=25:d=0.04[b];[a][b]concat=n=2:v=1:a=0",
+    "-c:v", "libx264", "-pix_fmt", "yuv420p", join(P, "broll/acc2.mp4"));
+  // window A: frames 1-2 (clip is long enough); window B: frames 5-8 (clip is two frames: the last one is held)
+  writeFileSync(join(P, "work/accents.json"), JSON.stringify({ accents: [
+    { id: "a", in: 0.04, out: 0.12, kind: "night", file: "broll/acc2.mp4" },
+    { id: "b", in: 0.2, out: 0.36, kind: "night", file: "broll/acc2.mp4" }] }));
+  const r0 = py(`from PIL import Image, ImageDraw
+import pathlib
+d = pathlib.Path(${JSON.stringify(join(P, "fx/masks"))})
+for i in range(10):
+    if i == 3: continue
+    m = Image.new("L", (989, 822), 0); ImageDraw.Draw(m).rectangle((300, 200, 700, 600), fill=255); m.save(d / f"{i:05d}.png")`);
+  assert.equal(r0.status, 0, r0.stderr);
+  let r = spawnSync("python3", ["scripts/ru/wide/night_base.py", P], { cwd: ROOT, encoding: "utf8" });
+  assert.equal(r.status, 0, r.stderr + r.stdout);
+  assert.match(r.stdout, /кадров без маски: 1 \(первые: 3\)/);
+  const out = join(P, "renders/picture.base.mp4");
+  const n = spawnSync("ffprobe", ["-v", "error", "-count_frames", "-select_streams", "v:0", "-show_entries", "stream=nb_read_frames", "-of", "csv=p=0", out], { encoding: "utf8" });
+  assert.equal(n.stdout.trim(), "10", "every frame of clean.mp4 is rendered");
+  assert.ok(pixel(out, 3, 547, 1456)[0] < 100, "frame 3 has no mask: no speaker");
+  const g3 = pixel(out, 3, 100, 300);
+  assert.ok(g3[0] < 50 && g3[1] < 50 && g3[2] < 70, `frame 3 stays night ${g3}`);
+  assert.ok(pixel(out, 4, 547, 1456)[0] > 170, "frame 4 (a neighbour of the gap) keeps its speaker");
+  assert.ok(pixel(out, 7, 547, 1456)[0] > 170, "frame 7 keeps its speaker");
+  const a1 = pixel(out, 1, 100, 300);
+  assert.ok(a1[1] > 100 && a1[0] < 80, `window A starts on the green frame ${a1}`);
+  const b5 = pixel(out, 5, 100, 300);
+  assert.ok(b5[1] > 100 && b5[2] < 80, `the same file in window B restarts from its first frame ${b5}`);
+  const b8 = pixel(out, 8, 100, 300);
+  assert.ok(b8[2] > 100 && b8[1] < 80, `the clip is shorter than the window: its last frame is held ${b8}`);
+  const n9 = pixel(out, 9, 100, 300);
+  assert.ok(n9[0] < 50 && n9[1] < 50 && n9[2] < 70, `after the window: night ${n9}`);
+  writeFileSync(join(P, "work/accents.json"), JSON.stringify({ accents: [{ id: "x", in: 0.04, out: 0.2, kind: "night", file: "broll/missing.mp4" }] }));
+  r = spawnSync("python3", ["scripts/ru/wide/night_base.py", P], { cwd: ROOT, encoding: "utf8" });
+  assert.notEqual(r.status, 0, "a missing accent file stops the run");
+  assert.match(r.stderr, /broll\/missing\.mp4/);
+});
+
+test("night_base --prep: stale frames and masks are cleared, a symlinked fx/masks is unlinked and its target is never touched", { timeout: 120000 }, () => {
+  const P = tmp("nb3-");
+  for (const d of ["assets", "renders", "work", "fx"]) mkdirSync(join(P, d), { recursive: true });
+  writeFileSync(join(P, "PROBE.json"), JSON.stringify({ summary: { fps: 25 } }));
+  ff("-f", "lavfi", "-i", "color=c=red:s=1080x1920:r=25:d=0.12", "-c:v", "libx264", "-pix_fmt", "yuv420p", join(P, "renders/clean.mp4"));
+  const other = tmp("nb3-other-"), other2 = tmp("nb3-other2-");   // the folders of "another, approved project"
+  writeFileSync(join(other, "00099.png"), "approved mask");
+  writeFileSync(join(other2, "00099.png"), "approved frame");
+  symlinkSync(other, join(P, "fx/masks"));
+  symlinkSync(other2, join(P, "work/card-frames"));
+  let r = spawnSync("python3", ["scripts/ru/wide/night_base.py", P, "--prep"], { cwd: ROOT, encoding: "utf8" });
+  assert.equal(r.status, 0, r.stderr + r.stdout);
+  for (const d of ["fx/masks", "work/card-frames"]) {
+    assert.ok(!lstatSync(join(P, d)).isSymbolicLink(), `${d} is a real folder now`);
+    assert.ok(!existsSync(join(P, d, "00099.png")), `${d}: nothing of the other project came along`);
+  }
+  assert.ok(existsSync(join(P, "fx/masks/00000.png")), "masks are generated");
+  assert.equal(readFileSync(join(other, "00099.png"), "utf8"), "approved mask", "the symlink target keeps its file");
+  assert.equal(readFileSync(join(other2, "00099.png"), "utf8"), "approved frame", "the symlink target keeps its file");
+  writeFileSync(join(P, "fx/masks/00099.png"), "stale");          // a real folder is cleared
+  r = spawnSync("python3", ["scripts/ru/wide/night_base.py", P, "--prep"], { cwd: ROOT, encoding: "utf8" });
+  assert.equal(r.status, 0, r.stderr + r.stdout);
+  assert.ok(!existsSync(join(P, "fx/masks/00099.png")), "a stale mask of a previous run is gone");
+  assert.ok(existsSync(join(P, "fx/masks/00000.png")));
 });
