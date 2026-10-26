@@ -2279,7 +2279,8 @@ ls -L $N/screens/ear | head -2
 ```js
 // claude-sfx · ночь: публичные страницы в тёмной теме сайта (дизайн 2026-10-26) для ночных окон. Playwright headless,
 // deviceScaleFactor 2 → screens/<file>.png + screens/rects-dark.json: прямоугольник каждой фразы в пикселях png —
-// первое совпадение, видное в пределах экрана (первое у GitHub часто скрытый мобильный блок About).
+// первое совпадение, видное в пределах экрана и не левее minX (у GitHub первое — часто скрытый мобильный блок About
+// или строка дерева файлов слева; для real-sfx нужно имя папки в «хлебных крошках» над списком).
 //   node <project>/screens/make-dark.mjs
 import { chromium } from "playwright";
 import { writeFileSync } from "node:fs";
@@ -2289,7 +2290,7 @@ import { fileURLToPath } from "node:url";
 const HERE = dirname(fileURLToPath(import.meta.url)), K = 2, VW = 1440, VH = 900;
 const PAGES = [
   ["https://github.com/WordPress/openverse", "gh-ov-dark.png", { desc: ["Openverse is a search engine for openly-licensed media", false] }],
-  ["https://github.com/Clipwing/skills/tree/main/skills/real-sfx", "gh-rsfx-dark.png", { rsfx_name: ["real-sfx", true] }],
+  ["https://github.com/Clipwing/skills/tree/main/skills/real-sfx", "gh-rsfx-dark.png", { rsfx_name: ["real-sfx", true, 300] }],
 ];
 const browser = await chromium.launch();
 const rects = {};
@@ -2298,10 +2299,10 @@ for (const [url, file, phrases] of PAGES) {
   const pg = await ctx.newPage();
   await pg.goto(url, { waitUntil: "domcontentloaded" });
   await pg.waitForTimeout(3500);
-  for (const [key, [text, exact]] of Object.entries(phrases)) {
+  for (const [key, [text, exact, minX = 0]] of Object.entries(phrases)) {
     const loc = pg.getByText(text, { exact });
     let box = null;
-    for (let i = 0; i < await loc.count() && !box; i++) { const b = await loc.nth(i).boundingBox(); if (b && b.y >= 0 && b.y + b.height <= VH) box = b; }
+    for (let i = 0; i < await loc.count() && !box; i++) { const b = await loc.nth(i).boundingBox(); if (b && b.y >= 0 && b.y + b.height <= VH && b.x >= minX) box = b; }
     if (!box) throw new Error(`${file}: «${text}» не видно на экране`);
     rects[key] = [box.x * K, box.y * K, box.width * K, box.height * K].map(Math.round);
   }
