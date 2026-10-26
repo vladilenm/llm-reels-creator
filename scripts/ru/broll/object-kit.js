@@ -270,7 +270,7 @@ OK.O.chat = {
 // code (</>): an extruded glyph that faces the camera like a sign (drawn in screen coordinates u right / v up and
 // mapped onto the plane y 0, so the chevrons stay upright under the iso shear); active lights the slash,
 // play breathes the brackets outward
-const upright = (uv) => uv.map(([u, v]) => { const x = u / 0.866; return [x, 0.5 * x + v]; });
+const upright = (uv) => uv.map(([u, v]) => { const x = u / C30; return [x, 0.5 * x + v]; });
 // the brackets stand 8 units clear of the slash at rest: the depth plate sits 7 units right of its front, so less looks touching
 const LT = upright([[-30, 80], [-66, 50], [-30, 20], [-22, 30], [-48, 50], [-22, 70]]);
 const RT = upright([[30, 80], [66, 50], [30, 20], [22, 30], [48, 50], [22, 70]]);
@@ -353,13 +353,18 @@ OK.O.lock = {
   },
 };
 
-// gear (settings, automation, a process): a cog facing us; spin turns it, play keeps it turning
-const cog = (a0) => Array.from({length: 40}, (_, k) => {
-  const a = a0 + k / 40 * Math.PI * 2, r = k % 4 < 2 ? 50 : 38; return [r * Math.cos(a), 60 + r * Math.sin(a)];
-});
+// gear (settings, automation, a process): a cog facing the camera with ten even teeth; spin turns it, play keeps it turning
+const cog = (a0) => {
+  const p = [], h = Math.PI / 10;
+  for (let k = 0; k < 10; k++) {
+    const a = a0 + k * 2 * h;
+    for (const [da, r] of [[-0.55, 38], [-0.32, 50], [0.32, 50], [0.55, 38]]) p.push([r * Math.cos(a + da * h), 60 + r * Math.sin(a + da * h)]);
+  }
+  return upright(p);
+};
 OK.O.gear = {
-  vb: [-50, -128, 110, 132],
-  svg: () => plate(cog(0), 10, {id: 'cg'}) + face(circ(0, 60, 14, 20), 0, 'fd'),
+  vb: [-56, -122, 122, 118],
+  svg: () => plate(cog(0), 10, {id: 'cg'}) + face(upright(circ(0, 60, 14, 20)), 0, 'fd'),
   pose: (P, s) => {
     const xz = cog((s.spin + s.t * 0.2 * s.play) * Math.PI * 2);
     P.cg.firstChild.setAttribute('points', pts(xz.map(([x, z]) => [x, -10, z])));
@@ -369,7 +374,7 @@ OK.O.gear = {
 
 // magnifier (search, a detail, review): a ring on a handle; active lights the glass, play runs a glint across it
 OK.O.magnifier = {
-  vb: [-52, -140, 116, 168],
+  vb: [-52, -140, 118, 168],
   svg: () => { const a = at(-24, 0, 92), b = at(-12, 0, 102);
     return plate([[20, 50], [30, 58], [62, 18], [52, 10]], 8) + plate(circ(-10, 80, 40, 32), 8)
       + face(circ(-10, 80, 30, 32), 0, 'ft', 'gl')
@@ -382,10 +387,10 @@ OK.O.magnifier = {
   },
 };
 
-// star (GitHub stars, a rating, favourites): a five-point star; active fills it with the accent, play twinkles it
-const STAR = Array.from({length: 10}, (_, i) => { const a = Math.PI / 2 + i * Math.PI / 5, r = i % 2 ? 22 : 52; return [r * Math.cos(a), 60 + r * Math.sin(a)]; });
+// star (GitHub stars, a rating, favourites): a five-point star facing the camera; active fills it with the accent, play twinkles it
+const STAR = upright(Array.from({length: 10}, (_, i) => { const a = Math.PI / 2 + i * Math.PI / 5, r = i % 2 ? 22 : 52; return [r * Math.cos(a), 60 + r * Math.sin(a)]; }));
 OK.O.star = {
-  vb: [-52, -128, 114, 134],
+  vb: [-58, -132, 126, 124],
   svg: () => plate(STAR, 10, {id: 'st'}),
   pose: (P, s, T) => {
     P.st.lastChild.style.fill = s.active > 0.5 ? T.accent : '';
@@ -397,7 +402,7 @@ OK.O.star = {
 // plugin (a plugin, an integration): two puzzle pieces; open slides the second one in until it covers the knob,
 // active tints it
 OK.O.plugin = {
-  vb: [-110, -90, 232, 164],
+  vb: [-110, -90, 234, 164],
   svg: () => OK.box(-84, -37, 0, 74, 74, 20) + OK.cyl(4, 0, 0, 12, 20)
     + `<g data-p="pb">${OK.box(4, -37, 0, 74, 74, 20)}</g>`,
   pose: (P, s, T) => {
@@ -422,7 +427,7 @@ OK.O.camera = {
 
 // mic (a voice, a recording, a podcast): a capsule on a stand; play sends waves out both sides, active lights its top
 OK.O.mic = {
-  vb: [-64, -134, 128, 158],
+  vb: [-64, -136, 128, 162],
   svg: () => {
     const [cx, cy] = OK.iso(0, 0, 82);
     const waves = [0, 1].map((i) => [-1, 1].map((side) => { const R = 40 + 16 * i, x = f1(cx + side * R * 0.5);
@@ -438,28 +443,29 @@ OK.O.mic = {
   },
 };
 
-// montage (editing, cuts): a film strip with scissors over it; struck cuts the strip (its halves part),
-// open opens the blades, play snips
-const PV = [-40, 72];
-const blade = (phi) => {
-  const dx = Math.cos(phi), dz = Math.sin(phi), nx = -dz * 6, nz = dx * 6;
-  return [[PV[0] + nx, PV[1] + nz], [PV[0] + 64 * dx, PV[1] + 64 * dz], [PV[0] - nx, PV[1] - nz]];
+// montage (editing, cuts): a film strip with scissors over it (the scissors face the camera, aimed at the cut);
+// struck cuts the strip (its halves part), open opens the blades, play snips
+const PV = [-30, 70], AIM = Math.atan2(6 - 70, 30);          // pivot (u, v) and the angle toward the cut on the strip
+const half = (phi) => {
+  const dx = Math.cos(phi), dy = Math.sin(phi), cx = PV[0] - 30 * dx, cy = PV[1] - 30 * dy;
+  return {blade: upright([[PV[0] - dy * 5, PV[1] + dx * 5], [PV[0] + 58 * dx, PV[1] + 58 * dy], [PV[0] + dy * 5, PV[1] - dx * 5], [PV[0] - 18 * dx, PV[1] - 18 * dy]]),
+    ring: upright(circ(cx, cy, 12, 20)), hole: upright(circ(cx, cy, 6, 14))};
 };
-const grip = (phi) => circ(PV[0] - 34 * Math.cos(phi), PV[1] - 34 * Math.sin(phi), 11, 16);
 OK.O.montage = {
-  vb: [-106, -146, 212, 210],
+  vb: [-108, -122, 216, 190],
   svg: () => [0, 1].map((h) => `<g data-p="h${h}">${OK.box(h ? 2 : -92, -18, 0, 90, 36, 6)}`
       + [0, 1, 2, 3].map((k) => { const x0 = (h ? 10 : -84) + k * 21;
         return OK.poly([[x0, -10, 6], [x0 + 16, -10, 6], [x0 + 16, 10, 6], [x0, 10, 6]], 'fd'); }).join('') + '</g>').join('')
-    + face(blade(-0.9), 0, 'ft', 'b0') + face(blade(-0.9), 0, 'ft', 'b1')
-    + face(grip(-0.9), 0, 'fl', 'g0') + face(grip(-0.9), 0, 'fl', 'g1')
-    + face(circ(PV[0], PV[1], 4, 10), 0, 'fa'),
+    + [0, 1].map((i) => { const h = half(AIM); return plate(h.ring, 6, {id: 'g' + i}) + face(h.hole, 0, 'fd', 'k' + i) + face(h.blade, 0, 'ft', 'b' + i); }).join('')
+    + face(upright(circ(PV[0], PV[1], 4, 10)), 0, 'fa'),
   pose: (P, s) => {
-    const th = 0.06 + 0.3 * c01(s.open + s.play * 0.5 * (1 + Math.sin(s.t * 9))), d = 8 * s.struck;
+    const th = 0.08 + 0.32 * c01(s.open + s.play * 0.5 * (1 + Math.sin(s.t * 9))), d = 8 * s.struck;
     for (const [i, sg] of [[0, 1], [1, -1]]) {
-      const phi = -0.9 + sg * th;
-      P['b' + i].setAttribute('points', pts(blade(phi).map(([x, z]) => [x, 0, z])));
-      P['g' + i].setAttribute('points', pts(grip(phi).map(([x, z]) => [x, 0, z])));
+      const h = half(AIM + sg * th);
+      P['b' + i].setAttribute('points', pts(h.blade.map(([x, z]) => [x, 0, z])));
+      P['g' + i].firstChild.setAttribute('points', pts(h.ring.map(([x, z]) => [x, -6, z])));
+      P['g' + i].lastChild.setAttribute('points', pts(h.ring.map(([x, z]) => [x, 0, z])));
+      P['k' + i].setAttribute('points', pts(h.hole.map(([x, z]) => [x, 0, z])));
     }
     P.h0.setAttribute('transform', `translate(${f1(-d * 0.866)} ${f1(-d * 0.5)})`);
     P.h1.setAttribute('transform', `translate(${f1(d * 0.866)} ${f1(d * 0.5)})`);
