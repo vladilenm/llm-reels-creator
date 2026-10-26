@@ -58,7 +58,9 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
     for (const q of MOODS[mood]) for (const page of [1, 2]) {
       if (!first) await sleep(PAUSE_MS);
       first = false;
-      const picks = selectMusic(await search(q, { license: "cc0,by", source: SOURCES, page }), { mood, seen });
+      let res;                                              // a query Openverse keeps failing is skipped, not fatal
+      try { res = await search(q, { license: "cc0,by", source: SOURCES, page }); } catch (e) { console.warn(`skip «${q}» p${page}: ${e.message.slice(0, 40)}`); continue; }
+      const picks = selectMusic(res, { mood, seen });
       const take = picks.slice(0, max - got);
       for (const c of take) seen.add(c.id);
       if (dry) {

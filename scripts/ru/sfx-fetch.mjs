@@ -64,7 +64,9 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
       if (got >= per) break;
       if (!first) await sleep(PAUSE_MS);
       first = false;
-      const res = await search(q, { license: "cc0", source: "freesound", length: p.long ? null : "shortest" });
+      let res;                                              // a query Openverse keeps failing is skipped, not fatal
+      try { res = await search(q, { license: "cc0", source: "freesound", length: p.long ? null : "shortest" }); }
+      catch (e) { console.warn(`skip «${q}»: ${e.message.slice(0, 40)}`); continue; }
       for (const r of selectSfx(res, { minMs: p.minMs ?? 0, maxMs: p.maxMs, have })) {
         if (got >= per) break;
         have.add(r.id);
