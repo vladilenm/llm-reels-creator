@@ -83,3 +83,36 @@ test("sfx-fetch: CC0 Freesound files within the length limit, ids on disk skippe
   assert.equal(credits["brand/sfx/library/click_tick/id1.mp3"].kind, "click_tick");
   assert.deepEqual([...haveIds(d, "click_tick")].sort(), ["id1", "id2"]);
 });
+
+// ---------- library: measurements ----------
+
+test("audio_measure: voice band, clipping, intro, evenness, attack, hiss, brightness, antiphase", () => {
+  const r = py(`
+import sys, numpy as np
+sys.path.insert(0, "scripts/ru/lib"); import audio_measure as A
+sr = 22050; t = np.arange(sr * 20) / sr; rng = np.random.default_rng(1)
+hi = 0.5 * np.sin(2 * np.pi * 2000 * t); lo = 0.5 * np.sin(2 * np.pi * 100 * t)
+assert A.band_share(hi, sr) > 0.9 and A.band_share(lo, sr) < 0.05
+assert A.clip_fraction(np.clip(3 * lo, -1, 1)) > 0.3 and A.clip_fraction(lo) == 0
+noise = 0.2 * rng.standard_normal(sr * 30)
+i = A.intro_seconds(np.concatenate([np.zeros(sr * 10), noise]), sr); assert 9.0 <= i <= 10.5, i
+assert A.loudness_range_db(noise, sr) < 1.5
+steps = np.concatenate([noise[: sr * 5], 0.1 * noise[: sr * 5]] * 4)
+assert A.loudness_range_db(steps, sr) > 12
+s, rg = A.steadiest_window(np.concatenate([steps, noise]), sr, 0, dur_s=10, until_s=60); assert s >= 40 and rg < 1.5, (s, rg)
+click = np.zeros(sr); click[100:300] = np.exp(-np.arange(200) / 20) * rng.standard_normal(200)
+ramp = np.zeros(sr); ramp[:4410] = np.linspace(0, 1, 4410) * rng.standard_normal(4410) * 0.5
+assert A.attack_ms(click, sr) < 5 and A.attack_ms(ramp, sr) > 100, (A.attack_ms(click, sr), A.attack_ms(ramp, sr))
+a, b = A.audible_span(click, sr); assert b - a < 0.02
+sr2 = 44100; k = np.arange(int(0.3 * sr2)) / sr2
+hissy = 0.05 * rng.standard_normal(len(k)) + 0.8 * np.sin(2 * np.pi * 3000 * k) * np.exp(-60 * (k - 0.1)) * (k >= 0.1)
+lv, fl = A.hiss(hissy, sr2); assert lv > -35 and fl > 0.4, (lv, fl)
+t3 = np.arange(3 * sr2) / sr2
+_, fl3 = A.hiss(0.5 * np.sin(2 * np.pi * 800 * t3) * np.sin(np.pi * t3 / 3), sr2); assert fl3 < 0.1, fl3
+assert A.hiss(np.zeros(100), sr2) == (None, None)
+assert A.stereo_corr(np.stack([lo, -lo], 1)) < -0.9 and A.stereo_corr(np.stack([lo, lo], 1)) > 0.99
+assert 1800 < A.centroid_hz(hi, sr) < 2200
+print("ok")
+`);
+  assert.equal(r.status, 0, r.stderr + r.stdout);
+});
