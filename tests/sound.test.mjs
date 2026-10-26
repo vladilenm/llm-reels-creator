@@ -116,3 +116,22 @@ print("ok")
 `);
   assert.equal(r.status, 0, r.stderr + r.stdout);
 });
+
+const BEAT = "0.5*sin(2*PI*55*t)*exp(-20*mod(t\\,0.6))+0.08*sin(2*PI*220*t)+0.05*sin(2*PI*330*t)";
+
+test("music_screen: a steady 100 BPM track passes with its tempo, a long intro and clipping fail", { timeout: 180000 }, () => {
+  const d = tmp("music-");
+  ff("-f", "lavfi", "-i", `aevalsrc=${BEAT}:s=22050:d=70`, join(d, "good.wav"));
+  ff("-f", "lavfi", "-i", `aevalsrc=(${BEAT})*gte(t\\,12):s=22050:d=82`, join(d, "intro.wav"));
+  ff("-f", "lavfi", "-i", `aevalsrc=4*(${BEAT}):s=22050:d=70`, join(d, "clip.wav"));
+  writeFileSync(join(d, "candidates.json"), JSON.stringify(Object.fromEntries(
+    ["good", "intro", "clip"].map((k) => [k, { file: join(d, `${k}.wav`) }]))));
+  const r = spawnSync("python3", ["scripts/ru/music_screen.py", "--dir", d], { cwd: ROOT, encoding: "utf8" });
+  assert.equal(r.status, 0, r.stderr);
+  const s = JSON.parse(readFileSync(join(d, "screen.json"), "utf8"));
+  assert.equal(s.good.status, "pass", JSON.stringify(s.good));
+  assert.ok(Math.abs(s.good.bpm - 100) < 3, `bpm ${s.good.bpm}`);
+  assert.ok(s.good.range_db < 3 && s.good.excerpt_start >= 0, JSON.stringify(s.good));
+  assert.deepEqual(s.intro.reasons, ["intro"]);
+  assert.ok(s.clip.reasons.includes("clipping"));
+});
