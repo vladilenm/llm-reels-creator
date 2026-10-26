@@ -6,15 +6,19 @@
      bg:{zoom:[t, dur, to], flip:[t, dur]},    full mode only. night: grid + glow, zoom = the grid flies into depth
                                                 and the glow flares. light: canvas + faint grid; flip = it wipes in
                                                 from the left over the night
-     chapter:{idx, l1, l2, y:200, tin, keys:[[t, {idx, l1, l2}]]},     «глава»: stays, the text swaps on keys
-     items:[{id, kind, x, y, size, tin, tout, label:{text, tin, dy:44}, states:[[t, {open:1}, dur]], active:[[t, 0|1]],
+     chapter:{idx, l1, l2, y:200, tin, keys:[[t, {idx, l1, l2}]]},     «глава»: stays, the text swaps on keys (idx types
+                                                again only when a key changes it)
+     items:[{id, kind, x, y, size, tin, tout, label:{text, tin, dy}, states:[[t, {open:1}, dur]], active:[[t, 0|1]],
              check:t, ghost:true, keys:[[t, {x, y, size}, dur:0.7]]}],   «материализация», «активный пункт»,
                                                                      «перестройка» (keys move and resize, tout leaves)
+                                                   label dy: the label's top under the floor centre; default 12 px under the
+                                                   object's lowest point, at least 44
      callouts:[{at:'id'|[x, y], text, t, dx:170, dy:-90, tout}],      «выноски»: a dotted elbow to a glass label
      returns:{to, from:[ids], t, gap:0.12, dur:0.5, bend:0.25, tout},  «возврат»: arrows back to the first item
-     drops:[{into:'id'|[x, y], kind:'document', n:1, t, gap:0.22, size:70, from:-320|[x, y]}],   «физика предмета»
+     drops:[{into:'id'|[x, y], kind:'document', n:1, t, gap:0.22, size:70, from:-320|[x, y]}],   «физика предмета» (fades in 0.1 s)
      morph:{from, t, dur:0.8, x:540, y, w:760, dots:[{at:0..1, t, on}], head:{t0, t1}},          «морф значка»
-     prompt:{x:540, y, w:840, text, t, dur:0.9, send, reply:{t, text}, tout},                      «строка ввода»
+     prompt:{x:540, y, w:840, text, t, dur:0.9, send, reply:{t, text}, tout},                      «строка ввода» (with send the text
+                                                is typed by send − 0.02 s at the latest, the reply never before the typing ends)
      assemble:{rect:[x, y, w, h], t, dur:0.8, then:'id'},      «сборка из сетки» (full mode only: cells match the clip's grid)
      links:[{from, to, tin, dur:0.5, dash:false}],                    «дерево и связи»: an elbow from → to
      fly:{id, t, dur:0.4},                                            «сквозной пролёт» into an item
@@ -127,12 +131,15 @@ OK.run = (cfg) => {
     const c = cfg.chapter, y = c.y ?? 200;
     const states = [{t: c.tin ?? 0, idx: c.idx, l1: c.l1, l2: c.l2},
       ...(c.keys || []).map(([t, s]) => ({t, idx: s.idx ?? c.idx, l1: s.l1 ?? c.l1, l2: s.l2 ?? c.l2}))];
+    let typeFrom = 0;                              // the idx types from the key where it last changed; a key that keeps it leaves it whole
     chapter = states.map((s, i) => {
+      if (i === 0 || s.idx !== states[i - 1].idx) typeFrom = s.t;
+      const type0 = typeFrom;
       const box = el('a', scene); box.style.left = '0'; box.style.top = '0';
       const idx = el('a okidx', box, 'div', i === 0 ? 'ok-idx' : undefined); idx.style.top = (y - 52) + 'px'; idx.style.color = TH.on;
       const t1 = el('a okt1', box); t1.textContent = s.l1 || ''; t1.style.top = y + 'px'; t1.style.color = TH.ink;
       const t2 = el('a okt2', box); t2.textContent = s.l2 || ''; t2.style.top = (y + 62) + 'px'; t2.style.color = TH.on;
-      return {s, box, idx, t1, t2, end: states[i + 1]?.t ?? null};
+      return {s, box, idx, t1, t2, type0, end: states[i + 1]?.t ?? null};
     });
   }
 
@@ -171,12 +178,14 @@ OK.run = (cfg) => {
     }
     items[it.id] = {it, O, svg, g: svg.firstChild, P, tracks, act, lb, ck, geo: geoTrack(it), at: null};
   }
+  // the label's top under the floor centre: label.dy, else 12 px under the object's lowest point (at least 44)
+  const lbDy = (I, k) => I.it.label.dy ?? Math.max(44, (I.O.vb[1] + I.O.vb[3]) * k + 12);
   // where an item stands at t; its svg, label and check follow
   const place = (I, t) => {
     const [x, y, size] = I.geo(t), [vx, vy, vw, vh] = I.O.vb, k = size / vw;
     I.svg.setAttribute('width', size.toFixed(1)); I.svg.setAttribute('height', (vh * k).toFixed(1));
     I.svg.style.left = (x + vx * k).toFixed(1) + 'px'; I.svg.style.top = (y + vy * k).toFixed(1) + 'px';
-    if (I.lb) { I.lb.style.left = x.toFixed(1) + 'px'; I.lb.style.top = (y + (I.it.label.dy ?? 44)).toFixed(1) + 'px'; }
+    if (I.lb) { I.lb.style.left = x.toFixed(1) + 'px'; I.lb.style.top = (y + lbDy(I, k)).toFixed(1) + 'px'; }
     if (I.ck) { I.ck.style.left = (x + size * 0.3).toFixed(1) + 'px'; I.ck.style.top = (y + vy * k * 0.75).toFixed(1) + 'px'; }
     return (I.at = {x, y, k, size});
   };
@@ -187,7 +196,7 @@ OK.run = (cfg) => {
   // follows items that move
   const linkD = (L) => {
     const a = items[L.from], b = items[L.to], A = a.at, Bq = b.at;
-    const x1 = A.x, y1 = A.y + (a.it.label ? (a.it.label.dy ?? 44) + 44 : 30), x2 = Bq.x, y2 = Bq.y + b.O.vb[1] * Bq.k - 16, ym = (y1 + y2) / 2;
+    const x1 = A.x, y1 = A.y + (a.it.label ? lbDy(a, A.k) + 44 : 30), x2 = Bq.x, y2 = Bq.y + b.O.vb[1] * Bq.k - 16, ym = (y1 + y2) / 2;
     const r = (v) => +v.toFixed(1);                                   // no trailing ".0": a still link reads M540,588 as before
     return `M${r(x1)},${r(y1)} V${r(ym)} H${r(x2)} V${r(y2)}`;
   };
@@ -352,7 +361,7 @@ OK.run = (cfg) => {
       const on = t >= c.s.t - 1e-6 && (c.end == null || t < c.end);
       c.box.style.display = on ? '' : 'none'; if (!on) continue;
       c.box.style.opacity = (c.end == null ? 1 : 1 - clamp((t - (c.end - 0.15)) / 0.15)).toFixed(3);
-      const s = c.s.idx || ''; M.setText(c.idx, s.slice(0, Math.round(s.length * clamp((t - c.s.t) / 0.4))));
+      const s = c.s.idx || ''; M.setText(c.idx, s.slice(0, Math.round(s.length * clamp((t - c.type0) / 0.4))));
       c.t1.style.clipPath = wipe(ex((t - c.s.t - 0.1) / 0.7));
       c.t2.style.clipPath = wipe(ex((t - c.s.t - 0.22) / 0.7));
     }
@@ -420,8 +429,9 @@ OK.run = (cfg) => {
       C.plate.style.top = (by - 26).toFixed(1) + 'px';
       C.plate.style.left = (dx >= 0 ? bx + 10 : bx - 10).toFixed(1) + 'px';
       C.plate.style.transform = dx >= 0 ? '' : 'translateX(-100%)';
-      const pu = ex((a - 0.25) / 0.5);              // left-to-right wipe that keeps 20 px around for the ring and glow
-      C.plate.style.clipPath = `inset(-20px calc(${(100 - 100 * pu).toFixed(2)}% + ${(20 - 40 * pu).toFixed(1)}px) -20px -20px round 14px)`;
+      const pu = ex((a - 0.25) / 0.5), side = `calc(${(100 - 100 * pu).toFixed(2)}% + ${(20 - 40 * pu).toFixed(1)}px)`;
+      // the wipe opens from the leader end (keeps 20 px around for the ring and glow): left → right for dx ≥ 0, right → left for dx < 0
+      C.plate.style.clipPath = dx >= 0 ? `inset(-20px ${side} -20px -20px round 14px)` : `inset(-20px -20px -20px ${side} round 14px)`;
     }
 
     if (cfg.returns) {
@@ -455,7 +465,7 @@ OK.run = (cfg) => {
       const x = fx + (tx - fx) * u, y = fy + (ty - fy) * u * u + 22 * sink;
       d.svg.style.left = (x + d.vx * d.k).toFixed(1) + 'px'; d.svg.style.top = (y + d.vy * d.k).toFixed(1) + 'px';
       d.svg.style.transform = `rotate(${((1 - u) * (d.j % 2 ? 14 : -14)).toFixed(2)}deg) scale(${(1 + sq * 0.5).toFixed(3)}, ${(1 - sq).toFixed(3)})`;
-      d.svg.style.opacity = (1 - sink).toFixed(3);
+      d.svg.style.opacity = (clamp(a / 0.1) * (1 - sink)).toFixed(3);
     }
 
     if (morph) {
@@ -524,19 +534,22 @@ OK.run = (cfg) => {
 
     if (prompt) {
       const c = prompt.c, a = t - c.t, out = c.tout == null ? 0 : clamp((t - c.tout) / 0.3), on = a >= 0 && out < 1;
+      // the text is typed in full before send (send − 0.02 at the latest, never faster than 0.15 s); the reply waits for the typing
+      const typeDur = c.send == null ? (c.dur ?? 0.9) : Math.max(0.15, Math.min(c.dur ?? 0.9, c.send - c.t - 0.25 - 0.02));
+      const typeEnd = c.t + 0.25 + typeDur, replyAt = prompt.reply ? Math.max(c.reply.t, typeEnd - 1e-6) : 0;
       prompt.bar.style.display = on ? '' : 'none';
-      if (prompt.reply) prompt.reply.style.display = on && t >= c.reply.t ? '' : 'none';
+      if (prompt.reply) prompt.reply.style.display = on && t >= replyAt ? '' : 'none';
       if (on) {
         const u = ex(a / 0.6);
         prompt.bar.style.clipPath = `inset(-60px calc(${(100 - 100 * u).toFixed(2)}% + ${(60 - 120 * u).toFixed(1)}px) -60px -60px round 48px)`;
         prompt.bar.style.opacity = (1 - out).toFixed(3);
-        const n = Math.round(c.text.length * clamp((a - 0.25) / (c.dur ?? 0.9)));
+        const n = Math.round(c.text.length * clamp((a - 0.25) / typeDur));
         M.setText(prompt.tx, c.text.slice(0, n));
         prompt.car.style.opacity = n < c.text.length || Math.floor(t * 2.5) % 2 === 0 ? '1' : '0';
         prompt.btn.style.background = mix(theme === 'night' ? '#2C2342' : '#E4DFEC', TH.accent, c.send == null ? 0 : ex((t - c.send) / 0.3));
         prompt.btn.style.transform = `scale(${(1 + 0.12 * Math.sin(Math.PI * clamp((t - (c.send ?? 1e9)) / 0.3))).toFixed(3)})`;
-        if (prompt.reply && t >= c.reply.t) {
-          const r = ex((t - c.reply.t) / 0.4);
+        if (prompt.reply && t >= replyAt) {
+          const r = ex((t - replyAt) / 0.4);
           prompt.reply.style.opacity = (r * (1 - out)).toFixed(3); prompt.reply.style.transform = `translateY(${((1 - r) * 10).toFixed(1)}px)`;
         }
       }

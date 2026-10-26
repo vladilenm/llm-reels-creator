@@ -5,6 +5,7 @@
 
    OK.iso(x, y, z) → [sx, sy]   true isometric (30°): +x goes right-down, +y left-down, +z up; origin = floor centre
    OK.ellipse(r) → [rx, ry]     a circle of radius r lying in the x-y plane
+   OK.smooth(points, per = 4, closed = true) → points   a Catmull-Rom curve through [u, v] points (an outline that must not look faceted)
    OK.O[kind] = {vb:[x, y, w, h], svg:() => markup, pose:(P, s, T) => void}
      vb    the drawing's box in iso screen units around the origin
      P     {part name: element} for every data-p in the markup
@@ -83,6 +84,21 @@ const plate = OK.plate = (xz, d, c = {}) => `<g${tag(c.id)}>${face(xz, -d, c.b |
 const circ = OK.circ = (cx, cz, r, n = 28, a0 = 0) => Array.from({length: n}, (_, i) => {
   const a = a0 + i / n * Math.PI * 2; return [cx + r * Math.cos(a), cz + r * Math.sin(a)];
 });
+
+// smooth(points, per = 4, closed = true): a Catmull-Rom curve through [u, v] points, `per` samples per segment (a closed
+// outline: points.length · per samples; an open line: (points.length − 1) · per + 1, ending on the last point)
+const smooth = OK.smooth = (p, per = 4, closed = true) => {
+  const n = p.length, get = (i) => (closed ? p[(i + n) % n] : p[Math.max(0, Math.min(n - 1, i))]), out = [];
+  for (let i = 0; i < (closed ? n : n - 1); i++) {
+    const [p0, p1, p2, p3] = [get(i - 1), get(i), get(i + 1), get(i + 2)];
+    for (let j = 0; j < per; j++) {
+      const u = j / per, u2 = u * u, u3 = u2 * u;
+      out.push([0, 1].map((a) => 0.5 * (2 * p1[a] + (p2[a] - p0[a]) * u + (2 * p0[a] - 5 * p1[a] + 4 * p2[a] - p3[a]) * u2 + (3 * p1[a] - p0[a] - 3 * p2[a] + p3[a]) * u3)));
+    }
+  }
+  if (!closed) out.push([...p[n - 1]]);
+  return out;
+};
 
 OK.O = {};
 
@@ -616,8 +632,8 @@ OK.O.rocket = {
 
 // ear (listening, hearing the result, earshot): an ear facing the camera (upright) with sound waves coming in from
 // the left; play pulses the waves toward it, active lights the inner curve
-const EAR = upright([[12, 24], [30, 40], [40, 70], [36, 104], [16, 128], [-12, 134], [-36, 120], [-46, 94], [-40, 70], [-26, 58], [-18, 40], [-6, 22]]);
-const EAR_IN = upright([[-24, 92], [-20, 110], [0, 118], [20, 104], [22, 80], [8, 64], [-2, 50]]);
+const EAR = upright(smooth([[12, 24], [30, 40], [40, 70], [36, 104], [16, 128], [-12, 134], [-36, 120], [-46, 94], [-40, 70], [-26, 58], [-18, 40], [-6, 22]]));
+const EAR_IN = upright(smooth([[-24, 92], [-20, 110], [0, 118], [20, 104], [22, 80], [8, 64], [-2, 50]], 4, false));
 OK.O.ear = {
   vb: [-100, -146, 152, 132],
   svg: () => {

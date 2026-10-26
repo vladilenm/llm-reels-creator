@@ -126,6 +126,22 @@ test("object kit, part 3: meaning, money, sound — eight objects, 32 in all, ea
   await checkObjects(["fan", "chart", "clock", "money", "checklist", "mail", "rocket", "ear"]);
 });
 
+test("object kit: smooth() runs a Catmull-Rom curve through its points, closed or open", () => {
+  const ctx = { window: {} };
+  vm.createContext(ctx);
+  vm.runInContext(readFileSync(join(ROOT, "scripts/ru/broll/object-kit.js"), "utf8"), ctx);
+  const sq = [[0, 0], [100, 0], [100, 100], [0, 100]];
+  const closed = [...ctx.window.OK.smooth(sq, 4)], open = [...ctx.window.OK.smooth(sq, 4, false)];
+  assert.equal(closed.length, 16, "closed: per samples per segment");
+  assert.equal(open.length, 13, "open: (n − 1) · per + 1");
+  sq.forEach((p, i) => assert.deepEqual([...closed[i * 4]].map(Math.round), p, `closed passes through point ${i}`));
+  sq.forEach((p, i) => assert.deepEqual([...open[i * 4]].map(Math.round), p, `open passes through point ${i}`));
+  assert.deepEqual([...open.at(-1)], sq.at(-1), "open ends on its last point");
+  const mid = closed[2];                                   // between (0,0) and (100,0): bulges less than a few units
+  assert.ok(mid[0] > 30 && mid[0] < 70 && Math.abs(mid[1]) < 15, `a smooth middle sample ${mid}`);
+  assert.equal(ctx.window.OK.smooth(sq).length, 16, "per defaults to 4");
+});
+
 // ---------- object scene ----------
 
 const scene = (cfg) => `<title>x</title><script>OK.run(${JSON.stringify(cfg)});</script>`;
@@ -149,7 +165,7 @@ test("object scene: ghost → glass, the label lights with the active item, link
     assert.equal(await c.at(2.0, col, "db"), "rgb(183, 156, 255)");
     assert.ok(+(await c.at(1.8, () => document.getElementById("ok-check-db").style.opacity)) > 0.9);
     assert.ok(parseFloat(await c.at(1.3, () => document.getElementById("ok-link-0").style.strokeDashoffset)) < 1);
-    assert.match(await c.at(1.3, () => document.getElementById("ok-link-0").getAttribute("d")), /^M540,588 /);
+    assert.match(await c.at(1.3, () => document.getElementById("ok-link-0").getAttribute("d")), /^M540,613 /, "500 + the agent's default label offset 69 (12 under its lowest point) + 44");
     const idx = () => document.getElementById("ok-idx").textContent;
     assert.ok((await c.at(0.2, idx)).length < "01 — тест".length);
     assert.equal(await c.at(1.0, idx), "01 — тест");
@@ -230,6 +246,110 @@ test("object scene: drops fall into a folder, the morph grows a timeline the pla
     assert.ok(await c.at(3.45, lit) >= 2, "cells light up");
     assert.equal(await c.at(3.95, lit), 0, "and are gone as the gear appears");
     assert.ok(await c.at(3.95, () => +document.getElementById("ok-item-g").style.opacity) > 0.8, "the gear is assembled");
+    assert.deepEqual(c.errors, []);
+  } finally { await c.browser.close(); }
+});
+
+test("object scene callouts: the plate opens from the leader end, to the right for dx > 0 and to the left for dx < 0", { timeout: 60000 }, async () => {
+  const c = await openClip(scene({ T: 3, mode: "panel", theme: "night",
+    callouts: [{ at: [300, 900], text: "вправо", t: 0.5, dx: 170, dy: -80 }, { at: [800, 900], text: "влево", t: 0.5, dx: -170, dy: -80 }] }));
+  try {
+    // the part of the plate that shows, in screen px, from its clip-path (inset: top right bottom left) and its box
+    const shown = (id) => {
+      const e = document.getElementById(id), r = e.getBoundingClientRect(), w = r.width;
+      const len = (s) => { const m = /calc\(\s*([-\d.]+)%\s*([+-])\s*([\d.]+)px\s*\)/.exec(s);
+        return m ? (+m[1] / 100) * w + (m[2] === "-" ? -1 : 1) * +m[3] : s.endsWith("%") ? (parseFloat(s) / 100) * w : parseFloat(s); };
+      const m = /inset\(\s*(\S+)\s+(calc\([^)]*\)|\S+)\s+(\S+)\s+(calc\([^)]*\)|\S+)/.exec(e.style.clipPath);
+      return { x0: r.left + len(m[4]), x1: r.right - len(m[2]), left: r.left, right: r.right };
+    };
+    const mid = 0.8;                                          // 0.3 s after t: the wipe is half done
+    const R = await c.at(mid, shown, "ok-co-0"), L = await c.at(mid, shown, "ok-co-1");
+    assert.ok(R.x0 <= R.left - 19 && R.x1 < R.right - 10, `dx > 0 opens from its left end: ${JSON.stringify(R)}`);
+    assert.ok(L.x1 >= L.right + 19 && L.x0 > L.left + 10, `dx < 0 opens from its right end, the leader's: ${JSON.stringify(L)}`);
+    assert.ok(L.x1 - L.x0 > 20 && R.x1 - R.x0 > 20, "something shows at mid-wipe");
+    for (const id of ["ok-co-0", "ok-co-1"]) {
+      const f = await c.at(1.5, shown, id);
+      assert.ok(f.x0 <= f.left - 19 && f.x1 >= f.right + 19, `${id} fully open: ${JSON.stringify(f)}`);
+    }
+    assert.deepEqual(c.errors, []);
+  } finally { await c.browser.close(); }
+});
+
+test("object scene: a label without dy sits below the object's lowest point, an explicit dy wins, the link starts under the label", { timeout: 60000 }, async () => {
+  const c = await openClip(scene({ T: 2, mode: "panel", theme: "night",
+    items: [{ id: "tt", kind: "turntable", x: 540, y: 600, size: 240, tin: 0, label: { text: "вертушка" } },
+      { id: "fx", kind: "turntable", x: 300, y: 1100, size: 240, tin: 0, label: { text: "dy 44", dy: 44 } },
+      { id: "kk", kind: "key", x: 780, y: 1100, size: 160, tin: 0, label: { text: "ключ" } }],
+    links: [{ from: "tt", to: "fx", tin: 0.1, dur: 0.3 }] }));
+  try {
+    const geo = (id) => { const s = document.getElementById("ok-item-" + id), l = document.getElementById("ok-label-" + id);
+      return { bottom: parseFloat(s.style.top) + +s.getAttribute("height"), top: parseFloat(l.style.top), y: parseFloat(l.style.top) }; };
+    const tt = await c.at(1, geo, "tt"), fx = await c.at(1, geo, "fx"), kk = await c.at(1, geo, "kk");
+    assert.ok(Math.abs(tt.top - (tt.bottom + 12)) < 0.2, `the label top ${tt.top} is 12 px below the svg bottom ${tt.bottom}`);
+    assert.equal(fx.top, 1100 + 44, "an explicit dy wins");
+    assert.ok(fx.top < fx.bottom, "…even when it overlaps the object");
+    const want = await c.at(1, (kind) => { const [, vy, vw, vh] = OK.O[kind].vb; return 1100 + Math.max(44, (vy + vh) * (160 / vw) + 12); }, "key");
+    assert.ok(Math.abs(kk.top - want) < 0.2, `a key: the label top ${kk.top} is ${want} (the 44 px minimum if it is short)`);
+    const d = await c.at(1, () => document.getElementById("ok-link-0").getAttribute("d"));
+    const y1 = +/^M[\d.]+,([\d.]+)/.exec(d)[1];
+    assert.ok(Math.abs(y1 - (tt.top + 44)) < 0.6, `the link starts 44 px under the label top: ${y1} vs ${tt.top}`);
+    assert.deepEqual(c.errors, []);
+  } finally { await c.browser.close(); }
+});
+
+test("object scene prompt: the text is typed in full before send, the reply never comes before the typing ends", { timeout: 60000 }, async () => {
+  const text = "стеклянный звон";
+  const run = (p) => openClip(scene({ T: 4, mode: "panel", theme: "night", prompt: { y: 300, w: 860, text, t: 0.5, ...p } }));
+  const txt = () => document.getElementById("ok-prompt-text").textContent;
+  const rep = () => { const e = document.getElementById("ok-prompt-reply"); return getComputedStyle(e).display === "none" ? 0 : +e.style.opacity; };
+  let c = await run({ dur: 0.9, send: 1.0, reply: { t: 0.9, text: "ответ" } });     // send 0.5 s after t: typing gets 0.23 s
+  try {
+    assert.ok((await c.at(0.8, txt)).length < text.length, "still typing right after its start");
+    assert.equal(await c.at(0.99, txt), text, "typed in full before send (it ends at send − 0.02 = 0.98)");
+    assert.equal(await c.at(1.0, txt), text);
+    assert.equal(await c.at(0.95, rep), 0, "the reply waits for the end of the typing, not its own earlier time");
+    assert.ok(await c.at(1.3, rep) > 0.9, "and comes right after");
+    assert.deepEqual(c.errors, []);
+  } finally { await c.browser.close(); }
+  c = await run({ dur: 0.6, send: 1.4, reply: { t: 1.6, text: "ответ" } });           // roomy send: the given duration is kept
+  try {
+    assert.ok((await c.at(1.1, txt)).length < text.length, "dur 0.6 is kept when send is far");
+    assert.equal(await c.at(1.4, txt), text);
+  } finally { await c.browser.close(); }
+  c = await run({ dur: 0.9, send: 0.6, reply: { t: 0.7, text: "ответ" } });           // send right after the start: never below 0.15 s
+  try {
+    assert.equal(await c.at(0.75 + 0.16, txt), text, "the floor is 0.15 s");
+    assert.ok((await c.at(0.75 + 0.05, txt)).length < text.length);
+  } finally { await c.browser.close(); }
+});
+
+test("object scene chapter: a key with the same idx does not type it again, a changed idx types it again", { timeout: 60000 }, async () => {
+  const c = await openClip(scene({ T: 5, mode: "panel", theme: "night",
+    chapter: { idx: "01 — тест", l1: "Раз", l2: "два", y: 200, tin: 0.1, keys: [[1.5, { l1: "Три" }], [3, { idx: "02 — другой", l1: "Четыре" }]] } }));
+  try {
+    const idx = () => { const b = [...document.querySelectorAll(".okidx")].find((e) => e.parentElement.style.display !== "none"); return b ? b.textContent : null; };
+    assert.equal(await c.at(1.0, idx), "01 — тест");
+    assert.equal(await c.at(1.55, idx), "01 — тест", "an unchanged idx stays whole on the key");
+    assert.equal(await c.at(1.51, idx), "01 — тест");
+    assert.ok((await c.at(3.05, idx)).length < "02 — другой".length, "a changed idx types again");
+    assert.equal(await c.at(3.6, idx), "02 — другой");
+    // the lines still wipe on every key
+    const clip = () => [...document.querySelectorAll(".okt1")].find((e) => e.parentElement.style.display !== "none").style.clipPath;
+    assert.notEqual(await c.at(1.6, clip), await c.at(2.5, clip), "l1 wipes in on the key");
+    assert.deepEqual(c.errors, []);
+  } finally { await c.browser.close(); }
+});
+
+test("object scene drops: a dropped object fades in over 0.1 s instead of popping in", { timeout: 60000 }, async () => {
+  const c = await openClip(scene({ T: 2, mode: "panel", theme: "night",
+    items: [{ id: "f", kind: "folder", x: 540, y: 900, size: 200, tin: 0 }], drops: [{ into: "f", kind: "document", n: 1, t: 0.3, size: 70 }] }));
+  try {
+    const op = () => { const e = document.getElementById("ok-drop-0-0"); return getComputedStyle(e).display === "none" ? null : +e.style.opacity; };
+    const a = await c.at(0.32, op), b = await c.at(0.35, op), d = await c.at(0.5, op);
+    assert.ok(a != null && a < 0.35, `starts transparent: ${a}`);
+    assert.ok(b > a && b < 0.8, `fading: ${b}`);
+    assert.ok(d > 0.99, `solid after 0.1 s: ${d}`);
+    assert.ok(await c.at(0.3 + 0.55 + 0.19, op) < 0.1, "and still sinks away at the end");
     assert.deepEqual(c.errors, []);
   } finally { await c.browser.close(); }
 });
@@ -488,6 +608,34 @@ test("kinetic captions: a theme edge ends a group and starts another, a group ne
   assert.deepEqual(run([0.9, 1.7]).map((x) => x.lines[0].map((w) => w.text).join(" ")), ["Раз два три", "четыре пять", "шесть семь"]);
 });
 
+test("applyHide: a group's linger tail does not come back after the hide window, a spoken word past the window does", async () => {
+  const { applyHide } = await import("../scripts/ru/make-captions.mjs");
+  const hide = [{ in: 39.62, out: 44.36 }];
+  // spoken 43.42–44.30 inside the window, 0.6 s linger to 44.90: only the tail would be left after 44.36
+  const tail = { start: 43.42, end: 44.9, lines: [[{ text: "хвост", start: 43.42, end: 44.3 }]] };
+  assert.deepEqual(applyHide([tail], hide), [], "a cue spoken inside the window leaves nothing after it");
+  const edge = { start: 43.42, end: 44.9, lines: [[{ text: "ровно", start: 43.42, end: 44.36 }]] };
+  assert.deepEqual(applyHide([edge], hide), [], "a last word ending exactly at the window end is not spoken after it");
+  const past = { start: 43.42, end: 45.2, lines: [[{ text: "раз", start: 43.42, end: 43.8 }, { text: "два", start: 44.2, end: 44.8 }]] };
+  assert.deepEqual(applyHide([past], hide).map((c) => [c.start, c.end]), [[44.36, 45.2]], "a word spoken after the window keeps the rest");
+  const before = { start: 38.5, end: 40.2, lines: [[{ text: "до", start: 38.5, end: 39.9 }]] };
+  assert.deepEqual(applyHide([before], hide).map((c) => [c.start, c.end]), [[38.5, 39.62]], "a cue that starts before the window is still cut at its edge");
+  assert.equal(applyHide([{ start: 50, end: 51, lines: [[{ text: "после", start: 50, end: 50.8 }]] }], hide).length, 1, "outside the window: untouched");
+});
+
+test("kinetic captions: a theme edge within 0.05 s after a group's start still ends the group there", async () => {
+  const { kineticGroups, kineticConfig, kineticHtml } = await import("../scripts/ru/make-captions.mjs");
+  const { loadBrand } = await import("../scripts/ru/lib/brand.mjs");
+  const brand = loadBrand();
+  const words = [{ text: "Раз", start: 1, end: 1.3 }, { text: "два", start: 1.35, end: 1.6 }];
+  const ov = { style: "kinetic", kinetic: { theme_default: "dark", theme_keys: [{ at: 1.05, theme: "light" }, { at: 3, theme: "dark" }] } };
+  const g = kineticGroups({ words }, kineticConfig(brand, ov), ov);
+  const html = kineticHtml(g, { duration: 4, brand, fontUrl: "a.ttf", accentUrl: "b.ttf", overrides: ov });
+  const m = /id="c0" class="kg dark clip" data-start="([\d.]+)" data-duration="([\d.]+)"/.exec(html);
+  assert.ok(m, "the first group is dark");
+  assert.ok(Number(m[1]) + Number(m[2]) <= 1.05 + 1e-6, `the dark group ends at the edge 1.05, not ${Number(m[1]) + Number(m[2])}`);
+});
+
 test("motion-check: known verbs, none twice in a row, at least 5 verbs, each on its word, 1–2 light accents", async () => {
   const { checkMotion, VERBS } = await import("../scripts/ru/motion-check.mjs");
   assert.equal(Object.keys(VERBS).length, 16);
@@ -665,6 +813,27 @@ for i in range(10):
   r = spawnSync("python3", ["scripts/ru/wide/night_base.py", P], { cwd: ROOT, encoding: "utf8" });
   assert.notEqual(r.status, 0, "an unknown accent kind stops the run");
   assert.match(r.stderr, /kind/);
+});
+
+test("night_base frame_count: round(video-stream duration × fps), not the native frame count", { timeout: 60000 }, () => {
+  const d = tmp("fc-");
+  ff("-f", "lavfi", "-i", "color=c=red:s=64x64:r=30:d=0.4", "-c:v", "libx264", "-pix_fmt", "yuv420p", join(d, "a.mp4"));      // 12 native frames at 30 fps
+  const r = py(`import sys, json
+sys.path.insert(0, "scripts/ru/wide")
+from night_base import frame_count
+out = {"at25": frame_count(${JSON.stringify(join(d, "a.mp4"))}, 25), "at30": frame_count(${JSON.stringify(join(d, "a.mp4"))}, 30)}
+try: frame_count(${JSON.stringify(join(d, "missing.mp4"))}, 25)
+except SystemExit as e: out["missing"] = str(e)
+open(${JSON.stringify(join(d, "nofile.txt"))}, "w").write("not a video")
+try: frame_count(${JSON.stringify(join(d, "nofile.txt"))}, 25)
+except SystemExit as e: out["junk"] = str(e)
+print(json.dumps(out))`);
+  assert.equal(r.status, 0, r.stderr);
+  const o = JSON.parse(r.stdout.trim().split("\n").pop());
+  assert.equal(o.at25, 10, "0.4 s at the project's 25 fps is 10 frames, as frames() reads them (a 30 fps file has 12 native ones)");
+  assert.equal(o.at30, 12);
+  assert.match(o.missing, /ffprobe не прочитал/);
+  assert.ok(o.junk, "a file without a video stream stops with a message");
 });
 
 test("night_base mask_src: a frame without a mask borrows the nearest neighbour within 3 frames, never across a cut", { timeout: 60000 }, () => {

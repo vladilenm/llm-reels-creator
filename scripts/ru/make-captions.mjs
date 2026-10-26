@@ -47,12 +47,19 @@ export function captionCues(transcript, brand) {
 //   hide: [{ in, out }]               no captions in these clean-timeline windows
 //   baseline_keys: [{ at, baseline_y }] baseline over time, linear between keys,
 //                                     brand baseline before the first key
+// A cue that starts inside a window and straddles its end keeps only what is spoken after the window: when its last word
+// ends at or before the window end, what is left is the linger tail of a hidden group, and it is dropped.
 export function applyHide(cues, hide = []) {
   return cues.flatMap((cue) => {
     let { start, end } = cue;
+    const spoken = (cue.lines ?? []).flat().map((w) => w?.end).filter(Number.isFinite);
+    const lastWord = spoken.length ? Math.max(...spoken) : Infinity;
     for (const h of hide) {
       if (start >= h.in && end <= h.out) return [];
-      if (start < h.out && end > h.out && start >= h.in) start = h.out;
+      if (start < h.out && end > h.out && start >= h.in) {
+        if (lastWord <= h.out) return [];
+        start = h.out;
+      }
       if (start < h.in && end > h.in && end <= h.out) end = h.in;
     }
     return end - start < 0.05 ? [] : [{ ...cue, start, end }];
@@ -196,11 +203,12 @@ export function kineticHtml(groups, { duration, brand, fontUrl, accentUrl, fps =
   const themeAt = themeAtFn(o);
   // a group's height and theme are fixed at its start: end it where the height or the theme changes, or it lands
   // on the face for the frames between a card's exit and the next group (2026-10-24 youtube-skills), or its
-  // tail spills white over a light window / dark over the night background
+  // tail spills white over a light window / dark over the night background. A height key within 0.05 s after the start
+  // is ignored; a theme edge is not: the group ends at the edge itself.
   groups = groups.map((g) => {
     const y0 = baselineAt(yKeys, g.start, k.y), t0 = themeAt(g.lines[0][0].start);
     const change = [...yKeys.filter((x) => x.at > g.start + 0.05 && baselineAt(yKeys, x.at, k.y) !== y0),
-      ...(o.theme_keys ?? []).filter((x) => x.at > g.start + 0.05 && themeAt(x.at) !== t0)].map((x) => x.at);
+      ...(o.theme_keys ?? []).filter((x) => x.at > g.start && themeAt(x.at) !== t0)].map((x) => x.at);
     return change.length ? { ...g, end: Math.min(g.end, Math.min(...change)) } : g;
   });
   const clips = groups.map((g, i) => {

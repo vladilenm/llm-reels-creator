@@ -159,15 +159,18 @@ def rel(P, path):
 
 
 def frame_count(path, fps_):
-    """число кадров видеопотока: nb_frames, если это число, иначе длительность потока × fps; ffprobe не прочёл — SystemExit"""
-    r = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=nb_frames,duration", "-of", "json",
+    """число кадров, как их читает frames(): round(длительность видеопотока × fps) — nb_frames считает родные кадры файла и
+    расходится с ними, если fps клипа не совпадает с fps проекта. Потоку не назвали длительность — берётся длительность
+    контейнера; ffprobe не прочёл файл или нет видеопотока — SystemExit"""
+    r = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=duration:format=duration", "-of", "json",
                         str(path)], capture_output=True, text=True)
     if r.returncode != 0: raise SystemExit(f"ffprobe не прочитал {path} (код {r.returncode}):\n{r.stderr.strip()}")
-    try: st = json.loads(r.stdout)["streams"][0]
+    try: info = json.loads(r.stdout); st = info["streams"][0]
     except (ValueError, KeyError, IndexError): raise SystemExit(f"в {path} нет видеопотока")
-    if str(st.get("nb_frames", "")).isdigit(): return int(st["nb_frames"])
-    try: return round(float(st["duration"]) * fps_)
-    except (KeyError, ValueError): raise SystemExit(f"ffprobe не назвал ни число кадров, ни длительность видеопотока {path}")
+    for d in (st.get("duration"), info.get("format", {}).get("duration")):
+        try: return round(float(d) * fps_)
+        except (TypeError, ValueError): continue
+    raise SystemExit(f"ffprobe не назвал длительность видеопотока {path}")
 
 
 def frames(path, fps_):
