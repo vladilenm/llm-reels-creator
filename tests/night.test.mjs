@@ -377,9 +377,11 @@ test("screen kit night: glass list rows, a night card, a pulled name flies to it
   try {
     const piece = () => { const e = document.getElementById("sk-pull-0"), d = e.getContext("2d").getImageData(0, 0, e.width, e.height).data;
       let a = 0, h = 0; for (let i = 0; i < d.length; i++) { a += d[i]; h = (h * 31 + d[i]) >>> 0; }
-      const b = e.getBoundingClientRect(); return { sum: a, hash: h, w: e.width, h: e.height, display: getComputedStyle(e).display, op: +e.style.opacity, cx: b.left + b.width / 2, cy: b.top + b.height / 2 }; };
+      const b = e.getBoundingClientRect(); return { sum: a, hash: h, w: e.width, h: e.height, bw: b.width, bh: b.height, display: getComputedStyle(e).display, op: +e.style.opacity, cx: b.left + b.width / 2, cy: b.top + b.height / 2 }; };
     const p2 = await c.at(2.0, piece), p3 = await c.at(3.05, piece), p4 = await c.at(3.6, piece);
-    assert.ok(p2.sum > 0 && p2.w === 225 && p2.h === 56, `the piece holds the media rect at the window's scale: ${JSON.stringify(p2)}`);
+    // 160×40 media px × k0 1.40625 × scale 2: the canvas holds the media rect at its landed resolution (no CSS upscale)
+    assert.ok(p2.sum > 0 && p2.w === 450 && p2.h === 113, `the piece is cut at its landed size: ${JSON.stringify(p2)}`);
+    assert.ok(Math.abs(p2.bw - 450) < 2 && Math.abs(p2.bh - 112.5) < 2, `landed at scale 1: ${p2.bw} × ${p2.bh}`);
     for (const q of [p3, p4]) assert.ok(q.display !== "none" && q.op > 0.99 && Math.abs(q.cx - 540) < 4 && Math.abs(q.cy - 600) < 4, `the piece stays on its place ${JSON.stringify(q)}`);
     assert.deepEqual([p4.sum, p4.hash], [p2.sum, p2.hash], "the pixels do not follow the shot change or the window");
     const wDisp = await c.at(3.6, () => getComputedStyle(document.querySelector(".sk-win")).display);
@@ -391,6 +393,18 @@ test("screen kit night: glass list rows, a night card, a pulled name flies to it
     assert.ok(before > 0 && dimmed < before * 0.8, `the source dims after the pull: ${before} → ${dimmed}`);
     const white = await c.at(3.25, () => [...document.querySelector(".sk-cv").getContext("2d").getImageData(393, 168, 1, 1).data]);
     assert.deepEqual(white, [255, 255, 255, 255], "the new shot is not dimmed");
+    assert.deepEqual(c.errors, []);
+  } finally { await c.browser.close(); }
+  // the clip-level tout takes the piece away too, when the pull has none of its own
+  c = await openClip(sk({ T: 4, tout: 2.5, mode: "dark", theme: "night", tin: 0, win: { x: 540, y: 700, w: 900, h: 480, tin: 0, enter: "grid" },
+    media: { a: { src: "a.png" } }, shots: [[0, "a", [0, 0, 640]]],
+    marks: [{ kind: "pull", rect: [200, 100, 160, 40], t: 1.2, dur: 0.6, to: [540, 600], scale: 2 }] }), files);
+  try {
+    const shown = () => { const e = document.getElementById("sk-pull-0"); return [getComputedStyle(e).display, +e.style.opacity]; };
+    const [d1, o1] = await c.at(2.0, shown), [d2, o2] = await c.at(2.65, shown), [d3] = await c.at(2.9, shown);
+    assert.ok(d1 !== "none" && o1 > 0.99, "the piece is on before the clip's tout");
+    assert.ok(d2 !== "none" && o2 > 0.01 && o2 < 0.99, `the piece fades with the clip's tout: ${o2}`);
+    assert.equal(d3, "none", "the piece is gone 0.3 s after the clip's tout");
     assert.deepEqual(c.errors, []);
   } finally { await c.browser.close(); }
   // wrong configs stop with a named error

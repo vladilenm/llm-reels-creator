@@ -15,7 +15,7 @@
        win.layers:{t, dur:0.9, n:3, gap:80, tilt:22, orbit:5, labels:[]} (opens into a stack of glass layers),
        marks kind 'lens' {keys:[[t,x,y]], r, zoom, t0, t1}, kind 'pull' {rect:[x,y,w,h] media px, t, dur:0.8, to:[x,y]
        frame px, scale:1.5, tout} (a piece leaves the window and lands on its place; it is cut from the media of the shot at
-       t and lives on its own until tout + 0.3, whatever the window does; the flight starts from the untilted window, so put
+       t and lives on its own until (tout ?? the clip's tout) + 0.3, whatever the window does; the flight starts from the untilted window, so put
        a pull before win.layers.t), glass list rows, a night card
      title:{l1, l2, y:372, tin?, tout?},          captions ≈1000–1070, the head starts ≈1095 (SHOOT.md)
      titles:[{l1, l2, y?, tin, tout}],            several titles in turn over one window (sections of a long clip)
@@ -305,9 +305,9 @@ SK.run = (cfg)=>{
     }
     for(const p of pulls){      // the place the piece left dims, while the pull's own shot is on
       const m = p.m;
-      if(t < m.t || shotAt(t) !== p.shot || (m.tout!=null && t > m.tout+0.3)) continue;
+      if(t < m.t || shotAt(t) !== p.shot || (p.out!=null && t > p.out+0.3)) continue;
       const [x,y,k] = map(m.rect[0], m.rect[1]), w = m.rect[2]*k, h = m.rect[3]*k;
-      const u = ex((t-m.t)/(m.dur ?? 0.8))*pullFade(m, t);
+      const u = ex((t-m.t)/(m.dur ?? 0.8))*pullFade(p, t);
       ctx.save(); ctx.fillStyle = `rgba(14,11,20,${(0.6*u).toFixed(3)})`; rr(x-4, y-4, w+8, h+8, 8); ctx.fill(); ctx.restore();
     }
     if(cpath && t >= cfg.cursor.keys[0][0] && t <= (cfg.cursor.until ?? T)){
@@ -321,15 +321,17 @@ SK.run = (cfg)=>{
 
   // «вытягивание»: a piece of the window (a name, a line) leaves it and flies to its own place in the frame
   // The piece is a pure function of the pull moment m.t: its pixels come from the media of the shot on at m.t (never from
-  // the live window), its start from the window and camera at m.t; it lives from m.t to m.tout + 0.3 on its own.
+  // the live window), its start from the window and camera at m.t; it lives from m.t to (m.tout ?? the clip's tout) + 0.3
+  // on its own. The canvas holds the media rect at its landed size (rect·k0·scale), so the flight scales it 1/scale → 1.
   const pulls = (cfg.marks||[]).map((m,mi)=>[m,mi]).filter(([m])=>m.kind==='pull').map(([m,mi],i)=>{
     if(!Array.isArray(m.rect) || !Array.isArray(m.to)) throw new Error(`SK: marks[${mi}] kind 'pull' needs rect and to`);
     if(!shots.length) throw new Error(`SK: marks[${mi}] kind 'pull' needs a shot to cut the piece from`);
     const shot = shotAt(m.t), [wx, wy, ww] = wgeo(m.t), [cx, cy, cwid] = cam(Math.max(m.t, shots[shot][0]));
-    const k0 = Math.round(ww)/cwid, pw = Math.max(1, Math.round(m.rect[2]*k0)), ph = Math.max(1, Math.round(m.rect[3]*k0));
+    const k0 = Math.round(ww)/cwid, sc1 = m.scale ?? 1.5;
+    const pw = Math.max(1, Math.round(m.rect[2]*k0*sc1)), ph = Math.max(1, Math.round(m.rect[3]*k0*sc1));
     const c = el('a sk-pull', root, 'canvas'); c.id = 'sk-pull-'+i;
     c.width = pw; c.height = ph; c.style.width = pw+'px'; c.style.height = ph+'px';
-    return {m, c, shot, pw, ph, x0: wx-ww/2+(m.rect[0]-cx)*k0, y0: wy+bar+(m.rect[1]-cy)*k0, drawn:false};
+    return {m, c, shot, pw, ph, sc1, out: m.tout ?? tout, x0: wx-ww/2+(m.rect[0]-cx)*k0, y0: wy+bar+(m.rect[1]-cy)*k0, drawn:false};
   });
   const pullReady = (p)=>{       // the media load asynchronously: cut the piece once, on the first draw that has them
     if(p.drawn) return true;
@@ -338,7 +340,7 @@ SK.run = (cfg)=>{
     p.c.getContext('2d').drawImage(im, p.m.rect[0], p.m.rect[1], p.m.rect[2], p.m.rect[3], 0, 0, p.pw, p.ph);
     return p.drawn = true;
   };
-  const pullFade = (m, t)=>m.tout==null ? 1 : 1-clamp((t-m.tout)/0.3);
+  const pullFade = (p, t)=>p.out==null ? 1 : 1-clamp((t-p.out)/0.3);
 
   // ---------- list («top N»: number, blurred name, stars) ----------
   let list = null;
@@ -485,13 +487,13 @@ SK.run = (cfg)=>{
       drawCanvas(t, cw, ch);
     }
     for(const p of pulls){
-      const m = p.m, on = t >= m.t && (m.tout==null || t <= m.tout+0.3) && pullReady(p);
+      const m = p.m, on = t >= m.t && (p.out==null || t <= p.out+0.3) && pullReady(p);
       p.c.style.display = on ? '' : 'none';
       if(!on) continue;
-      const u = ex((t-m.t)/(m.dur ?? 0.8)), sc = 1+((m.scale ?? 1.5)-1)*u, x1 = m.to[0]-p.pw*sc/2, y1 = m.to[1]-p.ph*sc/2;
+      const u = ex((t-m.t)/(m.dur ?? 0.8)), sc = (1+(p.sc1-1)*u)/p.sc1, x1 = m.to[0]-p.pw/2, y1 = m.to[1]-p.ph/2;
       p.c.style.left = (p.x0+(x1-p.x0)*u).toFixed(1)+'px'; p.c.style.top = (p.y0+(y1-p.y0)*u).toFixed(1)+'px';
       p.c.style.transform = `scale(${sc.toFixed(4)})`;
-      p.c.style.opacity = (clamp((t-m.t)/0.12)*pullFade(m, t)).toFixed(3);
+      p.c.style.opacity = (clamp((t-m.t)/0.12)*pullFade(p, t)).toFixed(3);
     }
 
     if(list){
