@@ -950,3 +950,27 @@ print(json.dumps({"bottom": fwd(540, 1920), "top": fwd(540, 1030), "edges": cine
   near(o.side[0], 0); near(o.side[1], 0.5436, 1e-3); near(o.side[2], 1); near(o.side[3], 1);
   near(o.punch[0], 1 / 1.05); near(o.punch[1], 540 - 540 / 1.05); near(o.punch[3], 1330 - 1330 / 1.05);
 });
+
+test("cine light: the grade pulls shadows to night black and keeps highlights; wrap lights the inner edge; key on the graphics side; halo pulse", () => {
+  const o = cinePy(`
+import numpy as np
+g = cine.grade(np.array([[[0, 0, 0], [40, 40, 40], [200, 180, 170], [255, 255, 255]]], np.float32))
+m = np.zeros((200, 200), np.float32); m[50:150, 50:150] = 1
+rgb = np.full((200, 200, 3), 60, np.float32); bg = np.zeros((200, 200, 3), np.float32); bg[..., 2] = 255
+w = cine.wrap(rgb, m, bg)
+kR, kL, k0 = cine.key(rgb, m, 1.0), cine.key(rgb, m, -1.0), cine.key(rgb, m, 0.0)
+print(json.dumps({"g": g[0].round(1).tolist(), "edge": w[100, 52].tolist(), "centre": w[100, 100].tolist(),
+  "kR": [float(kR[100, 147, 0]), float(kR[100, 52, 0])], "kL": [float(kL[100, 52, 0]), float(kL[100, 147, 0])],
+  "k0": bool((k0 == rgb).all()), "pulse": [cine.pulse(t, [5.0]) for t in (4.9, 5.0, 5.4, 5.79, 5.8)]}))`);
+  const [black, dark, skin, white] = o.g;
+  assert.ok(black[2] > black[0] && black[2] > 8 && black[0] < 15, `black → night purple-black ${black}`);
+  assert.ok(dark[0] < 40 && dark[2] > dark[0], `dark grey goes darker and purple ${dark}`);
+  assert.deepEqual(skin, [200, 180, 170], "light tones are untouched");
+  assert.deepEqual(white, [255, 255, 255]);
+  assert.ok(o.edge[2] > 120 && o.edge[0] < 61, `the inner edge takes the blue background ${o.edge}`);
+  assert.ok(o.centre[2] < 62, `the centre stays ${o.centre}`);
+  assert.ok(o.kR[0] > o.kR[1] + 15, `side +1: light on the right edge ${o.kR}`);
+  assert.ok(o.kL[0] > o.kL[1] + 15, `side −1: light on the left edge ${o.kL}`);
+  assert.equal(o.k0, true, "side 0: no key");
+  near(o.pulse[0], 1); near(o.pulse[1], 1); near(o.pulse[2], 1.6); assert.ok(o.pulse[3] > 1 && o.pulse[3] < 1.05); near(o.pulse[4], 1);
+});
