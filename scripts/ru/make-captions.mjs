@@ -126,6 +126,7 @@ window.__timelines=window.__timelines||{};window.__timelines["captions"]=tl;
 
 // ---------- «kinetic»: 1–3 words between the window and the head (remakes with a card above) ----------
 // PLAN.json captions: { style: "kinetic", kinetic: { y_keys: [{at, y}], theme_keys: [{at, theme: "light"|"dark"}],
+//                       theme_default: "light"|"dark" (the night look: "dark"),
 //                       accent: [word start time], accent_words: ["бесплатно"], breaks: [word start time] } }
 // Defaults below, overridable in brand.md captions.kinetic. Future words of a group wait dimmed and
 // blurred; each lights up on its own start. The accent word is the brand serif italic (font_serif.italic)
@@ -195,13 +196,13 @@ export function kineticHtml(groups, { duration, brand, fontUrl, accentUrl, fps =
   });
   const clips = groups.map((g, i) => {
     const d = Math.max(0.05, g.end - g.start);
-    const th = keyAt(o.theme_keys, g.start, "theme", "light") === "dark" ? "dark" : "light";
+    const th = keyAt(o.theme_keys, g.start, "theme", o.theme_default ?? "light") === "dark" ? "dark" : "light";
     const top = Math.round(baselineAt(yKeys, g.start, k.y) - lineH / 2);
     const ws = g.lines[0].map((w, j) => `<span class="w${w.accent ? " acc" : ""}" id="k${i}_${j}">${esc(w.text)}</span>`).join(" ");
     return `<div id="c${i}" class="kg ${th} clip" data-start="${r3(g.start)}" data-duration="${r3(d)}" data-track-index="0" style="top:${top}px">${ws}</div>`;
   }).join("\n");
   const tl = groups.map((g, i) => {
-    const th = keyAt(o.theme_keys, g.start, "theme", "light") === "dark" ? k.dark : k.light;
+    const th = keyAt(o.theme_keys, g.start, "theme", o.theme_default ?? "light") === "dark" ? k.dark : k.light;
     const out = g.start < 0.25 ? [`tl.set("#c${i}",{opacity:1,y:0},0);`]
       : [`tl.fromTo("#c${i}",{opacity:0,y:10},{opacity:1,y:0,duration:0.16,ease:"power2.out"},${r3(g.start)});`];
     g.lines[0].forEach((w, j) => {

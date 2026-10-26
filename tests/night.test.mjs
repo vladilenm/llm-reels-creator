@@ -174,3 +174,17 @@ test("screen kit night: no title plate, typed chapter index, the frame draws in,
     assert.deepEqual(c.errors, []);
   } finally { await c.browser.close(); }
 });
+
+// ---------- captions ----------
+
+test("kinetic captions: theme_default sets the theme where no key says otherwise", async () => {
+  const { kineticGroups, kineticConfig, kineticHtml } = await import("../scripts/ru/make-captions.mjs");
+  const { loadBrand } = await import("../scripts/ru/lib/brand.mjs");
+  const brand = loadBrand();
+  const words = [{ text: "Раз", start: 0, end: 0.3 }, { text: "два.", start: 0.35, end: 0.6 }, { text: "Три", start: 1.6, end: 1.9 }];
+  const ov = { style: "kinetic", kinetic: { theme_default: "dark", theme_keys: [{ at: 1.5, theme: "light" }] } };
+  const k = kineticConfig(brand, ov), g = kineticGroups({ words }, k, ov);
+  const html = kineticHtml(g, { duration: 3, brand, fontUrl: "a.ttf", accentUrl: "b.ttf", overrides: ov });
+  assert.match(html, /id="c0" class="kg dark clip"/);
+  assert.match(html, /id="c1" class="kg light clip"/);
+});
