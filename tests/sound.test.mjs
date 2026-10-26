@@ -227,3 +227,34 @@ test("sound_review serve: marks are saved per section, bad marks refused, files 
     assert.equal(JSON.parse(readFileSync(join(f.lib, "review.json"), "utf8")).signature, "B");
   } finally { p.kill(); }
 });
+
+test("sound_review apply: approved track downloaded into tracks.json with its credit, rejects remembered, signature saved", { timeout: 120000 }, () => {
+  const f = reviewFixture();
+  writeFileSync(join(f.mdir, "candidates", "m2.wav"), "x");
+  const cands = JSON.parse(readFileSync(join(f.mdir, "candidates", "candidates.json"), "utf8"));
+  cands.m2 = { ...cands.m1, file: join(f.mdir, "candidates", "m2.wav"), title: "Other" };
+  writeFileSync(join(f.mdir, "candidates", "candidates.json"), JSON.stringify(cands));
+  writeFileSync(join(f.mdir, "review.json"), JSON.stringify({ music: { m1: "yes", m2: "no" } }));
+  writeFileSync(join(f.lib, "review.json"), JSON.stringify({ sfx: { "click/k.wav": "no", "chime/c.wav": "yes" }, signature: "B" }));
+  writeFileSync(join(f.lib, "credits.json"), JSON.stringify({ "brand/sfx/library/click/k.wav": { kind: "click" },
+    "brand/sfx/library/chime/c.wav": { kind: "chime" } }));
+  mkdirSync(join(f.out, "signature"), { recursive: true });
+  writeFileSync(join(f.out, "signature", "variants.json"), JSON.stringify({ B: [{ file: "x/w.wav", role: "whoosh", dt: 0, gain_db: 0 }] }));
+  const r = spawnSync("python3", ["scripts/ru/sound_review.py", "apply", "--out", f.out, "--music-dir", f.mdir, "--lib", f.lib, "--no-index"],
+    { cwd: ROOT, encoding: "utf8" });
+  assert.equal(r.status, 0, r.stderr);
+  const tr = JSON.parse(readFileSync(join(f.mdir, "tracks.json"), "utf8")).tracks;
+  assert.equal(tr.length, 1);
+  assert.equal(tr[0].file, "calm-script-m1.mp3");
+  assert.equal(tr[0].credit, "Музыка: «Calm» — Ann (CC BY 4.0)");
+  assert.equal(tr[0].bpm, 100);
+  assert.ok(existsSync(join(f.mdir, tr[0].file)));
+  assert.deepEqual(JSON.parse(readFileSync(join(f.mdir, "rejected.json"), "utf8")), ["m2"]);
+  assert.ok(!existsSync(join(f.mdir, "candidates", "m1.wav")) && !existsSync(join(f.mdir, "candidates", "m2.wav")));
+  assert.deepEqual(Object.keys(JSON.parse(readFileSync(join(f.mdir, "candidates", "candidates.json"), "utf8"))), []);
+  assert.ok(existsSync(join(f.d, "sfx", "rejected", "click", "k.wav")));
+  const credits = JSON.parse(readFileSync(join(f.lib, "credits.json"), "utf8"));
+  assert.ok(credits["brand/sfx/library/chime/c.wav"].approved);
+  const sig = JSON.parse(readFileSync(join(f.d, "sfx", "signature.json"), "utf8"));
+  assert.equal(sig.chosen, "B"); assert.equal(sig.layers[0].role, "whoosh");
+});

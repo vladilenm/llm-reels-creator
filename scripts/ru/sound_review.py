@@ -315,6 +315,69 @@ def serve(out, mdir, lib, port):
     srv.serve_forever()
 
 
+# ---------- apply ----------
+
+def slug(s):
+    s = re.sub(r"[^a-z0-9]+", "-", s.lower()).strip("-")
+    return (s or "track")[:40].strip("-")
+
+
+def apply(out, mdir, lib, index=True):
+    from sfx_screen import move, credit_key
+    rd = lambda p, d: json.load(open(p)) if os.path.exists(p) else d
+    wr = lambda p, o: json.dump(o, open(p, "w"), ensure_ascii=False, indent=1)
+    today = datetime.date.today().isoformat()
+    marks = load_marks(mdir, lib)
+    cdir = os.path.join(mdir, "candidates")
+    cands, scr = rd(os.path.join(cdir, "candidates.json"), {}), rd(os.path.join(cdir, "screen.json"), {})
+    tracks, rejected = rd(os.path.join(mdir, "tracks.json"), {"tracks": []}), rd(os.path.join(mdir, "rejected.json"), [])
+    n = {"music+": 0, "music-": 0, "sfx+": 0, "sfx-": 0}
+    for i, v in marks["music"].items():
+        c = cands.get(i)
+        if not c: continue
+        src = c["file"] if os.path.isabs(c["file"]) else os.path.join(ROOT, c["file"])
+        if v == "yes":
+            name = f"{slug(c['title'])}-{i[:8]}.mp3"
+            req = urllib.request.Request(c["url"], headers={"User-Agent": "reels-studio-fetch"})
+            with urllib.request.urlopen(req, timeout=120) as r, open(os.path.join(mdir, name), "wb") as f:
+                shutil.copyfileobj(r, f)
+            s = scr.get(i, {})
+            tracks["tracks"].append({"file": name, "mood": c.get("mood", []), "bpm": s.get("bpm"),
+                                     "excerpt_start": s.get("excerpt_start"), "source": f"Openverse · {c['source']} · {c['page']}",
+                                     "license": c["license_name"], "license_url": c.get("license_url"), "credit": c.get("credit"),
+                                     "openverse_id": i})
+            n["music+"] += 1
+        else:
+            rejected.append(i); n["music-"] += 1
+        if os.path.exists(src): os.remove(src)
+        cands.pop(i)
+    wr(os.path.join(mdir, "tracks.json"), tracks)
+    wr(os.path.join(mdir, "rejected.json"), rejected)
+    if os.path.isdir(cdir): wr(os.path.join(cdir, "candidates.json"), cands)
+
+    cp = os.path.join(lib, "credits.json")
+    credits = rd(cp, {})
+    for k, v in marks["sfx"].items():
+        if not os.path.exists(os.path.join(lib, k)): continue
+        if v == "no":
+            move(lib, k, "rejected", credits); n["sfx-"] += 1
+        else:
+            key = credit_key(credits, k) or f"brand/sfx/library/{k}"
+            credits.setdefault(key, {})["approved"] = today; n["sfx+"] += 1
+    wr(cp, credits)
+
+    if marks["signature"]:
+        var = rd(os.path.join(out, "signature", "variants.json"), {})
+        if marks["signature"] in var:
+            wr(os.path.join(os.path.dirname(lib), "signature.json"),
+               {"chosen": marks["signature"], "date": today, "layers": var[marks["signature"]]})
+    print(f"music: {n['music+']} taken, {n['music-']} rejected · sfx: {n['sfx+']} taken, {n['sfx-']} rejected · "
+          f"signature: {marks['signature'] or 'not chosen'}")
+    if index:
+        r = subprocess.run([sys.executable, "scripts/build_index.py"], cwd=REAL_SFX, capture_output=True, text=True)
+        print((r.stdout.strip().splitlines() or [r.stderr[-300:]])[-1])
+
+
 # ---------- main ----------
 
 def main():
