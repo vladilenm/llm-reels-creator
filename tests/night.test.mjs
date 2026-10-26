@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, writeFileSync, readFileSync, mkdirSync, symlinkSync, lstatSync, existsSync, rmSync } from "node:fs";
+import { mkdtempSync, writeFileSync, readFileSync, mkdirSync, symlinkSync, lstatSync, existsSync, rmSync, utimesSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -1173,8 +1173,8 @@ test("assemble cine finish: glow on night clips only while they play, none on li
     composite(P, out);
     return (n) => frameRGB(out, n);
   };
-  const A = run("plain"), B = run("cine", { cine: true }), C = run("light", { cine: true }, "light");
-  const a5 = A(5), a15 = A(15), b5 = B(5), b15 = B(15), c15 = C(15);
+  const A = run("plain"), B = run("cine", { look: "night", cine: true }), C = run("light", { look: "night", cine: true }, "light"), N = run("nolook", { cine: true });
+  const a5 = A(5), a15 = A(15), b5 = B(5), b15 = B(15), c15 = C(15), n5 = N(5), n15 = N(15);
   assert.ok(patch(b15, 586, 940).mean > patch(a15, 586, 940).mean + 15, "glow next to the square while the clip plays");
   assert.ok(Math.abs(patch(b5, 586, 940).mean - patch(a5, 586, 940).mean) < 5, "no glow before the clip");
   assert.ok(Math.abs(patch(c15, 586, 940).mean - patch(a15, 586, 940).mean) < 6, "a light clip gets no glow");
@@ -1183,6 +1183,9 @@ test("assemble cine finish: glow on night clips only while they play, none on li
   assert.ok(Math.abs(patch(a5, 40, 40, 4).mean - patch(a5, 540, 960, 4).mean) < 3, "no vignette without cine");
   assert.ok(patch(b5, 540, 700, 10).std > 1.2, "grain with cine");
   assert.ok(patch(a5, 540, 700, 10).std < 0.8, "no grain without cine");
+  // the finish belongs to the night look: { cine: true } without look: "night" renders as the plain composite
+  assert.ok(Math.abs(patch(n15, 586, 940).mean - patch(a15, 586, 940).mean) < 2, "cine without the night look: no glow");
+  assert.ok(Math.abs(patch(n5, 40, 40, 4).mean - patch(a5, 40, 40, 4).mean) < 2 && patch(n5, 540, 700, 10).std < 0.8, "cine without the night look: no vignette, no grain");
   const cap = patch(b5, 200, 150, 3);
   assert.ok(cap.mean > 248 && cap.std < 1.5, `captions over the finish stay clean ${cap.mean} ${cap.std}`);
   writeFileSync(join(P, "fx/fx.json"), "{ nope");
@@ -1207,7 +1210,7 @@ test("assemble cine finish: the frame's colours stay put however many night clip
     writeFileSync(join(P, "broll/plan.json"), JSON.stringify({ video: "../renders/picture.mp4",
       clips: windows.map(([a, b], i) => ({ id: `sq${i}`, in: a, out: b, kind: "panel", file: `sq${i}.mov` })) }));
     composite(P, join(P, "work/plain.mov"));
-    writeFileSync(join(P, "fx/fx.json"), JSON.stringify({ cine: true }));
+    writeFileSync(join(P, "fx/fx.json"), JSON.stringify({ look: "night", cine: true }));
     composite(P, join(P, "work/cine.mov"));
     const mids = windows.map(([a, b]) => Math.round((a + b) / 2 * 25));   // frames 7, 12, 17
     // before the first clip and inside each of the three: the middle of the frame is where the finish does nothing but the RGB round trip
@@ -1223,4 +1226,84 @@ test("assemble cine finish: the frame's colours stay put however many night clip
       assert.ok(d > 10, `${base} clip ${i} glow ${d.toFixed(1)}`);
     });
   }
+});
+
+test("assemble cine finish: only light lines glow — a dark panel and the night background of a full clip stay put, the glow beside the lines stays", { timeout: 240000 }, async () => {
+  const { composite, GLOW } = await import(new URL("../scripts/ru/assemble.mjs", import.meta.url));
+  const P = tmp("thr-");
+  for (const d of ["renders/kit", "broll", "work", "fx"]) mkdirSync(join(P, d), { recursive: true });
+  ff("-f", "lavfi", "-i", "color=c=0x0D0913:s=1080x1920:r=25:d=1", "-c:v", "libx264", "-pix_fmt", "yuv420p", join(P, "renders/picture.mp4"));
+  // a dark glass panel (rgba(24,18,38,.94)) with a white square and a 4 px white line in it
+  ff("-f", "lavfi", "-i", "color=c=black@0.0:s=1080x1920:r=25:d=0.4,format=rgba,drawbox=x=260:y=660:w=560:h=600:color=0x181226@0.94:t=fill:replace=1,drawbox=x=500:y=900:w=80:h=80:color=white@1:t=fill:replace=1,drawbox=x=700:y=800:w=4:h=300:color=white@1:t=fill:replace=1",
+    "-c:v", "prores_ks", "-profile:v", "4", "-pix_fmt", "yuva444p10le", join(P, "broll/panel.mov"));
+  // a full night clip: opaque night background and a white square
+  ff("-f", "lavfi", "-i", "color=c=0x0E0B14:s=1080x1920:r=25:d=0.4,drawbox=x=500:y=900:w=80:h=80:color=white:t=fill",
+    "-c:v", "libx264", "-pix_fmt", "yuv420p", join(P, "broll/full.mp4"));
+  const plan = (c) => writeFileSync(join(P, "broll/plan.json"), JSON.stringify({ video: "../renders/picture.mp4", clips: [c] }));
+  const cases = [
+    ["panel", { id: "p", in: 0.4, out: 0.8, kind: "panel", file: "panel.mov" }, [[300, 700], [780, 1220], [540, 720], [540, 1200]]],
+    ["full", { id: "f", in: 0.4, out: 0.8, kind: "full", file: "full.mp4" }, [[300, 700], [780, 1220], [540, 720], [540, 1200]]],
+  ];
+  for (const [name, clip, far] of cases) {
+    plan(clip);
+    rmSync(join(P, "fx/fx.json"), { force: true });
+    composite(P, join(P, `work/${name}-plain.mov`));
+    writeFileSync(join(P, "fx/fx.json"), JSON.stringify({ look: "night", cine: true }));
+    composite(P, join(P, `work/${name}-cine.mov`));
+    const a = frameRGB(join(P, `work/${name}-plain.mov`), 15), b = frameRGB(join(P, `work/${name}-cine.mov`), 15);
+    // 60+ px from every white shape the finish adds nothing (a dark surface is not a light line): the same colour as the plain render
+    for (const [x, y] of far) {
+      const pa = patchRGB(a, x, y), pb = patchRGB(b, x, y);
+      pa.forEach((v, c) => assert.ok(Math.abs(v - pb[c]) <= 2, `${name} (${x}, ${y}) channel ${c}: plain ${pa.map((q) => q.toFixed(1))} cine ${pb.map((q) => q.toFixed(1))}`));
+    }
+    // 6–10 px beside the square the glow is still there
+    const ga = patchRGB(a, 588, 940, 2), gb = patchRGB(b, 588, 940, 2);
+    const d = (gb[0] + gb[1] + gb[2] - ga[0] - ga[1] - ga[2]) / 3;
+    assert.ok(d > 8, `${name}: glow beside the square ${d.toFixed(1)}`);
+    if (name === "panel") {   // a thin line glows too (its blur is weak, the threshold must not eat it)
+      const la = patchRGB(a, 712, 950, 2), lb = patchRGB(b, 712, 950, 2);
+      const dl = (lb[0] + lb[1] + lb[2] - la[0] - la[1] - la[2]) / 3;
+      assert.ok(dl > 8, `panel: glow beside the 4 px line ${dl.toFixed(1)}`);
+    }
+  }
+  assert.equal(GLOW.threshold, 0.3, "the glow source is cut at 30 %");
+});
+
+test("assemble: warns about overlapping glow windows and about a base older than its back clip; quiet otherwise", { timeout: 180000 }, async () => {
+  const { composite } = await import(new URL("../scripts/ru/assemble.mjs", import.meta.url));
+  const P = tmp("warn-");
+  for (const d of ["renders/kit", "broll", "work", "fx"]) mkdirSync(join(P, d), { recursive: true });
+  ff("-f", "lavfi", "-i", "color=c=0x808080:s=1080x1920:r=25:d=1", "-c:v", "libx264", "-pix_fmt", "yuv420p", join(P, "renders/picture.mp4"));
+  for (const n of ["a", "b", "back"]) ff("-f", "lavfi", "-i", "color=c=black@0.0:s=1080x1920:r=25:d=0.6,format=rgba,drawbox=x=500:y=900:w=80:h=80:color=white@1:t=fill:replace=1",
+    "-c:v", "prores_ks", "-profile:v", "4", "-pix_fmt", "yuva444p10le", join(P, `broll/${n}.mov`));
+  const clip = (id, a, b, extra = {}) => ({ id, in: a, out: b, kind: "panel", file: `${id}.mov`, ...extra });
+  const run = (clips, fx) => {
+    writeFileSync(join(P, "broll/plan.json"), JSON.stringify({ video: "../renders/picture.mp4", clips }));
+    if (fx) writeFileSync(join(P, "fx/fx.json"), JSON.stringify(fx)); else rmSync(join(P, "fx/fx.json"), { force: true });
+    const lines = [], warn = console.warn;
+    console.warn = (...a) => lines.push(a.join(" "));
+    try { composite(P, join(P, "work/w.mov"), { scale: 0.25 }); } finally { console.warn = warn; }
+    return lines;
+  };
+  const night = { look: "night", cine: true };
+  const a = clip("a", 0, 0.4), b = clip("b", 0.2, 0.6);
+  const over = run([a, b], night);
+  assert.equal(over.length, 1, over.join("\n"));
+  assert.match(over[0], /\ba\b.*\bb\b|\bb\b.*\ba\b/, "names both clips");
+  assert.deepEqual(run([a, clip("b", 0.4, 0.8)], night), [], "touching windows are fine");
+  assert.deepEqual(run([a, clip("b", 0.38, 0.8)], night), [], "less than a frame of overlap is fine");
+  assert.deepEqual(run([a, clip("b", 0.2, 0.6, { theme: "light" })], night), [], "a light clip has no glow to collide with");
+  assert.deepEqual(run([a, clip("b", 0.2, 0.6, { glow: false })], night), [], "glow: false has no glow to collide with");
+  assert.deepEqual(run([a, b]), [], "no cine, no glow, nothing to warn about");
+
+  // a back clip that is newer than the base: the base is stale
+  const now = Date.now() / 1000;
+  utimesSync(join(P, "renders/picture.mp4"), now - 100, now - 100);
+  utimesSync(join(P, "broll/back.mov"), now - 200, now - 200);
+  assert.deepEqual(run([a, clip("back", 0, 0.4, { layer: "back" })], night), [], "base newer than the back clip");
+  utimesSync(join(P, "broll/back.mov"), now - 10, now - 10);
+  const stale = run([a, clip("back", 0, 0.4, { layer: "back" })], night);
+  assert.equal(stale.length, 1, stale.join("\n"));
+  assert.match(stale[0], /night_base\.py/);
+  assert.match(stale[0], /back/);
 });
