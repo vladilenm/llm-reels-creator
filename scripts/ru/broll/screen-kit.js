@@ -11,7 +11,10 @@
      T, mode:'light'|'dark'|'card', tin:0, tout:null, theme?:'night',
        night look (2026-10-26): no title plate (wipes, italic in accent_light, title.idx = typed chapter index),
        glass window whose frame draws in by a line, light running along its top edge on entry and shot changes,
-       win.enter:'fly' (arrives from depth after an object scene's fly), marks kind 'lens' {keys:[[t,x,y]], r, zoom, t0, t1}
+       win.enter:'fly' (arrives from depth after an object scene's fly) | 'grid' (assembles from the grid's cells),
+       win.layers:{t, dur:0.9, n:3, gap:80, tilt:22, orbit:5, labels:[]} (opens into a stack of glass layers),
+       marks kind 'lens' {keys:[[t,x,y]], r, zoom, t0, t1}, kind 'pull' {rect:[x,y,w,h] media px, t, dur:0.8, to:[x,y]
+       frame px, scale:1.5, tout} (a piece leaves the window and lands on its place), glass list rows, a night card
      title:{l1, l2, y:372, tin?, tout?},          captions ≈1000–1070, the head starts ≈1095 (SHOOT.md)
      titles:[{l1, l2, y?, tin, tout}],            several titles in turn over one window (sections of a long clip)
      icons:{y:548, size:56, items:[{label, src?}], active:[[t, index]], tin?, tout?},
@@ -66,6 +69,9 @@ const css = `
 .sk-edge{width:140px;height:3px;border-radius:2px;background:linear-gradient(90deg,${rgba(B.accent_light,0)},#F1E9FF,${rgba(B.accent_light,0)});box-shadow:0 0 14px 3px ${rgba(B.accent_light,.8)}}
 .sk-draw{overflow:visible}
 .sk-grid{left:-200px;top:-200px;width:${W+400}px;height:${H+400}px;background-image:linear-gradient(${rgba(B.accent_light,.10)} 2px,transparent 2px),linear-gradient(90deg,${rgba(B.accent_light,.10)} 2px,transparent 2px);background-size:84px 84px}
+.sk-pull{border-radius:10px;transform-origin:0 0;box-shadow:0 0 0 3px ${rgba(B.accent_light,.6)},0 0 40px 6px ${rgba(B.accent,.45)}}
+.sk-ly{border-radius:26px;background:#1A1428;transform-origin:50% 50%;box-shadow:0 0 0 3px ${rgba(B.accent_light,.35)},0 0 40px 2px ${rgba(B.accent,.22)}}
+.sk-lyl{position:absolute;left:28px;top:16px;font-family:'SK Mono',monospace;font-weight:500;font-size:30px;color:rgba(245,243,250,.72)}
 `;
 
 // keyed interpolation: [{t, v:[...], dur, ease}] → t => v; a new key starts from wherever the last one was
@@ -95,7 +101,7 @@ SK.run = (cfg)=>{
 
   const haze = dark ? el('a sk-glow') : el('a sk-haze');
   if(card || (night && !dark)) haze.style.display = 'none';
-  if(night && dark) el('a sk-grid');
+  if(night && (dark || card)) el('a sk-grid');          // the night card is the night background, not the light canvas
 
   // ---------- titles ----------
   const titles = (cfg.titles || (cfg.title ? [cfg.title] : [])).map((c)=>{
@@ -151,7 +157,7 @@ SK.run = (cfg)=>{
     win.style.boxShadow = `0 0 0 3px ${rgba(B.accent_light,.45)},0 0 44px 4px ${rgba(B.accent,.28)},0 30px 80px -20px rgba(0,0,0,.7)`;
     Object.assign(barEl.style, {background:'rgba(255,255,255,.04)', borderBottom:`1px solid ${rgba(B.accent_light,.18)}`});
     Object.assign(urlEl.style, {background:'rgba(255,255,255,.06)', color:'rgba(245,243,250,.68)', fontFamily:"'SK Mono',monospace"});
-    if(wc.enter !== 'fly'){
+    if(wc.enter !== 'fly' && wc.enter !== 'grid'){
       drawSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); drawSvg.setAttribute('class', 'a sk-draw'); root.appendChild(drawSvg);
       drawRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
       for(const [k,v] of Object.entries({x:2, y:2, rx:26, fill:'none', stroke:B.accent_light, 'stroke-width':3, pathLength:1, 'stroke-dasharray':1})) drawRect.setAttribute(k, v);
@@ -163,6 +169,20 @@ SK.run = (cfg)=>{
   if(pgEl) pgEl.textContent = wc.pager;
   const cv = el('sk-cv', win, 'canvas'); cv.style.top = bar+'px';
   const ctx = cv.getContext('2d');
+  // «сборка из сетки»: the cells inside the window rect light up, then the window fills in (night, enter:'grid')
+  let gridIn = null;
+  if(night && wc.enter === 'grid'){
+    gridIn = OK.gridCells(root, [g0.x-g0.w/2, g0.y, g0.w, g0.h], {t:(wc.tin ?? tin), dur:0.8, id:'sk-cells'});
+    root.insertBefore(gridIn.el, win);
+  }
+  // «слои в глубину»: glass layers behind the window (the deepest first in the DOM), the stack tilts and slowly turns
+  const LY = night && wc.layers ? wc.layers : null;
+  const ghosts = [];
+  if(LY) for(let i=0; i<(LY.n ?? 3)-1; i++){
+    const g = el('a sk-ly'); g.id = 'sk-ly-'+i; root.insertBefore(g, ghosts[i-1] || win);
+    if(LY.labels?.[i]){ const lb = el('sk-lyl', g); lb.textContent = LY.labels[i]; }
+    ghosts.push(g);
+  }
 
   // ---------- media ----------
   const media = cfg.media || {}, BM = {};
@@ -256,6 +276,7 @@ SK.run = (cfg)=>{
     }
     const map = toScreen(t, cw, ch);
     for(const m of (cfg.marks||[])){
+      if(m.kind==='pull') continue;
       if(t < m.t0 || (m.t1!=null && t > m.t1+0.2)) continue;
       if(m.shot!=null && m.shot!==shots[i][1]) continue;
       if(m.kind==='lens'){ drawLens(m, t, map, cw, ch); continue; }
@@ -279,6 +300,17 @@ SK.run = (cfg)=>{
         rr(cx-(w/2+10)*sc, cy-(h/2+8)*sc, (w+20)*sc, (h+16)*sc, 14*sc); ctx.stroke(); ctx.restore();
       }
     }
+    for(const p of pulls){
+      const m = p.m;
+      if(t < m.t || (m.tout!=null && t > m.tout+0.3)) continue;
+      const [x,y,k] = map(m.rect[0], m.rect[1]), w = m.rect[2]*k, h = m.rect[3]*k;
+      const pw = Math.max(1, Math.round(w)), ph = Math.max(1, Math.round(h));
+      if(p.c.width!==pw || p.c.height!==ph){ p.c.width = pw; p.c.height = ph; p.c.style.width = pw+'px'; p.c.style.height = ph+'px'; }
+      p.cx.clearRect(0,0,pw,ph); p.cx.drawImage(cv, x, y, w, h, 0, 0, pw, ph);
+      const u = ex((t-m.t)/(m.dur ?? 0.8));
+      ctx.save(); ctx.fillStyle = `rgba(14,11,20,${(0.6*u).toFixed(3)})`; rr(x-4, y-4, w+8, h+8, 8); ctx.fill(); ctx.restore();
+      p.src = {x, y, w, h, u};
+    }
     if(cpath && t >= cfg.cursor.keys[0][0] && t <= (cfg.cursor.until ?? T)){
       const c = cpath(t), [x,y] = map(c.x, c.y), s = 0.95*(1-0.13*cpress(t));
       ctx.save(); ctx.translate(x,y); ctx.scale(s,s); ctx.translate(-3,-3);
@@ -287,6 +319,12 @@ SK.run = (cfg)=>{
       ctx.lineWidth=2.6; ctx.lineJoin='round'; ctx.strokeStyle='#fff'; ctx.stroke(CUR); ctx.restore();
     }
   };
+
+  // «вытягивание»: a piece of the window (a name, a line) leaves it and flies to its own place in the frame
+  const pulls = (cfg.marks||[]).filter(m=>m.kind==='pull').map((m,i)=>{
+    const c = el('a sk-pull', root, 'canvas'); c.id = 'sk-pull-'+i;
+    return {m, c, cx:c.getContext('2d'), src:null};
+  });
 
   // ---------- list («top N»: number, blurred name, stars) ----------
   let list = null;
@@ -302,6 +340,12 @@ SK.run = (cfg)=>{
       if(c.rh) pill.style.height = c.rh+'px';
       if(c.mono){ nm.style.fontFamily = "'SK Mono',monospace"; nm.style.fontWeight = 500; }
       if(it.stars!=null){ const st = el('sk-rs', r); st.innerHTML = '★ Star <b></b>'; st.querySelector('b').textContent = it.stars; if(c.rh) st.style.height = c.rh+'px'; }
+      if(night){
+        Object.assign(pill.style, {background:'#1A1428', boxShadow:`0 0 0 2px ${rgba(B.accent_light,.35)},0 10px 26px -14px rgba(0,0,0,.6)`});
+        nm.style.color = B.ink; pill.firstChild.style.background = rgba(B.accent_light,.25);
+        const st = r.querySelector('.sk-rs');
+        if(st){ Object.assign(st.style, {background:'#1A1428', boxShadow:`0 0 0 2px ${rgba(B.accent_light,.35)}`, color:'rgba(245,243,250,.7)'}); st.querySelector('b').style.color = B.ink; }
+      }
       // it.lit: the number lights up and stays (a count); c.active: one row at a time
       const keys = it.lit!=null ? [[it.lit, 1, M.FAST]] : (c.active||[]).map(([t,k])=>[t, k===i?1:0, M.FAST]);
       return {r, n, nm, it, on: M.track(0, keys)};
@@ -338,7 +382,7 @@ SK.run = (cfg)=>{
     if(title.idx){ const s = title.c.idx; M.setText(title.idx, s.slice(0, Math.round(s.length*clamp((t-a)/0.4)))); }
   };
   // the line that draws the window frame on entry, then the light along the top edge on entry and every shot change
-  const edgeTimes = night ? [...(wc.enter === 'fly' ? [] : [(wc.tin ?? tin) + 0.45]), ...shots.slice(1).map(s=>s[0])] : [];
+  const edgeTimes = night ? [...(wc.enter === 'fly' ? [] : [(wc.tin ?? tin) + (wc.enter === 'grid' ? 0.75 : 0.45)]), ...shots.slice(1).map(s=>s[0])] : [];
   const nightFrame = (t, x, y, w, h, wa, o)=>{
     if(drawSvg){
       Object.assign(drawSvg.style, {left:(x-w/2-2)+'px', top:(y-2)+'px', width:(w+4)+'px', height:(h+4)+'px'});
@@ -391,11 +435,14 @@ SK.run = (cfg)=>{
     }
 
     const [x,y,w,h] = wgeo(t);
+    for(const p of pulls) p.src = null;
+    if(gridIn) gridIn.draw(t);
     let wv = vis(t, wc.tin ?? tin, wc.tout === undefined ? tout : wc.tout, {lin:0.34});
     if(night){
       const wa = t - (wc.tin ?? tin), wo = wc.tout === undefined ? tout : wc.tout;
       const o = (wa < 0 ? 0 : 1) * (wo==null ? 1 : 1-clamp((t-wo)/0.3));
       if(wc.enter === 'fly'){ const u = ex(wa/0.6); wv = {o:o*clamp(wa/0.25), blur:(1-u)*6, s:0.35+0.65*u}; }
+      else if(wc.enter === 'grid'){ const u = clamp((wa-0.42)/0.3); wv = {o:o*u, blur:(1-u)*8, s:0.97+0.03*u}; win.style.clipPath = 'none'; }
       else {
         // the content wipes left → right; the clip leaves 120 px around so the ring, glow and drop shadow stay visible
         // (empty at u=0, shadow room on every side at u=1; same trick as the terminal in object-scene.js)
@@ -404,13 +451,34 @@ SK.run = (cfg)=>{
       }
       nightFrame(t, x, y, w, h, wa, o);
     }
-    if(M.apply(win, wv)){
+    let ext = '';
+    if(LY){
+      const u = ex((t-LY.t)/(LY.dur ?? 0.9));
+      ext = ` perspective(1800px) rotateX(${((LY.tilt ?? 22)*u).toFixed(2)}deg) rotateY(${((LY.orbit ?? 5)*u*Math.sin((t-LY.t)*0.7)).toFixed(2)}deg)`;
+      ghosts.forEach((g,i)=>{
+        const show = u>0.002 && wv.o>0.002;
+        g.style.display = show ? '' : 'none'; if(!show) return;
+        Object.assign(g.style, {left:(x-w/2).toFixed(2)+'px', top:y.toFixed(2)+'px', width:w.toFixed(2)+'px', height:h.toFixed(2)+'px'});
+        g.style.opacity = (u*wv.o*(1-0.22*i)).toFixed(3);
+        g.style.transform = `translateY(${(-(LY.gap ?? 80)*(i+1)*u).toFixed(1)}px) scale(${(1-0.05*(i+1)*u).toFixed(4)})${ext}`;
+      });
+    }
+    if(M.apply(win, wv, ext)){
       win.style.left = (x-w/2).toFixed(2)+'px'; win.style.top = y.toFixed(2)+'px';
       win.style.width = w.toFixed(2)+'px'; win.style.height = h.toFixed(2)+'px';
       const cw = Math.round(w), ch = Math.round(h-bar);
       if(cw!==lastW || ch!==lastH){ cv.width = cw; cv.height = ch; cv.style.width = cw+'px'; cv.style.height = ch+'px'; lastW=cw; lastH=ch; }
       const s = shots[shotAt(t)]; M.setText(urlEl, (s && media[s[1]]?.url) || wc.url || '');
       drawCanvas(t, cw, ch);
+    }
+    for(const p of pulls){
+      const m = p.m, s = p.src;
+      p.c.style.display = s && wv.o>0.002 ? '' : 'none';
+      if(!s) continue;
+      const sc = 1+((m.scale ?? 1.5)-1)*s.u, x0 = x-w/2+s.x, y0 = y+bar+s.y, x1 = m.to[0]-s.w*sc/2, y1 = m.to[1]-s.h*sc/2;
+      p.c.style.left = (x0+(x1-x0)*s.u).toFixed(1)+'px'; p.c.style.top = (y0+(y1-y0)*s.u).toFixed(1)+'px';
+      p.c.style.transform = `scale(${sc.toFixed(4)})`;
+      p.c.style.opacity = (m.tout==null ? 1 : 1-clamp((t-m.tout)/0.3)).toFixed(3);
     }
 
     if(list){
@@ -421,7 +489,7 @@ SK.run = (cfg)=>{
         x.r.style.transform = `translateY(${(14*(1-clamp((t-(x.it.t ?? 0))/0.35))).toFixed(1)}px) scale(${v.s.toFixed(4)})`;
         const on = clamp(x.on(t));
         const mix = (a,b2)=>{const A=M.hex(a),Bc=M.hex(b2); return `rgb(${A.map((q,k)=>Math.round(q+(Bc[k]-q)*on)).join(',')})`;};
-        x.n.style.color = mix('#A39DB0', B.accent);
+        x.n.style.color = mix(night ? '#6E6680' : '#A39DB0', night ? B.accent_light : B.accent);
         x.n.style.transform = `scale(${(1+0.18*on).toFixed(3)})`;
         const hid = t >= b0 && (b1==null || t < b1) ? 1 : clamp(1-(t-b1)/0.3);
         x.nm.style.filter = hid>0.01 ? `blur(${(9*hid).toFixed(2)}px)` : 'none';
@@ -453,7 +521,7 @@ SK.run = (cfg)=>{
   };
 
   window.READY = Promise.all(loads).then(()=>{ if(window.__skT!=null) draw(window.__skT); });
-  M.scene({W, H, T, bg: dark ? B.background : card ? (B.canvas || '#EFEDF4') : null, center:[W/2, H/2], intro:null,
+  M.scene({W, H, T, bg: dark || (card && night) ? B.background : card ? (B.canvas || '#EFEDF4') : null, center:[W/2, H/2], intro:null,
     SH:{none:{w:0, h:0, r:0, bg:'#FFFFFF', cam:1}}, start:'none', SEQ:[],
     extra:(t)=>{ window.__skT = t; draw(t); }});
   document.getElementById('shape').style.display = 'none';

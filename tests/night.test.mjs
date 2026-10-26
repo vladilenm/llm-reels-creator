@@ -323,6 +323,45 @@ test("screen kit night: no title plate, typed chapter index, the frame draws in,
   } finally { await c.browser.close(); }
 });
 
+test("screen kit night: glass list rows, a night card, a pulled name flies to its place, the window assembles from cells and opens into layers", { timeout: 90000 }, async () => {
+  const d = tmp("png-"); ff("-f", "lavfi", "-i", "testsrc2=size=640x360", "-frames:v", "1", join(d, "a.png"));
+  const files = { "a.png": readFileSync(join(d, "a.png")) };
+  const sk = (cfg) => `<title>x</title><script>SK.run(${JSON.stringify(cfg)});</script>`;
+  let c = await openClip(sk({ T: 2, mode: "card", theme: "night", tin: 0, title: { l1: "Три", l2: "ссылки", y: 260, tin: 0 }, win: { tin: 999 },
+    list: { y: 500, w: 760, row: 92, items: [{ name: "Openverse API", t: 0.2 }, { name: "Real SFX", t: 0.3 }] } }), files);
+  try {
+    assert.equal(await c.at(1, () => getComputedStyle(document.querySelector(".sk-rp")).backgroundColor), "rgb(26, 20, 40)", "glass row");
+    assert.equal(await c.at(1, () => getComputedStyle(document.querySelector(".sk-rt")).color), "rgb(245, 243, 250)");
+    assert.ok(await c.at(1, () => !!document.querySelector("#sk .sk-grid")), "the night card has the grid");
+    assert.deepEqual(c.errors, []);
+  } finally { await c.browser.close(); }
+  c = await openClip(sk({ T: 4, mode: "dark", theme: "night", tin: 0,
+    title: { l1: "Инструмент 2", l2: "", y: 470, tin: 0 },
+    win: { x: 540, y: 700, w: 900, h: 480, tin: 0, enter: "grid", layers: { t: 2.6, dur: 0.6, n: 3, gap: 80, labels: ["pop", "hit"] } },
+    media: { a: { src: "a.png" } }, shots: [[0, "a", [0, 0, 640]]],
+    marks: [{ kind: "pull", rect: [200, 100, 160, 40], t: 1.2, dur: 0.6, to: [540, 600], scale: 2 }] }), files);
+  try {
+    const lit = () => [...document.querySelectorAll("#sk-cells > div")].filter((e) => +e.style.opacity > 0.3).length;
+    assert.ok(await c.at(0.3, lit) > 3, "cells light inside the window rect");
+    // M.apply hides an invisible element with display:none and leaves its opacity as it was
+    const wo = () => { const s = getComputedStyle(document.querySelector(".sk-win")); return s.display === "none" ? 0 : +s.opacity; };
+    assert.ok(await c.at(0.2, wo) < 0.05, "the window waits for the cells");
+    assert.ok(await c.at(1.0, wo) > 0.95);
+    assert.equal(await c.at(1.0, lit), 0, "the cells are gone");
+    assert.equal(await c.at(1.1, () => getComputedStyle(document.getElementById("sk-pull-0")).display), "none");
+    const r = await c.at(2.0, () => document.getElementById("sk-pull-0").getBoundingClientRect().toJSON());
+    // media 640 px in a 900 px window: k = 1.40625; 160×40 → 225×56.25, ×2 → 450×112.5, centred on (540, 600)
+    assert.ok(Math.abs(r.left + r.width / 2 - 540) < 4 && Math.abs(r.top + r.height / 2 - 600) < 4, `pulled to its place ${JSON.stringify(r)}`);
+    assert.ok(Math.abs(r.width - 450) < 6, `scaled ×2: ${r.width}`);
+    const ly = await c.at(3.4, () => [...document.querySelectorAll(".sk-ly")].map((e) => [getComputedStyle(e).display, +e.style.opacity, e.style.transform]));
+    assert.equal(ly.length, 2, "n − 1 glass layers behind the window");
+    for (const [disp, o, tf] of ly) { assert.equal(disp, "block"); assert.ok(o > 0.5 && /rotateX\(2\d(\.\d+)?deg\)/.test(tf), tf); }
+    assert.notEqual(await c.at(3.4, () => getComputedStyle(document.querySelector(".sk-win")).transform), "none");
+    assert.equal(await c.at(3.4, () => document.querySelector("#sk-ly-0 .sk-lyl").textContent), "pop");     // the deepest layer is first in the DOM, so ask for the nearest one by id
+    assert.deepEqual(c.errors, []);
+  } finally { await c.browser.close(); }
+});
+
 // ---------- captions ----------
 
 test("kinetic captions: theme_default sets the theme where no key says otherwise", async () => {
