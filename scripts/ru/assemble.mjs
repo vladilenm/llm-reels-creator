@@ -4,6 +4,8 @@
 //   node scripts/ru/assemble.mjs <project> --preview       renders/preview.mp4 (540×960, ГЕЙТ C)
 //   node scripts/ru/assemble.mjs <project> --final         renders/final.mp4 (mode full) + check-reel
 //   node scripts/ru/assemble.mjs <project> --kit           renders/kit/* (mode kit)
+//   --tag v2   base picture renders/picture.v2.mp4 → work/composite-*.v2.mov, renders/preview|final.v2.mp4
+//              (a new look next to the approved one; the approved files stay untouched)
 //
 // Inputs (all times on the CLEAN timeline):
 //   renders/clean.mp4
@@ -40,16 +42,16 @@ export function loadPlan(project) {
 // One ffmpeg pass: base video, then each clip overlaid in its window, then captions.
 // Base picture: broll/plan.json `video` (relative to broll/, e.g. a renders/picture.mp4
 // with edit effects and SFX baked in), else renders/clean.mp4. Its audio is the mix.
-export function basePicture(project, plan = loadPlan(project)) {
+export function basePicture(project, plan = loadPlan(project), video) {
   const clean = join(project, "renders/clean.mp4");
-  const base = plan.video ? resolve(join(project, "broll"), plan.video) : clean;
+  const base = video ? resolve(video) : plan.video ? resolve(join(project, "broll"), plan.video) : clean;
   if (!existsSync(base)) throw new Error(`${relative(project, base)} missing (${base === clean ? "run S2" : "build the picture first"})`);
   return base;
 }
 
-export function composite(project, out, { scale = 1 } = {}) {
+export function composite(project, out, { scale = 1, video } = {}) {
   const plan = loadPlan(project);
-  const clean = basePicture(project, plan);
+  const clean = basePicture(project, plan, video);
   const captions = join(project, "renders/kit/captions.mov");
   const inputs = [clean, ...plan.clips.map((c) => c.path), ...(existsSync(captions) ? [captions] : [])];
   const W = Math.round(1080 * scale), H = Math.round(1920 * scale);
@@ -122,18 +124,20 @@ export function buildKit(project) {
 function main() {
   const a = process.argv.slice(2);
   const project = resolve(a[0] ?? "");
-  if (!a[0] || !existsSync(project)) { console.log("Usage: node scripts/ru/assemble.mjs <project> --preview | --final | --kit"); process.exit(1); }
+  if (!a[0] || !existsSync(project)) { console.log("Usage: node scripts/ru/assemble.mjs <project> --preview | --final | --kit [--tag v2]"); process.exit(1); }
   const fps = JSON.parse(readFileSync(join(project, "meta.json"), "utf8")).fps ?? 30;
   const work = join(project, "work");
   mkdirSync(work, { recursive: true });
+  const ti = a.indexOf("--tag"), tag = ti >= 0 ? a[ti + 1] : null, sfx = tag ? `.${tag}` : "";
+  const video = tag ? join(project, `renders/picture${sfx}.mp4`) : undefined;
   if (a.includes("--preview")) {
-    const c = composite(project, join(work, "composite-half.mov"), { scale: 0.5 });
-    const r = exportReel(c.out, join(project, "renders/preview.mp4"), { preview: true, fps });
+    const c = composite(project, join(work, `composite-half${sfx}.mov`), { scale: 0.5, video });
+    const r = exportReel(c.out, join(project, `renders/preview${sfx}.mp4`), { preview: true, fps });
     console.log(`preview → ${relative(ROOT, r.output)} (${c.clips} clips${c.captions ? " + captions" : ""})`);
   }
   if (a.includes("--final")) {
-    const c = composite(project, join(work, "composite-full.mov"));
-    const r = exportReel(c.out, join(project, "renders/final.mp4"), { fps });
+    const c = composite(project, join(work, `composite-full${sfx}.mov`), { video });
+    const r = exportReel(c.out, join(project, `renders/final${sfx}.mp4`), { fps });
     for (const x of r.check.results) console.log(`${x.status.padEnd(4)}  ${x.item}${x.detail !== undefined ? ` — ${x.detail}` : ""}`);
     console.log(r.check.ok ? "RESULT: PASS" : "RESULT: FAIL");
     process.exitCode = r.check.ok ? 0 : 1;

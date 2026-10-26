@@ -309,10 +309,11 @@ motion-broll по умолчанию ждёт SRT и оценивает врем
 ### 7.1. Вызов
 
 ```
-/reel <путь к файлу> [— бриф одной строкой] [--mode kit|full] [--review-cuts] [--density light|medium|heavy]
+/reel <путь к файлу> [— бриф одной строкой] [--mode kit|full] [--review-cuts] [--density light|medium|heavy] [--principles]
 ```
 
-По умолчанию: `--mode kit`, плотность `medium`.
+По умолчанию: `--mode kit`, плотность `medium`, проверка по принципам выключена
+(`--principles` — вердикты и правки по `reel-remake/references/script-principles.md` на ГЕЙТЕ B).
 
 ### 7.2. Стадии
 

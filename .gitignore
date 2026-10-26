@@ -36,27 +36,37 @@ Thumbs.db
 !examples/short-form/assets/
 !examples/short-form/assets/*.json
 
-# Three finished videos explicitly supplied for the public showcase.
-!examples/showcase/curiosity-reel-2.mp4
-!examples/showcase/curiosity-reel-1.mp4
-!examples/showcase/ais-live-ad.mp4
-
 # --- Reels Studio ---
-# Raw inputs, per-reel media and renders stay local. Text artifacts (.md, .json,
-# HTML compositions) inside video-projects/ ARE committed.
+# Everything personal stays local: raw inputs, reel projects, references, the
+# run log and the studio's taste files (brand/brand.md is tracked: private repo). The repo ships *.example templates;
+# `npm run setup` (and /reel S0) create the working copies when missing.
 inbox/*
 !inbox/.gitkeep
-video-projects/*/assets/
-video-projects/*/renders/
-video-projects/*/motion/work/
-video-projects/*/review/*.png
-refs/*.mp4
-refs/*.mov
-refs/*.webm
+video-projects/*
+!video-projects/.gitkeep
+refs/*
+!refs/NOTES.example.md
+brand/music/*
+!brand/music/README.md
+!brand/music/tracks.example.json
+brand/sfx/*
+!brand/sfx/README.md
+lessons.md
+runs.log.jsonl
 .cache/
 fixtures/out/
-video-projects/*/captions/node_modules
-video-projects/*/broll/dist/
-video-projects/*/captions/fonts/
-video-projects/*/captions/assets/
 .object-separation/
+
+# Guide images: frames of personal footage
+guide/
+
+# Third-party tools installed locally (earshot venv, clipwing clone) — see vendor/SOURCES.md
+tools/
+
+# Real SFX local state (paths to this machine, index of brand/sfx/library)
+.claude/skills/real-sfx/config.json
+.claude/skills/real-sfx/library_index.json
+.claude/skills/real-sfx/work/
+.claude/skills/real-sfx/result/
+.agents/skills/real-sfx/config.json
+.agents/skills/real-sfx/library_index.json

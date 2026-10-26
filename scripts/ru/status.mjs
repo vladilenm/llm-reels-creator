@@ -6,6 +6,9 @@
 //   node scripts/ru/status.mjs <project> --stage S2 --state done [--note "…"]
 //   node scripts/ru/status.mjs <project> --decision "Хук: вариант B"
 //   node scripts/ru/status.mjs <project> --next                 first unfinished stage
+//
+// A remake project (`"kind": "remake"`, created by scripts/ru/ref-intake.mjs) has
+// its own stages R0–R4; everything else works the same.
 
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { join, resolve, basename } from "node:path";
@@ -22,12 +25,22 @@ export const STAGES = [
   ["S7", "Сборка → ГЕЙТ C"],
   ["S8", "Уроки"],
 ];
+export const REMAKE_STAGES = [
+  ["R0", "Приём референса"],
+  ["R1", "Транскрипция"],
+  ["R2", "Разбор"],
+  ["R3", "Адаптация → ГЕЙТ R"],
+  ["R4", "Передача в /reel"],
+];
+export const stagesFor = (s) => (s?.kind === "remake" ? REMAKE_STAGES : STAGES);
 const STATES = new Set(["todo", "running", "waiting", "done", "skipped", "failed"]);
 
-export function readStatus(project) {
+export function readStatus(project, { kind } = {}) {
   const p = join(project, "STATUS.json");
   if (existsSync(p)) return JSON.parse(readFileSync(p, "utf8"));
-  return { slug: basename(project), stages: Object.fromEntries(STAGES.map(([id]) => [id, { state: "todo", note: "", at: null }])), decisions: [] };
+  const s = { slug: basename(project), ...(kind ? { kind } : {}), decisions: [] };
+  s.stages = Object.fromEntries(stagesFor(s).map(([id]) => [id, { state: "todo", note: "", at: null }]));
+  return s;
 }
 
 export function writeStatus(project, s) {
@@ -36,11 +49,12 @@ export function writeStatus(project, s) {
   const md = [
     `# STATUS · ${s.slug}`,
     "",
-    s.mode ? `Режим: \`${s.mode}\` · плотность: \`${s.density ?? "medium"}\`${s.reviewCuts ? " · --review-cuts" : ""}` : "",
+    s.kind === "remake" ? `Ремейк чужого рилса: разбор → сценарий → съёмка → \`/reel … --remake\`${s.principles ? " · --principles" : ""}` : "",
+    s.mode ? `Режим: \`${s.mode}\` · плотность: \`${s.density ?? "medium"}\`${s.reviewCuts ? " · --review-cuts" : ""}${s.principles ? " · --principles" : ""}` : "",
     "",
     "| Стадия | Состояние | Заметка | Когда |",
     "|---|---|---|---|",
-    ...STAGES.map(([id, name]) => {
+    ...stagesFor(s).map(([id, name]) => {
       const st = s.stages[id] ?? { state: "todo" };
       return `| ${id} ${name} | ${icon[st.state] ?? ""} ${st.state} | ${(st.note ?? "").replaceAll("|", "/")} | ${st.at ?? ""} |`;
     }),
@@ -54,7 +68,7 @@ export function writeStatus(project, s) {
 }
 
 export function nextStage(s) {
-  return STAGES.find(([id]) => !["done", "skipped"].includes(s.stages[id]?.state))?.[0] ?? null;
+  return stagesFor(s).find(([id]) => !["done", "skipped"].includes(s.stages[id]?.state))?.[0] ?? null;
 }
 
 export const now = () => new Date().toLocaleString("sv-SE").slice(0, 16);

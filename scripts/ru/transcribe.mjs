@@ -15,7 +15,9 @@
 //
 // Usage:
 //   node scripts/ru/transcribe.mjs <media> --out transcript.raw.json
-//        [--provider openai|elevenlabs] [--language ru] [--no-cache]
+//        [--provider openai|elevenlabs] [--language ru|en|auto] [--no-cache]
+// `--language auto` lets the provider detect the language (a foreign reference
+// reel for /remake); the Russian verbatim prompt is used only for `ru`.
 // Env / .env: OPENAI_API_KEY or ELEVENLABS_API_KEY; TRANSCRIBE_PROVIDER sets the default.
 
 import { readFileSync, writeFileSync, existsSync, mkdirSync, copyFileSync, createReadStream, openAsBlob, statSync, rmSync, mkdtempSync } from "node:fs";
@@ -89,7 +91,7 @@ async function openaiTranscribe(media, { language, prompt }) {
 }
 
 function elevenlabsTranscribe(media, out, { language, noCache }) {
-  const args = [join(ROOT, "scripts/transcribe-elevenlabs.mjs"), media, "--output", out, "--language", language || "ru", "--model", "scribe_v2"];
+  const args = [join(ROOT, "scripts/transcribe-elevenlabs.mjs"), media, "--output", out, "--language", language ?? "ru", "--model", "scribe_v2"];
   if (noCache) args.push("--no-cache");
   const r = spawnSync(process.execPath, args, { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
   if (r.status !== 0) throw new Error(`ElevenLabs failed: ${(r.stderr || r.stdout).slice(0, 600)}`);
@@ -99,6 +101,7 @@ function elevenlabsTranscribe(media, out, { language, noCache }) {
 
 export async function transcribe(media, { out, provider, language = "ru", cache = true, cacheDir = join(ROOT, ".cache/transcripts") } = {}) {
   provider = provider || readEnv("TRANSCRIBE_PROVIDER") || "openai";
+  if (language === "auto") language = "";
   media = resolve(media);
   out = resolve(out);
   const sha = await sha256File(media);
@@ -123,7 +126,7 @@ export async function transcribe(media, { out, provider, language = "ru", cache 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const a = process.argv.slice(2);
   if (!a.length || a.includes("--help")) {
-    console.log("Usage: node scripts/ru/transcribe.mjs <media> --out transcript.raw.json [--provider openai|elevenlabs] [--language ru] [--no-cache] [--cache-dir dir]");
+    console.log("Usage: node scripts/ru/transcribe.mjs <media> --out transcript.raw.json [--provider openai|elevenlabs] [--language ru|en|auto] [--no-cache] [--cache-dir dir]");
     process.exit(a.length ? 0 : 1);
   }
   const o = { cache: true };

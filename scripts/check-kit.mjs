@@ -10,14 +10,13 @@ const ignore = new Set(['node_modules', '.git', 'video-projects', 'raw-media', '
 // Reels Studio: generated fixture media lives in fixtures/out (gitignored).
 const ignorePaths = new Set(['fixtures/out']);
 function walk(dir) { return readdirSync(dir, { withFileTypes: true }).flatMap(e => ignore.has(e.name) || e.name === '.env' || ignorePaths.has(relative(root, join(dir,e.name)).replaceAll('\\','/')) ? [] : e.isDirectory() ? walk(join(dir,e.name)) : [join(dir,e.name)]); }
-const files = walk(root);
-// Explicitly approved public exports; other media remains excluded.
-const publicMedia = new Set([
-  'examples/showcase/curiosity-reel-2.mp4',
-  'examples/showcase/curiosity-reel-1.mp4',
-  'examples/showcase/ais-live-ad.mp4',
-  'examples/showcase/youtube-showreel.mp4',
-]);
+// Prefer what Git would ship (tracked + unignored); fall back to a disk walk outside a checkout.
+const listed = spawnSync('git', ['ls-files', '-z', '--cached', '--others', '--exclude-standard'], { cwd: root, encoding: 'utf8' });
+const files = listed.status === 0
+  ? listed.stdout.split('\0').filter(Boolean).map(f => join(root, f)).filter(f => existsSync(f))
+  : walk(root);
+// No media ships with the kit; reels and their renders stay local.
+const publicMedia = new Set();
 if (!readFileSync(join(root,'AGENTS.md')).equals(readFileSync(join(root,'CLAUDE.md')))) fail('Root instruction files differ');
 const sync = spawnSync(process.execPath, [join(root,'scripts/sync-codex-skills.mjs'),'--check'], {encoding:'utf8'});
 if (sync.status !== 0) fail(sync.stdout + sync.stderr);

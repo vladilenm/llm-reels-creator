@@ -22,7 +22,6 @@ For one stage, load the matching local skill:
 | --- | --- |
 | Reels, Shorts, and short advertisements | `short-form-edit` |
 | Motion-design showreels and brand reels cut to music | `motion-showreel` |
-| Existing May Shorts example maintenance | `short-form-video` |
 | New motion-graphics video from a brief | `make-a-video` |
 | Website-inspired compositions | `website-to-hyperframes` |
 | Full raw-video edit | `edit-video` |
@@ -52,9 +51,13 @@ See `style-templates/README.md` for whole-scene templates.
 
 Preserve raw files. Use a new output filename for each editing stage. Archive
 obsolete work. Video projects, personal footage, transcripts, credentials, and
-renders are gitignored. The 12 already-published projects are retained as teaching examples; new private
-projects stay ignored. Do not treat existing public examples as permission to add
-new personal footage. Never print secrets or copy private media into library examples.
+renders are gitignored: everything under `video-projects/`, `inbox/` and `refs/`
+stays local. Never print secrets or copy private media into library examples.
+`lessons.md`, `refs/NOTES.md`, `brand/music/tracks.json` and `runs.log.jsonl` are local
+too; `brand/brand.md` is tracked in this private repo. `npm run setup` or /reel S0 creates
+any of the first four that is missing from its `*.example` template. Write taste and brand
+changes to `brand/brand.md` / `lessons.md`; edit a template only to change the default for
+everyone who clones the kit.
 
 ## Editing and timing
 
@@ -112,6 +115,10 @@ validators. Structural checks supplement rendered video and audio review.
 | Timing, easing and choreography principles | `motion-principles` |
 | Instagram Reels encode and safe zones | `reel-export` |
 | Rotoscope a subject with SAM 2 | `object-separation` (optional, heavy) |
+| Replicate someone else's reel: breakdown, adapted script, shooting plan | `reel-remake` |
+| Fast remake cycle: text to say → shoot → preview → final, fewest stops | `remake-fast` |
+| Wide OBS recording (layout + screen 1:1) → reel: all speech, screen matched to words | `reel-wide` |
+| Real recorded SFX on a finished render, placed on the exact frame (library `brand/sfx/library`) | `real-sfx` |
 
 `object-separation` is optional and heavy: it needs a Python venv with torch and
 a 150–900 MB SAM 2 model, installed on first use only. Never run it in a reel
@@ -119,9 +126,24 @@ unless the user asks for it. Vendored versions and local patches: `vendor/SOURCE
 
 ## Reels Studio
 
-The main scenario is `/reel <file> [— brief] [--mode kit|full] [--review-cuts] [--density …]`.
+The main scenario is `/reel <file> [— brief] [--mode kit|full] [--review-cuts] [--density …] [--principles]`.
 Route every reel to the `vladilen-reels` skill, not straight to `short-form-edit`;
 the orchestrator calls the chassis skills itself. Spec: `SPEC.md`.
+Someone else's reel to replicate goes to `/remake <file> [— brief]` (`reel-remake`):
+breakdown → adapted script and shooting plan → ГЕЙТ R → the customer shoots →
+`/reel <raw> --remake <remake project>`. The reference is studied, never reused.
+The short cycle is `/remake-fast <file> [— brief]` (`remake-fast`): the text to say
+(`SAY.md`, 🎧 marks lines where an insert covers the speaker so he reads them) and the
+recordings to make → he shoots → `/remake-fast <remake project>` → preview → «да» →
+final, a ×1.1 cut and the Instagram caption. No ГЕЙТ R, A or B in this cycle.
+A wide OBS recording (`Reels-wide-*.mp4`, 4104×1964: layout left, screen right) goes to
+`/reel-wide <file> [— brief]` (`reel-wide`, engine `vladilen-reels`): every spoken comment kept, empty
+stretches cut, the matching screen moment under each phrase, preview (normal + ×1.12) → «ок» → final.
+No ГЕЙТ A or B; scripts in `scripts/ru/wide/`.
+`--principles` (on `/reel`, `/remake`, `/remake-fast`; off by default, or «проверь сценарий
+по принципам») checks the script against `reel-remake/references/script-principles.md`:
+a verdict per principle (уместно / спорно / не здесь) and numbered edits in `PRINCIPLES.md`.
+Apply only the edits the customer picks; never invent a number to make a line specific.
 
 - Before creative work read `brand/brand.md`, `lessons.md`, `refs/NOTES.md`,
   `MOTION_PHILOSOPHY.md`.
@@ -140,3 +162,7 @@ the orchestrator calls the chassis skills itself. Spec: `SPEC.md`.
 - Claude cannot hear. Every report that touches audio ends with «Звук мной не
   прослушан: громкость, музыку и склейки по интонации проверь на слух».
 - Reports: short, by stage — done, decided, needs the human.
+- `SETUP.md` is the customer's one-page map of every setting (brand, music, SFX,
+  keys, `/reel` flags, `fx.json`, captions). When you add, rename, remove or change
+  the default of a setting, update `SETUP.md` in the same change: short, in Russian,
+  where it lives and what it affects.

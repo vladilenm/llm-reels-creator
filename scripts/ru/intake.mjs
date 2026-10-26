@@ -4,7 +4,10 @@
 //
 // Usage:
 //   node scripts/ru/intake.mjs <source> --slug agents-10h [--brief "…"] [--mode kit|full]
-//        [--density light|medium|heavy] [--review-cuts] [--date 2026-10-12]
+//        [--density light|medium|heavy] [--review-cuts] [--principles] [--date 2026-10-12]
+//        [--remake video-projects/<date>-remake-<slug>]
+// --remake links an approved remake (scripts/ru/ref-intake.mjs, /remake): BRIEF.md
+// points at its SCRIPT.md, STATUS.json keeps the path, and the remake's R4 is closed.
 // Prints the project path. Refuses to overwrite an existing project (resume
 // with scripts/ru/status.mjs <project> --next instead).
 
@@ -13,6 +16,7 @@ import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync, symli
 import { extname, join, resolve, dirname, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { readStatus, writeStatus, now } from "./status.mjs";
+import { ensurePersonalFiles } from "./lib/personal.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 
@@ -51,11 +55,12 @@ export function probe(file) {
 
 function main() {
   const a = process.argv.slice(2);
+  for (const f of ensurePersonalFiles()) console.error(`created ${f} from its .example template`);
   const get = (k, d) => { const i = a.indexOf(k); return i >= 0 ? a[i + 1] : d; };
-  const valueFlags = new Set(["--slug", "--brief", "--mode", "--density", "--date"]);
+  const valueFlags = new Set(["--slug", "--brief", "--mode", "--density", "--date", "--remake"]);
   const src = a.find((x, i) => !x.startsWith("--") && !valueFlags.has(a[i - 1]));
   if (!src || !get("--slug")) {
-    console.error('Usage: node scripts/ru/intake.mjs <source> --slug agents-10h [--brief "…"] [--mode kit|full] [--density medium] [--review-cuts]');
+    console.error('Usage: node scripts/ru/intake.mjs <source> --slug agents-10h [--brief "…"] [--mode kit|full] [--density medium] [--review-cuts] [--principles]');
     process.exit(1);
   }
   const source = resolve(src);
@@ -64,6 +69,8 @@ function main() {
   const slug = `${date}-${get("--slug")}`;
   const project = join(ROOT, "video-projects", slug);
   if (existsSync(project)) throw new Error(`project exists: ${relative(ROOT, project)} — resume it (scripts/ru/status.mjs ${relative(ROOT, project)} --next)`);
+  const remake = get("--remake") ? resolve(get("--remake")) : null;
+  if (remake && !existsSync(join(remake, "SCRIPT.md"))) throw new Error(`--remake: no SCRIPT.md in ${relative(ROOT, remake)} — finish /remake (ГЕЙТ R) first`);
 
   const nv = spawnSync(process.execPath, [join(ROOT, "scripts/new-video.mjs"), slug], { encoding: "utf8" });
   if (nv.status !== 0) throw new Error(nv.stderr || nv.stdout);
@@ -95,15 +102,25 @@ function main() {
   const mode = get("--mode", "kit");
   const density = get("--density", "medium");
   const reviewCuts = a.includes("--review-cuts");
+  const principles = a.includes("--principles");
   const brief = get("--brief", "");
   writeFileSync(join(project, "BRIEF.md"), [
     `# BRIEF · ${slug}`,
     "",
     `- Исходник: \`${relative(ROOT, source)}\` → копия \`${relative(project, raw)}\` (оригинал не трогаем)`,
     `- Бриф заказчика: ${brief ? `«${brief}»` : "—"}`,
-    `- Режим: \`${mode}\` · плотность графики: \`${density}\` · ГЕЙТ A (--review-cuts): ${reviewCuts ? "включён" : "выключен"}`,
+    `- Режим: \`${mode}\` · плотность графики: \`${density}\` · ГЕЙТ A (--review-cuts): ${reviewCuts ? "включён" : "выключен"} · принципы сценария (--principles): ${principles ? "включены" : "выключены"}`,
     `- Исходник: ${summary.width}×${summary.height}, ${summary.fps} fps, ${summary.duration.toFixed(1)} с, ${summary.video_codec}${summary.audio ? `, звук ${summary.audio.codec} ${summary.audio.sample_rate} Гц` : ", без звука"}`,
     ...(warnings.length ? ["", "## Предупреждения", "", ...warnings.map((w) => `- ${w}`)] : []),
+    ...(remake ? [
+      "",
+      "## Ремейк",
+      "",
+      `- Сценарий: \`${relative(project, join(remake, "SCRIPT.md"))}\` (утверждён на ГЕЙТЕ R), разбор референса: \`${relative(project, join(remake, "BREAKDOWN.md"))}\`.`,
+      "- S2: сверять речь с текстом сценария — фраза, сказанная дважды, это дубль; слова не из сценария не резать без причины.",
+      "- S3: план графики собирать из колонки «Что в кадре» сценария на чистом таймлайне; хуки — вариант из сценария плюс два своих.",
+      "- Кадры, звук и текст референса в рилс не попадают.",
+    ] : []),
     "",
     "## Прочитано перед творческой работой",
     "",
@@ -112,7 +129,15 @@ function main() {
   ].join("\n"));
 
   const s = readStatus(project);
-  s.mode = mode; s.density = density; s.reviewCuts = reviewCuts; s.brief = brief;
+  s.mode = mode; s.density = density; s.reviewCuts = reviewCuts; s.principles = principles; s.brief = brief;
+  if (remake) {
+    s.remake = relative(ROOT, remake);
+    const r = readStatus(remake);
+    if (r.stages?.R4) {
+      r.stages.R4 = { state: "done", note: `сырьё снято → ${relative(ROOT, project)}`, at: now() };
+      writeStatus(remake, r);
+    }
+  }
   s.stages.S0 = { state: "done", note: `${summary.duration.toFixed(1)} с, ${summary.width}×${summary.height}@${summary.fps}${warnings.length ? `, предупреждений: ${warnings.length}` : ""}`, at: now() };
   writeStatus(project, s);
   console.log(JSON.stringify({ project: relative(ROOT, project), summary, warnings }, null, 2));

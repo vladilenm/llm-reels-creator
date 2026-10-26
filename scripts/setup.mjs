@@ -13,6 +13,8 @@ for (const [command, args] of [['node', ['--version']], ['ffmpeg', ['-version']]
 if (Number(process.versions.node.split('.')[0]) < 22) { console.error('Node 22+ required.'); missing = true; }
 if (!existsSync(join(root, '.env'))) { copyFileSync(join(root, '.env.example'), join(root, '.env')); console.log('Created local .env. Fill only the keys your chosen services need.'); }
 else console.log('Existing .env preserved.');
+const { ensurePersonalFiles } = await import('./ru/lib/personal.mjs');
+for (const file of ensurePersonalFiles(root)) console.log(`Created local ${file} from its .example template.`);
 console.log('Service setup and alternatives: docs/TOOLS-AND-API-KEYS.md');
 console.log('Next: npx hyperframes doctor (Chrome diagnostics), then npm run demo.');
 process.exitCode = missing ? 1 : 0;

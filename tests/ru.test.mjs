@@ -254,8 +254,20 @@ test("make-captions: every clean word lands in a cue, lines ≤22 chars, glyph-c
   assert.equal(res.cues, cues.length);
   assert.deepEqual(validateSrt(readFileSync(join(P, "captions.srt"), "utf8")), []);
   const html = readFileSync(join(P, "captions/index.html"), "utf8");
-  assert.match(html, /@font-face\{font-family:"ReelCaption";src:url\("fonts\/Inter-700\.ttf"\)/);
+  const b = loadBrand(), files = b.font_body.files;
+  const fontFile = (files[String(b.captions.weight)] ?? Object.values(files).at(-1)).split("/").at(-1);
+  assert.ok(html.includes(`@font-face{font-family:"ReelCaption";src:url("fonts/${fontFile}")`), `caption font is the brand body font ${fontFile}`);
   assert.match(html, /window\.__timelines\["captions"\]/);
+});
+
+test("brand fonts: kinetic accent and defaults come from brand.md font_serif", async () => {
+  const { kineticConfig } = await import("../scripts/ru/make-captions.mjs");
+  const { DEFAULT_BRAND } = await import("../scripts/ru/lib/brand.mjs");
+  assert.equal(kineticConfig(DEFAULT_BRAND).accent_font, "brand/fonts/PlayfairDisplay-Italic-Variable.ttf");
+  const custom = { ...DEFAULT_BRAND, font_serif: { italic: "brand/fonts/Spectral-SemiBoldItalic.ttf" } };
+  assert.equal(kineticConfig(custom).accent_font, "brand/fonts/Spectral-SemiBoldItalic.ttf");
+  assert.equal(kineticConfig(custom, { kinetic: { accent_font: "x.ttf" } }).accent_font, "x.ttf", "PLAN override wins");
+  for (const p of [DEFAULT_BRAND.font_serif.italic, DEFAULT_BRAND.font_serif.display]) assert.ok(existsSync(join(ROOT, p)), p);
 });
 
 test("make-captions: PLAN.json overrides hide windows and move the baseline", async () => {
@@ -282,6 +294,71 @@ test("make-captions: PLAN.json overrides hide windows and move the baseline", as
   const plain = captionsHtml([cue(12, 13)], { duration: 22, brand, fontUrl: "f.ttf" });
   assert.match(plain, new RegExp(`top:${brand.captions.baseline_y - lineH}px`));
   assert.doesNotMatch(plain, /tl\.to\("#c0",\{y:/);
+});
+
+test("make-captions kinetic: 1–3 word groups, prepositions carried, accents, forced breaks, themes", async () => {
+  const { kineticGroups, kineticConfig, kineticHtml } = await import("../scripts/ru/make-captions.mjs");
+  const { loadBrand } = await import("../scripts/ru/lib/brand.mjs");
+  const text = "Твой Claude Code умеет разбирать любое приложение у тебя на компьютере. И бесплатно. Это REA Reverse Engineer";
+  let t = 0;
+  const words = text.split(" ").map((w) => { const x = { text: w, start: +t.toFixed(2), end: +(t + 0.3).toFixed(2), type: "word" }; t += 0.34 + (/[.]$/.test(w) ? 0.5 : 0); return x; });
+  const brand = loadBrand();
+  const ov = { style: "kinetic", kinetic: { accent_words: ["бесплатно"], breaks: [words.find((w) => w.text === "Reverse").start], theme_keys: [{ at: words.find((w) => w.text === "И").start - 0.01, theme: "dark" }], y_keys: [{ at: 0, y: 1000 }] } };
+  const k = kineticConfig(brand, ov);
+  const g = kineticGroups({ words }, k, ov);
+  const lines = g.map((c) => c.lines[0].map((w) => w.text).join(" "));
+  assert.deepEqual(lines.flatMap((l) => l.split(" ")), words.map((w) => w.text.replace(/[.,;:]+$/, "")), "every word, in order");
+  for (const l of lines) assert.ok(l.split(" ").length <= 3 && (l.length <= k.max_chars || !l.includes(" ")), l);
+  for (const c of g) assert.ok(!["у", "на", "и", "в"].includes(c.lines[0].at(-1).text.toLowerCase()) || c.lines[0].length === 1, "no group ends on a preposition");
+  assert.ok(lines.includes("Reverse Engineer"), "forced break starts a group");
+  assert.ok(g.find((c) => c.lines[0].some((w) => w.text === "бесплатно")).lines[0].find((w) => w.text === "бесплатно").accent);
+  assert.equal(g[0].start, 0);
+  for (let i = 1; i < g.length; i++) assert.ok(g[i - 1].end <= g[i].start + 1e-9, "groups never overlap");
+  const html = kineticHtml(g, { duration: t + 1, brand, fontUrl: "a.ttf", accentUrl: "b.ttf", overrides: ov });
+  assert.match(html, /class="kg light clip"[^>]*top:955px/);
+  assert.match(html, /class="kg dark clip"/);
+  assert.match(html, /class="w acc"[^>]*>бесплатно</);
+  assert.match(html, /window\.__timelines\["captions"\]/);
+  assert.equal(k.light.accent, brand.accent);
+});
+
+test("screen kit: recording → frames + manifest; build.py embeds kit, brand and Cyrillic fonts", () => {
+  const d = tmp();
+  const rec = join(d, "rec.mp4");
+  let r = spawnSync("ffmpeg", ["-loglevel", "error", "-f", "lavfi", "-i", "testsrc2=size=640x360:rate=30", "-t", "1", "-pix_fmt", "yuv420p", rec], { encoding: "utf8" });
+  assert.equal(r.status, 0, r.stderr);
+  r = node(["scripts/ru/broll/screen-frames.mjs", rec, join(d, "screens", "term"), "--to", "0.5", "--width", "320"]);
+  assert.equal(r.status, 0, r.stderr);
+  const man = JSON.parse(r.stdout);
+  assert.equal(man.n, 15);
+  assert.equal(man.w, 320);
+  assert.match(readFileSync(join(d, "screens", "term", "manifest.js"), "utf8"), /\(window\.SKF=window\.SKF\|\|\{\}\)\["term"\]=\{"n":15,/);
+  mkdirSync(join(d, "clips"));
+  writeFileSync(join(d, "clips", "01-x.html"), "<title>x</title><script>SK.run({T:1, media:{a:{frames:'../screens/term'}}, shots:[[0,'a',[0,0,320]]]});</script>");
+  r = spawnSync("python3", ["scripts/ru/broll/build.py", join(d, "dist"), join(d, "clips", "01-x.html")], { encoding: "utf8", cwd: ROOT });
+  assert.equal(r.status, 0, r.stderr);
+  const html = readFileSync(join(d, "dist", "01-x.html"), "utf8");
+  assert.match(html, /window\.SK=\{BRAND:\{"accent":/);
+  assert.match(html, /BASE:"\.\.\/clips\/"/);
+  assert.match(html, /font-family:'SK Serif'/);
+  assert.ok(html.indexOf("SK.run = ") < html.indexOf("SK.run({T:1"), "kit before the fragment");
+  for (const f of ["render.js", "beats.js"]) assert.match(readFileSync(join(ROOT, ".claude/skills/motion-broll/engine", f), "utf8"), /window\.READY/);
+});
+
+test("refineWithSilences trims words whisper stretched over a long pause", async () => {
+  const { refineWithSilences } = await import("../scripts/ru/normalize-transcript.mjs");
+  const words = [
+    { text: "Он", start: 31.92, end: 32.64 },         // real onset 32.55 after 0.63 s of silence
+    { text: "Шаг", start: 45.5, end: 45.8 },
+    { text: "шагом.", start: 46.08, end: 47.7 },      // real end 46.43, then 1.3 s of silence inside «the word»
+  ];
+  const silences = [{ start: 30.0, end: 32.55 }, { start: 32.66, end: 45.48 }, { start: 46.41, end: 50.9 }];
+  const { words: w } = refineWithSilences(words, silences);
+  assert.ok(Math.abs(w[0].start - 32.53) < 0.011, `start ${w[0].start}`);
+  assert.ok(Math.abs(w[2].end - 46.43) < 0.011, `end ${w[2].end}`);
+  // the same silences no longer than maxShift behave as before
+  const short = refineWithSilences([{ text: "да", start: 10.0, end: 10.9 }], [{ start: 10.5, end: 10.7 }]).words[0];
+  assert.equal(short.end, 10.52);
 });
 
 test("refineWithSilences pulls late whisper starts back to the speech onset and closes silence-free gaps", async () => {
@@ -342,4 +419,234 @@ test("build-edl: --max-pause widens silence cuts without entering words", async 
   assert.equal(tightenPauses(cuts, words, NaN), cuts);             // option off → unchanged
   // a pause already shorter than the limit stays as it is
   assert.deepEqual(tightenPauses([{ start: 1.05, end: 2.95, reasons: [] }], words, 0.12)[0], { start: 1.05, end: 2.95, reasons: [] });
+});
+
+test("fx_picture --validate: joins come from EDL.json, a location join off a cut is an error", () => {
+  const P = mkdtempSync(join(tmpdir(), "reel-fx-"));
+  mkdirSync(join(P, "fx"));
+  writeFileSync(join(P, "EDL.json"), JSON.stringify({ source_duration: 10, delete_ranges: [
+    { start: 0, end: 0.5 }, { start: 3, end: 4 }, { start: 6, end: 6.5 }, { start: 9.5, end: 10 }] }));
+  writeFileSync(join(P, "fx/fx.json"), JSON.stringify({ location_joins: [2.5, 3.0], camera: [[0, 2.5, 1, 1.05, 540, 600]] }));
+  let r = spawnSync("python3", ["scripts/ru/fx/fx_picture.py", P, "--validate"], { encoding: "utf8" });
+  assert.equal(r.status, 1, r.stderr);
+  assert.match(r.stdout, /ERROR location_join 3 is not an EDL join/);
+  assert.match(r.stdout, /joins \[2\.5, 4\.5\]/);
+  writeFileSync(join(P, "fx/fx.json"), JSON.stringify({ location_joins: [2.5, 4.5] }));
+  r = spawnSync("python3", ["scripts/ru/fx/fx_picture.py", P, "--validate"], { encoding: "utf8" });
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+});
+
+test("fx_picture relocate: the speaker moves down, no ghost stays in the room, titles may not overlap", () => {
+  const P = mkdtempSync(join(tmpdir(), "reel-reloc-"));
+  mkdirSync(join(P, "fx"));
+  writeFileSync(join(P, "EDL.json"), JSON.stringify({ source_duration: 10, delete_ranges: [] }));
+  writeFileSync(join(P, "title.mov"), "");
+  writeFileSync(join(P, "fx/fx.json"), JSON.stringify({ relocate: [{ t0: 1, t1: 5 }], titles: [{ t0: 4, reveal: [4.5, 6], layer: "title.mov" }] }));
+  let r = spawnSync("python3", ["scripts/ru/fx/fx_picture.py", P, "--validate"], { encoding: "utf8" });
+  assert.equal(r.status, 1);
+  assert.match(r.stdout, /ERROR relocate 1–5 overlaps a title moment/);
+  const py = `
+import sys, types; sys.path.insert(0, "scripts/ru/fx"); import numpy as np; import fx_picture as F
+from PIL import Image, ImageDraw
+img = Image.new("RGB", (F.W, F.H), (90, 160, 90)); m = Image.new("L", (F.W, F.H), 0)
+for im, c in ((ImageDraw.Draw(img), (220, 30, 30)), (ImageDraw.Draw(m), 255)):
+    im.ellipse([390, 230, 690, 560], fill=c); im.rectangle([200, 520, 880, F.H], fill=c)   # head + body, top at y 230
+fake = types.SimpleNamespace(split_k=lambda R, t: 1.0, mask_dir=lambda d, f: m)
+R = {"t0": 0, "t1": 9, "_dir": "", "_dy": 0.57 * F.H - 230}
+a = np.asarray(F.Picture.relocate_frame(fake, img, R, 0, 1.0), np.float32)
+red = lambda y0, y1: float(((a[y0:y1, :, 0] > 170) & (a[y0:y1, :, 1] < 80)).mean())
+print(round(red(240, 900), 3), round(red(1180, 1400), 3))
+`;
+  r = spawnSync("python3", ["-c", py], { encoding: "utf8", cwd: ROOT });
+  assert.equal(r.status, 0, r.stderr);
+  const [ghost, moved] = r.stdout.trim().split(" ").map(Number);
+  assert.ok(ghost < 0.005, `speaker left in the room: ${ghost}`);
+  assert.ok(moved > 0.1, `speaker not found lower: ${moved}`);
+});
+
+test("fx sfx: whoosh waits for the last word, a sound inside a word is flagged", () => {
+  const P = mkdtempSync(join(tmpdir(), "reel-sfx-"));
+  mkdirSync(join(P, "fx"));
+  writeFileSync(join(P, "transcript.clean.json"), JSON.stringify({ audio_duration_secs: 3, words: [
+    { text: "Привет,", start: 0.2, end: 0.9 }, { text: "мир.", start: 1.05, end: 1.5 }, { text: "Снова", start: 1.7, end: 2.3 }] }));
+  writeFileSync(join(P, "fx/fx.json"), JSON.stringify({ location_joins: [1.55], sfx: [
+    { name: "клик в слове", kind: "click", word: "привет", offset: 0.3, gain: 0.1 },
+    { name: "клик после", kind: "click", word: "мир", offset: 0.5, gain: 0.1 }] }));
+  const r = spawnSync("python3", ["scripts/ru/fx/sfx.py", P], { encoding: "utf8" });
+  assert.equal(r.status, 0, r.stderr);
+  assert.match(r.stdout, /WARN клик в слове: 0\.50 is inside the word «Привет,»/);
+  assert.doesNotMatch(r.stdout, /клик после/);
+  const log = JSON.parse(readFileSync(join(P, "fx/sfx.json"), "utf8"));
+  const wh = log.find((e) => e.name.startsWith("переход"));
+  assert.ok(wh.t >= 1.5 + 0.03 - 1e-9, `whoosh at ${wh.t} starts before «мир.» ends`);
+  assert.ok(existsSync(join(P, "fx/sfx.wav")));
+});
+
+test("sound.py: voice dips at joins, music ducks under speech, a stop-down returns on a downbeat", { timeout: 120000 }, () => {
+  const P = mkdtempSync(join(tmpdir(), "sound-"));
+  mkdirSync(join(P, "renders")); mkdirSync(join(P, "fx"));
+  const ff = (...a) => assert.equal(spawnSync("ffmpeg", ["-v", "error", "-y", ...a]).status, 0);
+  ff("-f", "lavfi", "-i", "color=c=gray:s=108x192:r=30:d=3", "-f", "lavfi", "-i", "sine=f=220:d=3:sample_rate=48000", "-shortest", "-c:v", "libx264", "-c:a", "aac", join(P, "renders/clean.mp4"));
+  ff("-f", "lavfi", "-i", "aevalsrc=0.8*sin(2*PI*55*t)*exp(-25*mod(t-0.1\\,0.5))*gte(t\\,0.1):s=48000:d=8", join(P, "music.wav"));
+  writeFileSync(join(P, "EDL.json"), JSON.stringify({ keep_ranges: [{ start: 0, end: 1.5 }, { start: 4, end: 5.5 }] }));
+  writeFileSync(join(P, "transcript.clean.json"), JSON.stringify({ audio_duration_secs: 3, words: [
+    { text: "раз", start: 0.2, end: 0.9 }, { text: "два", start: 1.7, end: 2.2 }, { text: "три", start: 2.4, end: 2.8 }] }));
+  writeFileSync(join(P, "fx/fx.json"), JSON.stringify({ sound: { sfx: "none.wav", music: { src: "music.wav", bpm: 120,
+    stops: [{ word: "два", lead: 0.1, back_word: "три" }], fade_out: 0.2 } } }));
+  const r = spawnSync("python3", [join(ROOT, "scripts/ru/fx/sound.py"), P], { encoding: "utf8" });
+  assert.equal(r.status, 0, r.stderr);
+  const rep = JSON.parse(readFileSync(join(P, "fx/sound.json"), "utf8"));
+  assert.equal(rep.voice.joins_faded, 1);
+  assert.ok(Math.abs(rep.music.bpm - 120) < 1, `bpm ${rep.music.bpm}`);
+  assert.ok(rep.music.under_speech_db_vs_voice < rep.music.between_phrases_db_vs_voice - 4, JSON.stringify(rep.music));
+  const back = rep.music.segments.at(-1);                       // [clean t, track t] after the stop
+  assert.equal(back[0], 2.4);
+  const bars = (back[1] - rep.music.phase_s) / (4 * 60 / rep.music.bpm), frac = bars - Math.round(bars);
+  assert.ok(Math.abs(frac) < 0.02, `restart at ${back[1]} is ${frac.toFixed(3)} bar off the downbeat`);
+  assert.ok(existsSync(join(P, "fx/mix.wav")));
+});
+
+test("export-reel --audio replaces the soundtrack of a silent picture", { timeout: 120000 }, async () => {
+  const { exportReel } = await import("../scripts/ru/export-reel.mjs");
+  const d = mkdtempSync(join(tmpdir(), "exp-"));
+  const ff = (...a) => assert.equal(spawnSync("ffmpeg", ["-v", "error", "-y", ...a]).status, 0);
+  ff("-f", "lavfi", "-i", "color=c=gray:s=1080x1920:r=30:d=2", "-c:v", "libx264", "-pix_fmt", "yuv420p", join(d, "pic.mp4"));
+  ff("-f", "lavfi", "-i", "sine=f=330:d=2:sample_rate=48000", "-ac", "2", join(d, "mix.wav"));
+  exportReel(join(d, "pic.mp4"), join(d, "out.mp4"), { audio: join(d, "mix.wav"), check: false });
+  const v = spawnSync("ffmpeg", ["-hide_banner", "-i", join(d, "out.mp4"), "-af", "volumedetect", "-f", "null", "-"], { encoding: "utf8" });
+  const mean = Number(/mean_volume: (-?[\d.]+) dB/.exec(v.stderr)?.[1]);
+  assert.ok(mean > -30, `mean volume ${mean} dB — the silent fallback track was used`);
+});
+
+test("fx_picture: face track is smoothed per shot, eye-match meets halfway and never uncovers the frame", () => {
+  const py = `
+import sys, numpy as np
+sys.path.insert(0, "scripts/ru/fx"); import fx_picture as F
+v = np.array([[100.0]] * 30 + [[900.0]] * 30)
+s = F.smooth_track(v, [30])
+assert s[29, 0] == 100 and s[30, 0] == 900, "smoothing leaked across the cut"
+p = F.Picture.__new__(F.Picture)
+j = 1.0
+p.cfg = {"location_joins": [j], "camera": [[0.0, 2.0, 1.0, 1.04, 540, 960]]}
+p.titles, p.follow, p.eye = [], True, True
+face = np.zeros((60, 3)); face[:30] = [700, 600, 300]; face[30:] = [420, 1150, 600]
+p.face = face
+for f in range(0, 60):
+    t = f / 30; S, tx, ty = p.transform(t)
+    assert S <= 1.45 + 1e-6, (t, S)
+    assert tx <= 1e-6 and ty <= 1e-6 and S * F.W + tx >= F.W - 1e-6 and S * F.H + ty >= F.H - 1e-6, ("uncovered", t, S, tx, ty)
+def face_on_screen(t):
+    S, tx, ty = p.transform(t); fx, fy, _ = p.face_at(t); return np.array([S * fx + tx, S * fy + ty])
+a, b = face_on_screen(j - 1 / 30), face_on_screen(j)
+assert np.linalg.norm(a - b) < 0.35 * np.linalg.norm(face[0, :2] - face[59, :2]), ("faces do not meet", a, b)
+print("ok")
+`;
+  const r = spawnSync("python3", ["-c", py], { cwd: ROOT, encoding: "utf8" });
+  assert.equal(r.status, 0, r.stderr + r.stdout);
+});
+
+test("fx_picture: the clean plate hides the person, the whip shifts without wrapping, impact is local in time", () => {
+  const py = `
+import sys, numpy as np
+sys.path.insert(0, "scripts/ru/fx"); import fx_picture as F
+from PIL import Image
+a = np.zeros((F.H, F.W, 3), np.float32); a[..., 2] = 200          # blue room
+m = np.zeros((F.H, F.W), np.float32); m[600:1400, 300:780] = 1    # the person
+a[m > 0] = [220, 30, 30]                                            # red person
+plate = F.fill_person(a, m)
+assert plate[1000, 540, 0] < 60 and plate[1000, 540, 2] > 150, plate[1000, 540]
+s = F.hshift_blur(a, 200, 0, n=1)
+assert s[100, 100].sum() == 0 and s[100, 300, 2] == 200, "shift must leave black, not wrap"
+p = F.Picture.__new__(F.Picture); p.impacts = [(1.0, 1.0)]
+im = Image.fromarray(a.astype(np.uint8))
+assert p.impact(im, 0.9) is im and p.impact(im, 1.3) is im and p.impact(im, 1.02) is not im
+print("ok")
+`;
+  const r = spawnSync("python3", ["-c", py], { cwd: ROOT, encoding: "utf8" });
+  assert.equal(r.status, 0, r.stderr + r.stdout);
+});
+
+// ---------- /remake ----------
+
+import { readStatus, nextStage, writeStatus } from "../scripts/ru/status.mjs";
+import { contactSheets } from "../scripts/ru/contact-sheet.mjs";
+import { speechStats } from "../scripts/ru/ref-intake.mjs";
+
+test("remake projects get their own stages R0–R4", () => {
+  const d = tmp();
+  const s = readStatus(d, { kind: "remake" });
+  assert.deepEqual(Object.keys(s.stages), ["R0", "R1", "R2", "R3", "R4"]);
+  s.stages.R0.state = "done";
+  assert.equal(nextStage(s), "R1");
+  writeStatus(d, s);
+  assert.match(readFileSync(join(d, "STATUS.md"), "utf8"), /R3 Адаптация → ГЕЙТ R/);
+  assert.deepEqual(Object.keys(readStatus(tmp()).stages).slice(0, 2), ["S0", "S1"], "reels keep S0–S8");
+});
+
+test("speechStats: pace and pauses between words", () => {
+  const w = (start, end) => ({ text: "x", start, end });
+  const s = speechStats([w(0.2, 0.5), w(0.5, 0.9), w(1.4, 1.8), w(1.9, 2.2)], 3);
+  assert.equal(s.words, 4);
+  assert.equal(s.first_word_at, 0.2);
+  assert.equal(s.words_per_second, 2);
+  assert.deepEqual(s.gaps.map((g) => g.dur), [0.5], "only pauses ≥ 0.25 s");
+});
+
+test("ref-intake: three shots, label-only sheets, remake status, --gaps", { timeout: 120000 }, async () => {
+  const d = tmp();
+  const ref = join(d, "their-reel.mp4");
+  // Three flat colours, one second each; a tone with a silent middle second.
+  const r = spawnSync("ffmpeg", ["-v", "error", "-y",
+    "-f", "lavfi", "-i", "color=c=red:s=360x640:r=30:d=1",
+    "-f", "lavfi", "-i", "color=c=blue:s=360x640:r=30:d=1",
+    "-f", "lavfi", "-i", "color=c=green:s=360x640:r=30:d=1",
+    "-f", "lavfi", "-i", "sine=f=440:d=3",
+    "-filter_complex", "[0:v][1:v][2:v]concat=n=3:v=1:a=0[v];[3:a]volume='if(between(t,1,2),0,1)':eval=frame[a]",
+    "-map", "[v]", "-map", "[a]", "-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "aac", "-shortest", ref]);
+  assert.equal(r.status, 0, String(r.stderr));
+  const out = node(["scripts/ru/ref-intake.mjs", ref, "--slug", "their-reel", "--principles", "--date", "2026-01-01", "--projects-dir", d, "--every", "1"]);
+  assert.equal(out.status, 0, out.stderr);
+  const P = join(d, "2026-01-01-remake-their-reel");
+  const j = JSON.parse(readFileSync(join(P, "REF.json"), "utf8"));
+  assert.deepEqual(j.shots.map((s) => Math.round(s.start)), [0, 1, 2]);
+  assert.equal(j.rhythm.shots, 3);
+  assert.ok(j.audio.silences_over_0_25s >= 1, "the silent second is found");
+  assert.ok(existsSync(join(P, "review/ref-every.png")) && existsSync(join(P, "review/ref-shots.png")));
+  assert.ok(existsSync(join(P, "assets/ref.mp4")));
+  const s = JSON.parse(readFileSync(join(P, "STATUS.json"), "utf8"));
+  assert.equal(s.kind, "remake");
+  assert.equal(s.principles, true, "--principles is stored for R3");
+  assert.match(readFileSync(join(P, "STATUS.md"), "utf8"), /--principles/);
+  assert.equal(s.stages.R0.state, "done");
+  assert.equal(node(["scripts/ru/status.mjs", P, "--next"]).stdout.trim(), "R1");
+  assert.equal(node(["scripts/ru/ref-intake.mjs", ref, "--slug", "their-reel", "--date", "2026-01-01", "--projects-dir", d]).status, 1, "refuses to overwrite");
+
+  // Words before and after the silent second → the pause measures as silence.
+  writeFileSync(join(P, "transcript.words.json"), JSON.stringify({ language_code: "en", words: [
+    { text: "one", start: 0.1, end: 1.0 }, { text: "two", start: 2.0, end: 2.9 },
+  ] }));
+  const g = node(["scripts/ru/ref-intake.mjs", "--gaps", P]);
+  assert.equal(g.status, 0, g.stderr);
+  const j2 = JSON.parse(readFileSync(join(P, "REF.json"), "utf8"));
+  assert.equal(j2.speech.words, 2);
+  assert.equal(j2.audio.gaps.count, 1);
+  assert.ok(j2.audio.gaps.median_db < -50, `silent pause, got ${j2.audio.gaps.median_db}`);
+  assert.match(j2.audio.gaps.verdict, /музыки под голосом, скорее всего, нет/);
+});
+
+test("contact sheet window: --from/--to keep only that stretch", { timeout: 60000 }, async () => {
+  const d = tmp();
+  const v = join(d, "v.mp4");
+  assert.equal(spawnSync("ffmpeg", ["-v", "error", "-y", "-f", "lavfi", "-i", "testsrc=s=180x320:r=30:d=4", "-pix_fmt", "yuv420p", v]).status, 0);
+  const r = await contactSheets(v, { out: join(d, "s.png"), from: 1, to: 2, every: 0.5, zones: "label", width: 90 });
+  assert.deepEqual(r.times, [1, 1.5, 2]);
+});
+
+test("intake --remake refuses a remake without an approved SCRIPT.md", () => {
+  const d = tmp();
+  writeFileSync(join(d, "raw.mov"), "");
+  const r = node(["scripts/ru/intake.mjs", join(d, "raw.mov"), "--slug", "never-created", "--date", "1999-01-01", "--remake", d]);
+  assert.equal(r.status, 1);
+  assert.match(r.stderr, /no SCRIPT\.md/);
+  assert.ok(!existsSync(join(ROOT, "video-projects/1999-01-01-never-created")));
 });

@@ -10,7 +10,15 @@ export const DEFAULT_BRAND = {
   background: "#0B0B0F",
   ink: "#F4F2EE",
   canvas: "#E9E7E2",
+  glow: "#1E1630",
   font_body: { family: "Inter", files: { 400: "brand/fonts/Inter-400.ttf", 700: "brand/fonts/Inter-700.ttf" } },
+  // Serif: `italic` is the kinetic-caption accent and the screen-kit plate, `display` the giant fx textmask.
+  font_serif: {
+    family: "Playfair Display",
+    italic: "brand/fonts/PlayfairDisplay-Italic-Variable.ttf",
+    display: "brand/fonts/PlayfairDisplay-Variable.ttf",
+  },
+  font_mono: { family: "Geist Mono", files: { 500: "brand/fonts/GeistMono-Medium.woff2" } },
   captions: {
     style: "anchor-rail", font_px: 64, weight: 700, color: "#FFFFFF", active_color: "#FF5A1F",
     max_chars_per_line: 22, max_lines: 2, baseline_y: 1330,
@@ -19,6 +27,8 @@ export const DEFAULT_BRAND = {
 };
 
 export function loadBrand(path = join(ROOT, "brand/brand.md")) {
+  // brand.md is local (gitignored); a fresh clone falls back to the shipped template.
+  if (!existsSync(path) && path === join(ROOT, "brand/brand.md")) path = join(ROOT, "brand/brand.example.md");
   if (!existsSync(path)) return { ...DEFAULT_BRAND, _source: "defaults" };
   const md = readFileSync(path, "utf8");
   const m = /```json\s*\n([\s\S]*?)\n```/.exec(md);

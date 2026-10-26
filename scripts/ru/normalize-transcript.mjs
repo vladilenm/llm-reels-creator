@@ -99,7 +99,9 @@ export function detectSilences(media, { noiseDb = -40, minDur = 0.12 } = {}) {
 }
 
 // Snap word edges to detected silences. Pure function (tested without ffmpeg).
-export function refineWithSilences(words, silences, { maxShift = 0.6, pad = 0.02 } = {}) {
+// longPause: a silence this long that overlaps a word is never part of it (whisper-1 stretches words
+// over pauses of a second or more), so the word is trimmed to it whatever maxShift says.
+export function refineWithSilences(words, silences, { maxShift = 0.6, pad = 0.02, longPause = 0.3 } = {}) {
   const out = words.map((w) => ({ ...w }));
   let moved = 0;
   for (let i = 0; i < out.length; i++) {
@@ -112,7 +114,7 @@ export function refineWithSilences(words, silences, { maxShift = 0.6, pad = 0.02
     let onset = null;
     for (const s of silences) {
       if (s.end > prevEnd && s.end <= w.start + 0.005 && w.start - s.end <= maxShift) onset = s.end;
-      if (s.start < w.start && s.end > w.start && s.end < w.end && s.end - w.start <= maxShift) onset = s.end;
+      if (s.start < w.start && s.end > w.start && s.end < w.end - 0.08 && (s.end - w.start <= maxShift || s.end - s.start >= longPause)) onset = s.end;
     }
     if (onset !== null) {
       const ns = Math.max(prevEnd, onset - pad);
@@ -122,7 +124,7 @@ export function refineWithSilences(words, silences, { maxShift = 0.6, pad = 0.02
     // after it (end reported early).
     let offset = null;
     for (const s of silences) {
-      if (s.start > w.start + 0.05 && s.start < w.end && w.end - s.start <= maxShift) { offset = s.start; break; }
+      if (s.start > w.start + 0.05 && s.start < w.end && (w.end - s.start <= maxShift || s.end - s.start >= longPause)) { offset = s.start; break; }
       if (s.start >= w.end && s.start < nextStart && s.start - w.end <= maxShift) { offset = s.start; break; }
     }
     if (offset !== null) {

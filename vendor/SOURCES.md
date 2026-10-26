@@ -14,13 +14,23 @@ root `LICENSE`.
 | `heygen-com/hyperframes` | `d4dd6c097d22ca890c0eea401eaebf550ce10fae` (2026-10-11) | Apache-2.0 | `skills/embedded-captions`, `skills/talking-head-recut`, `skills/hyperframes/references/brief-contract.md` | `.claude/skills/embedded-captions/`, `.claude/skills/talking-head-recut/` |
 | `LottieFiles/motion-design-skill` | `f9a8a041b85185ee4881b3471d3415e939aac772` (2026-05-18) | MIT | `skills/motion-design` → renamed `motion-principles` | `.claude/skills/motion-principles/` |
 | `charlie947/motion-graphics-skills` | `229022ebca76972e119e36ada23a1648d51665ab` (2026-10-11) | MIT | `skills/reel-export` | `.claude/skills/reel-export/` |
+| `aiwithremy/content-principles` | `18f96703c98763b9c3bd647a46f2e031bda4a29d` (2026-10-13) | none (no `LICENSE`) | Ideas only, retold in Russian in our own words; no text copied, not installed as a skill | `.claude/skills/reel-remake/references/script-principles.md` |
 | `whaleyxbt/claude-motion` | `e627941543d9988b155dc610bb9cc0115a5e365e` (2026-10-09) | MIT | Text of the `review-loop` checklist and `sound-design` rules, adapted (not installed as skills) | `.claude/skills/vladilen-reels/references/` |
+| `Clipwing/skills` | `edbefcbc3474869e6cc1e8a7ca583b0efd0dab7e` (2026-10-21) | MIT per `skills/real-sfx/README.md` § Licences (no root `LICENSE`); uisfx sounds CC0 | `skills/real-sfx` (Real SFX: real recorded SFX placed on the exact frame) | `.claude/skills/real-sfx/` (its `vendor/node_modules/uisfx`, `config.json`, `library_index.json` stay local) |
+| `Leonxlnx/earshot` | `591fa3e028032e6dce56620a20e932e35667e8d8` (2026-10-22) | MIT | CLI in its own venv: `sfx render` / `sfx check` for the brand kit, `timeline` for the sound-to-cut check | `tools/earshot/` (gitignored; Python 3.12 venv via `uv`) |
 
 Copyright notices: Nate Herk (2026), Bart (2026), HeyGen (Apache-2.0, see
 `.claude/skills/talking-head-recut/NOTICE.md`), LottieFiles (2025), Charlie Hills
 (2026), whaleyxbt (2026).
 
 ## How each was installed
+
+- **earshot.** `git clone --depth 1` into `tools/earshot`, then `uv venv --python 3.12 .venv`,
+  `uv pip install torch --index-url https://download.pytorch.org/whl/cpu`, `uv pip install -e ".[mcp]"`.
+  `sfx`/`kit`/`measure` need no models; `timeline`, `describe`, `match` download them on first use.
+- **Real SFX.** Copied `skills/real-sfx` from a shallow clone (`tools/clipwing-skills`), then
+  `python3 scripts/setup.py init --library main=<repo>/brand/sfx/library --index` from the skill folder.
+  Library: CC0 Freesound recordings fetched from Openverse by `scripts/ru/sfx-fetch.mjs`.
 
 - **Chassis.** The repo is ~420 MB, almost all of it finished example MP4s. On a
   slow link a full clone was impractical, so it was fetched with
@@ -51,6 +61,7 @@ Copyright notices: Nate Herk (2026), Bart (2026), HeyGen (Apache-2.0, see
 | `.claude/skills/cut-mistakes/SKILL.md` | Documents the language config, new types and the "read the whole transcript anyway" rule | |
 | `.claude/skills/motion-broll/scripts/words.py` | Also accepts a word-level JSON transcript and prints exact word times | SPEC §3.5: no ±0.2 s SRT estimate |
 | `.claude/skills/motion-broll/engine/beats.js` | Resizes the viewport to the clip's stage before screenshots; tiles 360 px wide for vertical clips | Was fixed at 1920×1080, so 1080×1920 sheets lost the bottom 840 px |
+| `.claude/skills/motion-broll/engine/render.js`, `beats.js` | After `document.fonts.ready` also await `window.READY` when a clip sets it | The screen kit (`scripts/ru/broll/screen-kit.js`) preloads screenshots and recording frames; the first seek must not draw an empty window |
 | `.claude/skills/motion-broll/scripts/make_pages.py` | The on-black web preview of a `.mov` panel uses the clip's own size | Was fixed at 1920×1080 |
 | `.claude/skills/reel-export/SKILL.md` | Added `setparams=range=tv:colorspace=bt709:color_primaries=bt709:color_trc=bt709` to the encode filter chain | With ffmpeg 8.1 the original command writes `color_primaries`/`color_trc` as unknown; verified with ffprobe |
 
