@@ -176,6 +176,11 @@ test("object scene: «перестройка» moves an item and its link follow
     assert.ok(await c.at(2.5, linkY) < await c.at(0.9, linkY) - 120, "the link starts under the moved agent");
     const vis = (id) => { const s = getComputedStyle(document.getElementById(id)); return s.display !== "none" && +s.opacity > 0.5; };
     assert.equal(await c.at(3.5, vis, "ok-item-b"), false, "b left on tout");
+    const away = (id) => { const s = getComputedStyle(document.getElementById(id)); return s.display === "none" || +s.opacity < 0.05; };
+    assert.equal(await c.at(3.5, away, "ok-link-0"), true, "the link to b leaves with b");
+    assert.equal(await c.at(3.5, away, "ok-ret-0"), true, "so does the return arrow from b");
+    assert.equal(await c.at(3.5, away, "ok-ret-head-0"), true, "and its head");
+    assert.equal(await c.at(3.5, away, "ok-ret-1"), false, "the arrow from c stays");
     assert.equal(await c.at(0.4, vis, "ok-co-0"), false, "the plate waits for its word");
     assert.equal(await c.at(1.3, vis, "ok-co-0"), true);
     assert.equal(await c.at(1.3, () => document.getElementById("ok-co-0").textContent), "whoosh");

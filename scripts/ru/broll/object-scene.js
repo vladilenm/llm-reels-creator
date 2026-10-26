@@ -97,7 +97,7 @@ OK.run = (cfg) => {
   const geoTrack = (it) => {
     const ks = [{t: -1e9, v: [it.x, it.y, it.size], d: 0}];
     for (const [t, o, d] of (it.keys || []).slice().sort((a, b) => a[0] - b[0])) {
-      const p = ks[ks.length - 1].v; ks.push({t, v: [o.x ?? p[0], o.y ?? p[1], o.size ?? p[2]], d: d ?? 0.7});
+      const p = ks[ks.length - 1].v; ks.push({t, v: [o.x ?? p[0], o.y ?? p[1], o.size ?? p[2]], d: Math.max(1e-3, d ?? 0.7)});
     }
     return (t) => {
       let v = ks[0].v;
@@ -138,6 +138,7 @@ OK.run = (cfg) => {
     return (I.at = {x, y, k, size});
   };
   const centre = (I) => [I.at.x, I.at.y + (I.O.vb[1] + I.O.vb[3] / 2) * I.at.k];
+  const need = (id, what) => { if (!items[id]) throw new Error(`OK: ${what} → unknown item ${id}`); return items[id]; };
 
   // links («дерево и связи»): an elbow from under the parent (below its label) to the top of the child; the path
   // follows items that move
@@ -148,6 +149,7 @@ OK.run = (cfg) => {
     return `M${r(x1)},${r(y1)} V${r(ym)} H${r(x2)} V${r(y2)}`;
   };
   const links = (cfg.links || []).map((L, n) => {
+    need(L.from, `links[${n}].from`); need(L.to, `links[${n}].to`);
     const p = document.createElementNS(NS, 'path'); p.id = 'ok-link-' + n;
     for (const [key, v] of Object.entries({fill: 'none', stroke: TH.line, 'stroke-width': 3, 'stroke-linecap': 'round'})) p.setAttribute(key, v);
     lsvg.appendChild(p);
@@ -164,6 +166,7 @@ OK.run = (cfg) => {
 
   // callouts («выноски»): a dot on the point, a dotted elbow, a glass plate with a mono label; one per word
   const callouts = (cfg.callouts || []).map((c, n) => {
+    if (typeof c.at === 'string') need(c.at, `callouts[${n}].at`);
     const p = document.createElementNS(NS, 'path'); p.id = 'ok-co-line-' + n;
     for (const [key, v] of Object.entries({fill: 'none', stroke: TH.line, 'stroke-width': 3, 'stroke-linecap': 'round', 'stroke-dasharray': '1 10'})) p.setAttribute(key, v);
     const m = document.createElementNS(NS, 'mask'); m.id = 'okcm' + n; m.setAttribute('maskUnits', 'userSpaceOnUse');
@@ -178,7 +181,9 @@ OK.run = (cfg) => {
   });
 
   // returns («возврат»): curved arrows from items back to the one the scene started with, one after another
+  if (cfg.returns) need(cfg.returns.to, 'returns.to');
   const returns = (cfg.returns?.from || []).map((id, n) => {
+    need(id, `returns.from[${n}]`);
     const p = document.createElementNS(NS, 'path'); p.id = 'ok-ret-' + n;
     for (const [key, v] of Object.entries({fill: 'none', stroke: TH.on, 'stroke-width': 3, 'stroke-linecap': 'round'})) p.setAttribute(key, v);
     const head = document.createElementNS(NS, 'polygon'); head.id = 'ok-ret-head-' + n; head.setAttribute('fill', TH.on);
@@ -244,6 +249,7 @@ OK.run = (cfg) => {
     for (const I of Object.values(items)) place(I, t);
     for (const I of Object.values(items)) {
       const it = I.it, a = t - it.tin, gone = it.tout == null ? 0 : ex((t - it.tout) / 0.35);
+      I.gone = gone;                                  // links and arrows to a departed item leave with it
       const show = a >= 0 && gone < 0.999;
       for (const e of [I.svg, I.lb, I.ck]) if (e) e.style.display = show ? '' : 'none';
       if (!show) continue;
@@ -275,8 +281,10 @@ OK.run = (cfg) => {
       L.p.style.display = '';
       const d = linkD(L.L);
       if (d !== L.d) { L.p.setAttribute('d', d); if (L.drawn !== L.p) L.drawn.setAttribute('d', d); L.len = L.p.getTotalLength(); L.drawn.style.strokeDasharray = L.len; L.d = d; }
-      L.p.style.display = t < L.L.tin ? 'none' : '';
+      const lg = Math.max(items[L.L.from].gone, items[L.L.to].gone);
+      L.p.style.display = t < L.L.tin || lg >= 0.999 ? 'none' : '';
       L.drawn.style.strokeDashoffset = (L.len * (1 - ex((t - L.L.tin) / (L.L.dur ?? 0.5)))).toFixed(2);
+      L.p.style.opacity = (1 - lg).toFixed(3);
     }
 
     for (const C of callouts) {
@@ -301,7 +309,8 @@ OK.run = (cfg) => {
     if (cfg.returns) {
       const R = cfg.returns, To = items[R.to], [bx, by] = centre(To), out = R.tout == null ? 0 : clamp((t - R.tout) / 0.3);
       for (const r of returns) {
-        const I = items[r.id], [ax, ay] = centre(I), a = t - (R.t + r.n * (R.gap ?? 0.12)), on = a >= 0 && out < 1;
+        const I = items[r.id], [ax, ay] = centre(I), a = t - (R.t + r.n * (R.gap ?? 0.12)), lg = Math.max(I.gone, To.gone);
+        const on = a >= 0 && out < 1 && lg < 0.999;
         r.p.style.display = on ? '' : 'none'; r.head.style.display = on ? '' : 'none';
         if (!on) continue;
         const L = Math.hypot(bx - ax, by - ay) || 1, ux = (bx - ax) / L, uy = (by - ay) / L;
@@ -314,8 +323,8 @@ OK.run = (cfg) => {
         r.p.style.strokeDashoffset = (r.len * (1 - u)).toFixed(2);
         const hl = Math.hypot(tx - qx, ty - qy) || 1, hx = (tx - qx) / hl, hy = (ty - qy) / hl;
         r.head.setAttribute('points', [[tx, ty], [tx - hx * 16 - hy * 9, ty - hy * 16 + hx * 9], [tx - hx * 16 + hy * 9, ty - hy * 16 - hx * 9]].map((p) => p.map((v) => v.toFixed(1)).join(',')).join(' '));
-        r.head.style.opacity = (clamp((u - 0.85) / 0.15) * (1 - out)).toFixed(3);
-        r.p.style.opacity = (1 - out).toFixed(3);
+        r.head.style.opacity = (clamp((u - 0.85) / 0.15) * (1 - out) * (1 - lg)).toFixed(3);
+        r.p.style.opacity = ((1 - out) * (1 - lg)).toFixed(3);
       }
     }
 
