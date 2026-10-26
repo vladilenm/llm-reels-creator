@@ -381,6 +381,8 @@ test("music-pick: mood, a tempo for the speech, never the previous reel's track;
   assert.equal(fx.sound.music.src, "brand/music/calm-b.mp3");
   assert.equal(fx.sound.music.start, "auto");
   assert.equal(fx.sound.music.credit, tracks[2].credit);
+  assert.equal(fx.sound.music.level_db, -13);
+  assert.equal(fx.sound.music.duck_db, -5);
   assert.equal(applyPick({}, tracks[4]).sound.music.bpm, 90);
   const d = tmp(), cap = join(d, "CAPTION.md");
   writeFileSync(cap, "Текст\n");

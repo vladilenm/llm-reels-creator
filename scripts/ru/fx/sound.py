@@ -5,6 +5,7 @@
 #   python3 scripts/ru/fx/sound.py <project> --plan [--music f] [--bpm n] [--variant B]
 #   →  work/sound/music[.B].wav only: the music aligned to the clean timeline (ducked, stops) — for sfx_real.py
 #   --sfx fx/sfx.B.wav   mix this SFX track (an sfx_real.py variant) instead of "sound.sfx"
+#   --level -13 --duck -5   override sound.music level_db / duck_db for this run
 #
 # numpy + ffmpeg only (system python3). Settings live in <project>/fx/fx.json under "sound":
 #   voice:     {chain: "default" | "off" | "<ffmpeg -af string>", denoise: "auto" | true | false}
@@ -315,6 +316,8 @@ def main():
     mc = dict(cfg.get("music", {}))
     if opt("--music"): mc["src"] = opt("--music")
     if opt("--bpm"): mc["bpm"] = float(opt("--bpm"))
+    if opt("--level"): mc["level_db"] = float(opt("--level"))
+    if opt("--duck"): mc["duck_db"] = float(opt("--duck"))
     if "--no-music" in a: mc = {}
     var = opt("--variant"); suf = f".{var}" if var else ""
     tr = json.load(open(os.path.join(P, "transcript.clean.json")))

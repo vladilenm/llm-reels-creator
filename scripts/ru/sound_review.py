@@ -26,7 +26,7 @@ import sound as S                                    # decode, fit, db, smooth_g
 
 ROOT = os.path.abspath(os.path.join(HERE, "..", ".."))
 REAL_SFX = os.path.join(ROOT, ".claude", "skills", "real-sfx")
-LEVEL_DB, DUCK_DB, EXCERPT_S = -17.0, -9.0, 25.0
+LEVEL_DB, DUCK_DB, EXCERPT_S = -13.0, -5.0, 25.0     # music-pick.mjs LEVEL
 DEFAULT_REEL = os.path.join(ROOT, "video-projects", "2026-10-25-understand-anything")
 
 

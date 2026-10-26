@@ -38,9 +38,13 @@ export function pickTrack(tracks, { wps, mood = null }) {
   return [...pool].sort((a, b) => score(b) - score(a) || at(a).localeCompare(at(b)) || a.file.localeCompare(b.file))[0];
 }
 
+// The brand music level (customer, 2026-10-26: live tracks at −17 / −9 were «оооочень тихо»): −13 dB against the
+// voice between phrases, −18 dB under speech. A new track replaces the old one's tuned levels; stops stay.
+export const LEVEL = { level_db: -13, duck_db: -5 };
+
 export function applyPick(fx, track) {
   const prev = fx.sound?.music ?? {};
-  fx.sound = { ...(fx.sound ?? {}), music: { level_db: -17, duck_db: -9, fade_out: 1.2, ...prev, start: "auto",
+  fx.sound = { ...(fx.sound ?? {}), music: { fade_out: 1.2, ...prev, ...LEVEL, start: "auto",
     src: `brand/music/${track.file}`, bpm: track.bpm ?? 90, credit: track.credit ?? null } };
   return fx;
 }
