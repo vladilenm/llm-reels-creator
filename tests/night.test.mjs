@@ -1101,3 +1101,45 @@ test("night_base: a back clip lies behind the speaker, a missing back file stops
   assert.notEqual(r.status, 0);
   assert.match(r.stderr, /нет файлов back-клипов: broll\/back\.mov/);
 });
+
+// ---------- assemble: финиш кадра ----------
+
+function patch(get, x, y, r = 2) {
+  const v = [];
+  for (let j = -r; j <= r; j++) for (let i = -r; i <= r; i++) { const p = get(x + i, y + j); v.push((p[0] + p[1] + p[2]) / 3); }
+  const mean = v.reduce((a, b) => a + b) / v.length;
+  return { mean, std: Math.sqrt(v.reduce((a, b) => a + (b - mean) ** 2, 0) / v.length) };
+}
+
+test("assemble cine finish: glow on night clips only while they play, none on light ones; vignette and grain only with cine; captions stay clean on top", { timeout: 180000 }, async () => {
+  const P = tmp("fin-");
+  for (const d of ["assets", "renders/kit", "broll", "work", "fx"]) mkdirSync(join(P, d), { recursive: true });
+  ff("-f", "lavfi", "-i", "color=c=0x808080:s=1080x1920:r=25:d=1", "-c:v", "libx264", "-pix_fmt", "yuv420p", join(P, "renders/picture.mp4"));
+  ff("-f", "lavfi", "-i", "color=c=black@0.0:s=1080x1920:r=25:d=0.4,format=rgba,drawbox=x=500:y=900:w=80:h=80:color=white@1:t=fill:replace=1",
+    "-c:v", "prores_ks", "-profile:v", "4", "-pix_fmt", "yuva444p10le", join(P, "broll/sq.mov"));
+  ff("-f", "lavfi", "-i", "color=c=black@0.0:s=1080x1920:r=25:d=1,format=rgba,drawbox=x=100:y=100:w=200:h=100:color=white@1:t=fill:replace=1",
+    "-c:v", "prores_ks", "-profile:v", "4", "-pix_fmt", "yuva444p10le", join(P, "renders/kit/captions.mov"));
+  const { composite } = await import(new URL("../scripts/ru/assemble.mjs", import.meta.url));
+  const run = (name, fx, theme) => {
+    writeFileSync(join(P, "broll/plan.json"), JSON.stringify({ video: "../renders/picture.mp4",
+      clips: [{ id: "sq", in: 0.4, out: 0.8, kind: "panel", file: "sq.mov", ...(theme ? { theme } : {}) }] }));
+    if (fx) writeFileSync(join(P, "fx/fx.json"), JSON.stringify(fx)); else rmSync(join(P, "fx/fx.json"), { force: true });
+    const out = join(P, `work/${name}.mov`);
+    composite(P, out);
+    return (n) => frameRGB(out, n);
+  };
+  const A = run("plain"), B = run("cine", { cine: true }), C = run("light", { cine: true }, "light");
+  const a5 = A(5), a15 = A(15), b5 = B(5), b15 = B(15), c15 = C(15);
+  assert.ok(patch(b15, 586, 940).mean > patch(a15, 586, 940).mean + 15, "glow next to the square while the clip plays");
+  assert.ok(Math.abs(patch(b5, 586, 940).mean - patch(a5, 586, 940).mean) < 5, "no glow before the clip");
+  assert.ok(Math.abs(patch(c15, 586, 940).mean - patch(a15, 586, 940).mean) < 6, "a light clip gets no glow");
+  assert.ok(patch(b5, 40, 40, 4).mean < patch(b5, 540, 960, 4).mean - 20, "vignette with cine");
+  assert.ok(Math.abs(patch(b5, 540, 960, 4).mean - patch(a5, 540, 960, 4).mean) < 2, "levels unchanged by the finish where the vignette is ~1");
+  assert.ok(Math.abs(patch(a5, 40, 40, 4).mean - patch(a5, 540, 960, 4).mean) < 3, "no vignette without cine");
+  assert.ok(patch(b5, 540, 700, 10).std > 1.2, "grain with cine");
+  assert.ok(patch(a5, 540, 700, 10).std < 0.8, "no grain without cine");
+  const cap = patch(b5, 200, 150, 3);
+  assert.ok(cap.mean > 248 && cap.std < 1.5, `captions over the finish stay clean ${cap.mean} ${cap.std}`);
+  writeFileSync(join(P, "fx/fx.json"), "{ nope");
+  assert.throws(() => composite(P, join(P, "work/x.mov")), /fx\/fx\.json: /);
+});

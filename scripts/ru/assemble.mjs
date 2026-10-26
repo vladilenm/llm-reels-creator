@@ -42,6 +42,18 @@ export function loadPlan(project) {
 // Clips over the speaker. "layer": "back" clips are already in the base, behind the speaker (night_base.py).
 export const frontClips = (clips = []) => clips.filter((c) => c.layer !== "back");
 
+// fx/fx.json "cine": true — the frame finish (docs/superpowers/specs/2026-10-26-night-cine-slice-design.md): night clips
+// get a soft glow (a blurred copy screened over them), the whole frame a vignette and grain; captions go on top, clean.
+export const GLOW = { sigma: 10, opacity: 0.7 };
+export const FINISH = { vignette: "PI/8", grain: 5, seed: 7 };
+
+export function readCine(project) {
+  const p = join(project, "fx/fx.json");
+  if (!existsSync(p)) return false;
+  try { return JSON.parse(readFileSync(p, "utf8")).cine === true; }
+  catch (e) { throw new Error(`fx/fx.json: ${e.message}`); }
+}
+
 // One ffmpeg pass: base video, then each clip overlaid in its window, then captions.
 // Base picture: broll/plan.json `video` (relative to broll/, e.g. a renders/picture.mp4
 // with edit effects and SFX baked in), else renders/clean.mp4. Its audio is the mix.
@@ -56,21 +68,40 @@ export function composite(project, out, { scale = 1, video } = {}) {
   const plan = loadPlan(project);
   const clean = basePicture(project, plan, video);
   const clips = frontClips(plan.clips);
+  const cine = readCine(project);
   const captions = join(project, "renders/kit/captions.mov");
   const inputs = [clean, ...clips.map((c) => c.path), ...(existsSync(captions) ? [captions] : [])];
   const W = Math.round(1080 * scale), H = Math.round(1920 * scale);
   const f = [`[0:v]scale=${W}:${H},setsar=1,format=yuva444p[b0]`];
   let last = "b0";
   clips.forEach((c, i) => {
-    const k = i + 1;
-    f.push(`[${k}:v]scale=${W}:${H},format=yuva444p,tpad=stop_mode=clone:stop_duration=30,setpts=PTS-STARTPTS+${c.in}/TB[c${k}]`);
-    f.push(`[${last}][c${k}]overlay=0:0:enable='between(t,${c.in},${c.out})':eof_action=pass[b${k}]`);
+    const k = i + 1, en = `enable='between(t,${c.in},${c.out})'`;
+    const src = `[${k}:v]scale=${W}:${H},format=yuva444p,tpad=stop_mode=clone:stop_duration=30`;
+    if (!(cine && c.theme !== "light" && c.glow !== false)) {
+      f.push(`${src},setpts=PTS-STARTPTS+${c.in}/TB[c${k}]`);
+      f.push(`[${last}][c${k}]overlay=0:0:${en}:eof_action=pass[b${k}]`);
+    } else {
+      // glow: the clip blurred (alpha premultiplied, black where it is empty), padded with black up to its start,
+      // screened over the frame while the clip plays; shortest=1 keeps the base's length.
+      // overlay's default output is 4:2:0; going yuva420p -> gbrp -> yuva444p shifts every level by 2-3, so the
+      // overlay keeps 4:4:4 here (the frame without cine and the frame with it then match to about a level)
+      f.push(`${src},split[s${k}][h${k}]`, `[s${k}]setpts=PTS-STARTPTS+${c.in}/TB[c${k}]`,
+        `[h${k}]format=gbrap,premultiply=inplace=1,format=gbrp,gblur=sigma=${+(GLOW.sigma * scale).toFixed(2)},setpts=PTS-STARTPTS,tpad=start_duration=${c.in}:color=black[g${k}]`,
+        `[${last}][c${k}]overlay=0:0:${en}:eof_action=pass:format=yuv444,format=gbrp[o${k}]`,
+        `[o${k}][g${k}]blend=all_mode=screen:all_opacity=${GLOW.opacity}:shortest=1:${en},format=yuva444p[b${k}]`);
+    }
     last = `b${k}`;
   });
+  if (cine) {
+    f.push(`[${last}]format=yuv444p,vignette=angle=${FINISH.vignette},noise=c0s=${FINISH.grain}:c0f=t:all_seed=${FINISH.seed},format=yuva444p[fin]`);
+    last = "fin";
+  }
   if (existsSync(captions)) {
     const k = inputs.length - 1;
     f.push(`[${k}:v]scale=${W}:${H},format=yuva444p[cap]`);
-    f.push(`[${last}][cap]overlay=0:0:eof_action=pass[bc]`);
+    // with the glow in the graph ffmpeg's 4:2:0 overlay would scale the captions' white down to ~233 (a range quirk):
+    // under cine the captions go on in 4:4:4
+    f.push(`[${last}][cap]overlay=0:0:eof_action=pass${cine ? ":format=yuv444" : ""}[bc]`);
     last = "bc";
   }
   f.push(`[${last}]format=yuv420p[v]`);
