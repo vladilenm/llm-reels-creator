@@ -119,7 +119,7 @@ OK.run = (cfg) => {
   // links («дерево и связи»)
   const links = (cfg.links || []).map((L, n) => {
     const a = items[L.from], b = items[L.to];
-    const x1 = a.it.x, y1 = a.it.y + 30, x2 = b.it.x, y2 = b.it.y + b.O.vb[1] * b.k - 16, ym = (y1 + y2) / 2;
+    const x1 = a.it.x, y1 = a.it.y + (a.it.label ? (a.it.label.dy ?? 44) + 44 : 30), x2 = b.it.x, y2 = b.it.y + b.O.vb[1] * b.k - 16, ym = (y1 + y2) / 2;
     const p = document.createElementNS(NS, 'path'); p.id = 'ok-link-' + n;
     for (const [key, v] of Object.entries({d: `M${x1},${y1} V${ym} H${x2} V${y2}`, fill: 'none', stroke: TH.line, 'stroke-width': 3, 'stroke-linecap': 'round'})) p.setAttribute(key, v);
     lsvg.appendChild(p);
@@ -158,6 +158,7 @@ OK.run = (cfg) => {
   let term = null;
   if (cfg.terminal) {
     const c = cfg.terminal, box = el('a okterm', root, 'div', 'ok-term');
+    root.insertBefore(box, scene);                                    // objects draw above the terminal
     Object.assign(box.style, {left: c.x + 'px', top: c.y + 'px', width: c.w + 'px', height: c.h + 'px', color: TH.ink,
       background: theme === 'night' ? 'rgba(24,18,38,.94)' : '#FFFFFF',
       boxShadow: `0 0 0 2px rgba(${TH.glow},.45),0 0 40px 2px rgba(124,58,237,.22)`});
@@ -178,7 +179,7 @@ OK.run = (cfg) => {
       grid.style.transform = `translateY(${(-t * 6).toFixed(1)}px) scale(${(1 + ((z?.[2] ?? 1) - 1) * u).toFixed(4)})`;
       if (z) glow.style.opacity = (0.7 + 0.3 * Math.sin(Math.PI * clamp((t - z[0]) / 0.8))).toFixed(3);
     }
-    if (flip && cfg.bg?.flip) { const [a, d] = cfg.bg.flip; flip.style.clipPath = `inset(0 ${(100 - 100 * eio((t - a) / d)).toFixed(2)}% 0 0)`; }
+    if (flip && cfg.bg?.flip) { const [a, d] = cfg.bg.flip; flip.style.clipPath = `inset(0 ${(100 - 100 * ex((t - a) / d)).toFixed(2)}% 0 0)`; }
 
     for (const c of chapter) {
       const on = t >= c.s.t - 1e-6 && (c.end == null || t < c.end);

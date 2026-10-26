@@ -96,6 +96,7 @@ test("object scene: ghost → glass, the label lights with the active item, link
     assert.equal(await c.at(2.0, col, "db"), "rgb(183, 156, 255)");
     assert.ok(+(await c.at(1.8, () => document.getElementById("ok-check-db").style.opacity)) > 0.9);
     assert.ok(parseFloat(await c.at(1.3, () => document.getElementById("ok-link-0").style.strokeDashoffset)) < 1);
+    assert.match(await c.at(1.3, () => document.getElementById("ok-link-0").getAttribute("d")), /^M540,588 /);
     const idx = () => document.getElementById("ok-idx").textContent;
     assert.ok((await c.at(0.2, idx)).length < "01 — тест".length);
     assert.equal(await c.at(1.0, idx), "01 — тест");
@@ -114,7 +115,7 @@ test("object scene full: light canvas wipes over the night, counter counts, obje
   try {
     assert.equal(await c.at(0, () => getComputedStyle(document.getElementById("stage")).backgroundColor), "rgb(14, 11, 20)");
     const flip = () => +/inset\(0(?:px)? ([\d.]+)%/.exec(document.getElementById("ok-flip").style.clipPath)[1];
-    assert.ok(await c.at(0.05, flip) > 50);
+    assert.ok(await c.at(0.02, flip) > 50);
     assert.ok(await c.at(0.6, flip) < 1);
     assert.equal((await c.at(1.2, () => document.getElementById("ok-count").firstChild.textContent)).replace(/\s/g, ""), "5220123");
     assert.equal(await c.at(1.2, () => getComputedStyle(document.querySelector("#ok-item-db polygon, #ok-item-db path")).stroke), "rgb(23, 20, 28)");
@@ -136,6 +137,7 @@ test("object scene terminal: the command types, output lines arrive on their wor
     const strike = () => +document.querySelector('#ok-item-k [data-p="strike"]').style.strokeDashoffset;
     assert.ok(await c.at(1.9, strike) > 0.95);
     assert.ok(await c.at(2.8, strike) < 0.1);
+    assert.ok(await c.at(1.6, () => !!(document.getElementById("ok-term").compareDocumentPosition(document.getElementById("ok-scene")) & Node.DOCUMENT_POSITION_FOLLOWING)), "scene above the terminal");
     assert.deepEqual(c.errors, []);
   } finally { await c.browser.close(); }
 });
