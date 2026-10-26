@@ -31,10 +31,13 @@ DEFAULT_REEL = os.path.join(ROOT, "video-projects", "2026-10-25-understand-anyth
 
 # ---------- audio ----------
 
-def write_audio(path, x):
+def write_audio(path, x, reel_loudness=False):
+    """reel_loudness: −14 LUFS like the exported reel (export-reel.mjs) — the clean voice sits ~11 dB lower, and the
+    music under it would drop out of hearing on the page while it is audible in the reel."""
     x = x if x.ndim == 2 else np.stack([x, x], 1)
     codec = ["-c:a", "libmp3lame", "-b:a", "192k"] if path.endswith(".mp3") else ["-c:a", "pcm_s16le"]
-    r = subprocess.run(["ffmpeg", "-v", "error", "-y", "-f", "f32le", "-ac", "2", "-ar", str(S.SR), "-i", "-", *codec, path],
+    af = ["-af", f"loudnorm=I=-14:TP=-1.5:LRA=11,aresample={S.SR}"] if reel_loudness else []
+    r = subprocess.run(["ffmpeg", "-v", "error", "-y", "-f", "f32le", "-ac", "2", "-ar", str(S.SR), "-i", "-", *af, *codec, path],
                        input=np.clip(x, -1, 1).astype("<f4").tobytes(), capture_output=True)
     if r.returncode != 0: raise RuntimeError(r.stderr.decode()[-300:])
 
@@ -98,7 +101,7 @@ def build_music(out, mdir, voice, speech):
         x = fades(S.fit(S.decode(src, ss=m.get("excerpt_start") or None), len(voice)))
         x = x * 10 ** ((-16 - rms_db(x)) / 20)
         write_audio(os.path.join(out, "music", f"{i}.clean.mp3"), x)
-        write_audio(os.path.join(out, "music", f"{i}.voice.mp3"), under_voice(voice, speech, x))
+        write_audio(os.path.join(out, "music", f"{i}.voice.mp3"), under_voice(voice, speech, x), reel_loudness=True)
         items.append({"section": "music", "id": i, "title": f"{c.get('title', i)} — {c.get('creator', '')}",
                       "meta": f"{', '.join(c.get('mood', []))} · {m.get('bpm') or 'без бита'} BPM · {c.get('license_name', c.get('license', ''))}",
                       "audio": [["Музыка", f"a/music/{i}.clean.mp3"], ["Под голосом", f"a/music/{i}.voice.mp3"]]})
@@ -163,7 +166,7 @@ def build_signature(out, lib, reel, swap_t):
         write_audio(os.path.join(d, f"{name}.mp3"), alone * (10 ** (-3 / 20) / (np.abs(alone).max() + 1e-9)))
         sig = render_layers(layers, len(voice), t_in)
         sig *= 10 ** ((S.db(np.abs(voice).max()) - 9) / 20) / (np.abs(sig).max() + 1e-9)
-        write_audio(os.path.join(d, f"{name}.context.mp3"), voice + sig)
+        write_audio(os.path.join(d, f"{name}.context.mp3"), voice + sig, reel_loudness=True)
         items.append({"section": "signature", "id": name, "title": f"Вариант {name}: {NAMES[name]}",
                       "audio": [["Отдельно", f"a/signature/{name}.mp3"], ["На смене фона", f"a/signature/{name}.context.mp3"]]})
     return items
