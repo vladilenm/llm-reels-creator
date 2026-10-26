@@ -10,6 +10,7 @@ import { searchUrl, creditLine, licenseName, download } from "../scripts/ru/lib/
 import { selectMusic, MOODS } from "../scripts/ru/music-fetch.mjs";
 import { PALETTE, selectSfx, folderFor } from "../scripts/ru/lib/sfx-palette.mjs";
 import { haveIds, migrateLegacy } from "../scripts/ru/sfx-fetch.mjs";
+import { wordsPerSecond, tempoOk, pickTrack, applyPick, addCredit } from "../scripts/ru/music-pick.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const tmp = (p = "snd-") => mkdtempSync(join(tmpdir(), p));
@@ -346,4 +347,34 @@ test("sfx_real --dry writes the kept and dropped events without running Real SFX
   r = spawnSync("python3", ["scripts/ru/fx/sfx.py", P], { cwd: ROOT, encoding: "utf8" });
   assert.equal(r.status, 2);
   assert.match(r.stdout + r.stderr, /sfx_real\.py/);
+});
+
+// ---------- reel: music-pick ----------
+
+test("music-pick: mood, a tempo for the speech, never the previous reel's track; CC BY credit once", () => {
+  const tracks = [
+    { file: "generated-lofi-106.wav", mood: ["lo-fi"], bpm: 106 },
+    { file: "calm-a.mp3", mood: ["спокойный"], bpm: 92, last_used: { at: "2026-10-26T10:00:00Z", reel: "r1" } },
+    { file: "calm-b.mp3", mood: ["спокойный"], bpm: 96, credit: "Музыка: «B» — Ann (CC BY 4.0)" },
+    { file: "fast.mp3", mood: ["бодрый"], bpm: 122 },
+    { file: "pad.mp3", mood: ["кинематографичный"], bpm: null },
+  ];
+  assert.equal(pickTrack(tracks, { wps: 3.2, mood: "спокойный" }).file, "calm-b.mp3");
+  assert.equal(pickTrack(tracks, { wps: 2.4, mood: "бодрый" }).file, "fast.mp3");
+  assert.equal(pickTrack([tracks[0]], { wps: 3 }).file, "generated-lofi-106.wav");
+  assert.equal(pickTrack([], { wps: 3 }), null);
+  assert.ok(tempoOk(null, 3.5) && !tempoOk(122, 3.1) && tempoOk(98, 2.8));
+  assert.equal(wordsPerSecond({ audio_duration_secs: 10, words: [{ text: "a" }, { text: "b", type: "spacing" }, { text: "c" }] }), 0.2);
+  const fx = applyPick({ sound: { music: { src: "old.wav", stops: [{ word: "x" }], start: 3.2 } } }, tracks[2]);
+  assert.deepEqual(fx.sound.music.stops, [{ word: "x" }]);
+  assert.equal(fx.sound.music.src, "brand/music/calm-b.mp3");
+  assert.equal(fx.sound.music.start, "auto");
+  assert.equal(fx.sound.music.credit, tracks[2].credit);
+  assert.equal(applyPick({}, tracks[4]).sound.music.bpm, 90);
+  const d = tmp(), cap = join(d, "CAPTION.md");
+  writeFileSync(cap, "Текст\n");
+  assert.ok(addCredit(cap, tracks[2].credit));
+  assert.ok(!addCredit(cap, tracks[2].credit));
+  assert.equal(readFileSync(cap, "utf8"), `Текст\n\n${tracks[2].credit}\n`);
+  assert.ok(!addCredit(cap, null));
 });
