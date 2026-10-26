@@ -163,3 +163,67 @@ test("sfx_screen: clipped, hissy and wrong-length files go to rejected/, the bes
   const credits = JSON.parse(readFileSync(join(lib, "credits.json"), "utf8"));
   assert.ok("brand/sfx/rejected/click/clipped.wav" in credits, Object.keys(credits).join(", "));
 });
+
+// ---------- library: review page ----------
+
+function reviewFixture() {
+  const d = tmp("rev-"), mdir = join(d, "music"), cand = join(mdir, "candidates"), lib = join(d, "sfx", "library"), reel = join(d, "reel");
+  for (const p of [cand, join(reel, "renders"), ...["whoosh", "subdrop", "chime", "riser", "click"].map((f) => join(lib, f))]) mkdirSync(p, { recursive: true });
+  ff("-f", "lavfi", "-i", `aevalsrc=${BEAT}:s=22050:d=40`, join(cand, "m1.wav"));
+  writeFileSync(join(cand, "candidates.json"), JSON.stringify({ m1: { file: join(cand, "m1.wav"), title: "Calm </script>", creator: "Ann",
+    license: "by", license_name: "CC BY 4.0", credit: "Музыка: «Calm» — Ann (CC BY 4.0)", mood: ["спокойный"], source: "jamendo",
+    page: "https://x/1", url: `file://${join(cand, "m1.wav")}` } }));
+  writeFileSync(join(cand, "screen.json"), JSON.stringify({ m1: { status: "pass", score: -3, bpm: 100, excerpt_start: 2, reasons: [] } }));
+  const sfx = { "whoosh/w.wav": "0.5*sin(2*PI*900*t)*sin(PI*t/0.6)", "subdrop/s.wav": "0.8*sin(2*PI*50*t)*exp(-4*t)",
+    "chime/c.wav": "0.4*sin(2*PI*2000*t)*exp(-3*t)", "riser/r.wav": "0.4*sin(2*PI*600*t)*t/1.5", "click/k.wav": "0.8*sin(2*PI*3000*t)*exp(-200*t)" };
+  const dur = { "whoosh/w.wav": 0.6, "subdrop/s.wav": 1.2, "chime/c.wav": 1.0, "riser/r.wav": 1.5, "click/k.wav": 0.2 };
+  const scr = {};
+  for (const [k, e] of Object.entries(sfx)) {
+    ff("-f", "lavfi", "-i", `aevalsrc=${e}:s=44100:d=${dur[k]}`, join(lib, k));
+    scr[k] = { status: "shortlist", reasons: [], dur: dur[k], attack_ms: 10, centroid: 1000, score: -0.1 };
+  }
+  writeFileSync(join(lib, "screen.json"), JSON.stringify(scr));
+  writeFileSync(join(lib, "credits.json"), JSON.stringify({}));
+  ff("-f", "lavfi", "-i", "color=c=gray:s=108x192:r=30:d=6", "-f", "lavfi", "-i", "sine=f=220:d=6:sample_rate=48000",
+    "-shortest", "-c:v", "libx264", "-c:a", "aac", join(reel, "renders", "clean.mp4"));
+  writeFileSync(join(reel, "transcript.clean.json"), JSON.stringify({ audio_duration_secs: 6, words: [
+    { text: "раз", start: 0.5, end: 1.5 }, { text: "два", start: 3.0, end: 4.0 }] }));
+  return { d, mdir, lib, reel, out: join(d, "out") };
+}
+
+test("sound_review build: music clean and under the voice, SFX with spectrograms, three signature variants", { timeout: 120000 }, () => {
+  const f = reviewFixture();
+  const r = spawnSync("python3", ["scripts/ru/sound_review.py", "build", "--out", f.out, "--music-dir", f.mdir, "--lib", f.lib,
+    "--voice-reel", f.reel, "--voice-start", "0", "--swap-t", "3"], { cwd: ROOT, encoding: "utf8" });
+  assert.equal(r.status, 0, r.stderr);
+  for (const p of ["index.html", "music/m1.clean.mp3", "music/m1.voice.mp3", "sfx/click__k.wav.png", "signature/B.mp3", "signature/C.context.mp3"])
+    assert.ok(existsSync(join(f.out, p)), p);
+  const html = readFileSync(join(f.out, "index.html"), "utf8");
+  assert.match(html, /"id": "m1"/);
+  assert.doesNotMatch(html, /Calm <\/script>/);                 // untrusted titles cannot close the script tag
+  const v = JSON.parse(readFileSync(join(f.out, "signature", "variants.json"), "utf8"));
+  assert.deepEqual(Object.keys(v).sort(), ["A", "B", "C"]);
+  assert.equal(v.B.length, 3);
+  assert.equal(v.B[1].role, "sub_drop");
+  assert.ok(!v.B[0].file.startsWith("/"), "variant files are relative to the repo");
+});
+
+test("sound_review serve: marks are saved per section, bad marks refused, files outside the library unreachable", { timeout: 60000 }, async () => {
+  const f = reviewFixture();
+  const port = 18000 + Math.floor(Math.random() * 2000);
+  const p = spawn("python3", ["scripts/ru/sound_review.py", "serve", "--out", f.out, "--music-dir", f.mdir, "--lib", f.lib, "--port", String(port)], { cwd: ROOT });
+  try {
+    await new Promise((ok, bad) => { p.stdout.on("data", (b) => String(b).includes("http://") && ok()); p.on("exit", () => bad(new Error("serve exited"))); });
+    const base = `http://127.0.0.1:${port}`;
+    const post = (o) => fetch(`${base}/verdict`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(o) });
+    assert.equal((await post({ section: "music", id: "m1", verdict: "yes" })).status, 200);
+    assert.equal((await post({ section: "sfx", id: "click/k.wav", verdict: "no" })).status, 200);
+    assert.equal((await post({ section: "signature", id: "B", verdict: "pick" })).status, 200);
+    assert.equal((await post({ section: "music", id: "m1", verdict: "maybe" })).status, 400);
+    assert.deepEqual(await (await fetch(`${base}/verdicts`)).json(), { music: { m1: "yes" }, sfx: { "click/k.wav": "no" }, signature: "B" });
+    assert.equal((await fetch(`${base}/lib/click/k.wav`)).status, 200);
+    assert.equal((await fetch(`${base}/lib/..%2F..%2Fmusic%2Freview.json`)).status, 404);
+    assert.equal(JSON.parse(readFileSync(join(f.mdir, "review.json"), "utf8")).music.m1, "yes");
+    assert.equal(JSON.parse(readFileSync(join(f.lib, "review.json"), "utf8")).signature, "B");
+  } finally { p.kill(); }
+});
