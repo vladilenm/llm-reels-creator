@@ -313,4 +313,156 @@ OK.O.server = {
     }
   },
 };
+
+// ---------- tools ----------
+
+// cloud (a hosted service, sync, deploy): a puffy plate; active shows the upload arrow, play bobs it
+const CL = [[-40, 40, 28], [0, 58, 36], [40, 40, 28]];
+const CLOUD = (() => {
+  const top = [], bot = [];
+  for (let x = -68; x <= 68.001; x += 4) {
+    let zt = -Infinity;
+    for (const [cx, cz, r] of CL) if (Math.abs(x - cx) <= r) zt = Math.max(zt, cz + Math.sqrt(r * r - (x - cx) ** 2));
+    const [sx, sz, sr] = CL[x < 0 ? 0 : 2], dx = Math.abs(x - sx);
+    top.push([x, zt]); bot.push([x, Math.abs(x) <= 40 ? 12 : sz - Math.sqrt(Math.max(0, sr * sr - dx * dx))]);
+  }
+  return [...top, ...bot.reverse()];
+})();
+OK.O.cloud = {
+  vb: [-66, -112, 144, 130],
+  svg: () => plate(CLOUD, 14) + face([[-8, 22], [8, 22], [8, 42], [18, 42], [0, 62], [-18, 42], [-8, 42]], 0, 'fa', 'up'),
+  pose: (P, s) => {
+    P.up.style.opacity = s.active.toFixed(3);
+    P.up.setAttribute('transform', `translate(0 ${f1(-6 * s.play * Math.abs(Math.sin(s.t * 3)))})`);
+  },
+};
+
+// lock (security, a login, a paywall): a body and a shackle; open lifts the shackle, active lights the keyhole
+const SHACKLE = (() => {
+  const o = [], i = [];
+  for (let k = 0; k <= 12; k++) { const a = Math.PI * k / 12; o.push([28 * Math.cos(a), 90 + 28 * Math.sin(a)]); i.push([18 * Math.cos(a), 90 + 18 * Math.sin(a)]); }
+  return [[28, 66], ...o, [-28, 66], [-18, 66], ...i.reverse(), [18, 66]];
+})();
+OK.O.lock = {
+  vb: [-54, -146, 108, 180],
+  svg: () => `<g data-p="sh">${plate(SHACKLE, 8)}</g>` + OK.box(-40, -14, 0, 80, 28, 70)
+    + OK.disc(0, 14, 42, 9, 'y', 'fd', 'kh') + OK.poly([[-3, 14, 20], [3, 14, 20], [3, 14, 38], [-3, 14, 38]], 'fd', 'ks'),
+  pose: (P, s, T) => {
+    P.sh.setAttribute('transform', `translate(0 ${f1(-16 * s.open)})`);
+    for (const e of [P.kh, P.ks]) e.style.fill = s.active > 0.5 ? T.on : '';
+  },
+};
+
+// gear (settings, automation, a process): a cog facing us; spin turns it, play keeps it turning
+const cog = (a0) => Array.from({length: 40}, (_, k) => {
+  const a = a0 + k / 40 * Math.PI * 2, r = k % 4 < 2 ? 50 : 38; return [r * Math.cos(a), 60 + r * Math.sin(a)];
+});
+OK.O.gear = {
+  vb: [-50, -128, 110, 132],
+  svg: () => plate(cog(0), 10, {id: 'cg'}) + face(circ(0, 60, 14, 20), 0, 'fd'),
+  pose: (P, s) => {
+    const xz = cog((s.spin + s.t * 0.2 * s.play) * Math.PI * 2);
+    P.cg.firstChild.setAttribute('points', pts(xz.map(([x, z]) => [x, -10, z])));
+    P.cg.lastChild.setAttribute('points', pts(xz.map(([x, z]) => [x, 0, z])));
+  },
+};
+
+// magnifier (search, a detail, review): a ring on a handle; active lights the glass, play runs a glint across it
+OK.O.magnifier = {
+  vb: [-52, -140, 116, 168],
+  svg: () => { const a = at(-24, 0, 92), b = at(-12, 0, 102);
+    return plate([[20, 50], [30, 58], [62, 18], [52, 10]], 8) + plate(circ(-10, 80, 40, 32), 8)
+      + face(circ(-10, 80, 30, 32), 0, 'ft', 'gl')
+      + `<line class="ln" data-p="gn" x1="${a[0]}" y1="${a[1]}" x2="${b[0]}" y2="${b[1]}" style="opacity:0"/>`; },
+  pose: (P, s, T) => {
+    P.gl.style.fill = s.active > 0.01 ? `rgba(${T.glow},${(0.2 + 0.4 * s.active).toFixed(2)})` : '';
+    const u = (s.t * 0.7) % 1;
+    P.gn.style.opacity = s.play > 0.01 ? (s.play * Math.sin(Math.PI * u)).toFixed(3) : '0';
+    P.gn.setAttribute('transform', `translate(${f1(30 * u * 0.866)} ${f1(30 * u * 0.5)})`);
+  },
+};
+
+// star (GitHub stars, a rating, favourites): a five-point star; active fills it with the accent, play twinkles it
+const STAR = Array.from({length: 10}, (_, i) => { const a = Math.PI / 2 + i * Math.PI / 5, r = i % 2 ? 22 : 52; return [r * Math.cos(a), 60 + r * Math.sin(a)]; });
+OK.O.star = {
+  vb: [-52, -128, 114, 134],
+  svg: () => plate(STAR, 10, {id: 'st'}),
+  pose: (P, s, T) => {
+    P.st.lastChild.style.fill = s.active > 0.5 ? T.accent : '';
+    const [cx, cy] = OK.iso(0, 0, 60), k = 1 + 0.06 * s.play * Math.sin(s.t * 5);
+    P.st.setAttribute('transform', `translate(${f1(cx)} ${f1(cy)}) scale(${k.toFixed(4)}) translate(${f1(-cx)} ${f1(-cy)})`);
+  },
+};
+
+// plugin (a plugin, an integration): two puzzle pieces; open slides the second one in until it covers the knob,
+// active tints it
+OK.O.plugin = {
+  vb: [-110, -90, 232, 164],
+  svg: () => OK.box(-84, -37, 0, 74, 74, 20) + OK.cyl(4, 0, 0, 12, 20)
+    + `<g data-p="pb">${OK.box(4, -37, 0, 74, 74, 20)}</g>`,
+  pose: (P, s, T) => {
+    const d = 22 * (1 - s.open);
+    P.pb.setAttribute('transform', `translate(${f1(d * 0.866)} ${f1(d * 0.5)})`);
+    P.pb.querySelectorAll('polygon')[2].style.fill = s.active > 0.5 ? `rgba(${T.glow},.45)` : '';
+  },
+};
+
+// camera (filming, a video, the take): a body, a lens and a viewfinder; play blinks the REC dot, active lights the lens
+OK.O.camera = {
+  vb: [-78, -114, 156, 164],
+  svg: () => { const r = at(38, 30, 50);
+    return OK.box(-50, -30, 0, 100, 60, 60) + OK.box(-30, -20, 60, 40, 30, 18)
+      + OK.disc(6, 30, 30, 22, 'y', 'ft') + OK.disc(6, 30, 30, 13, 'y', 'fd', 'lens')
+      + `<circle class="fa" data-p="rec" cx="${r[0]}" cy="${r[1]}" r="6"/>`; },
+  pose: (P, s, T) => {
+    P.lens.style.fill = s.active > 0.01 ? `rgba(${T.glow},${(0.3 + 0.5 * s.active).toFixed(2)})` : '';
+    P.rec.style.opacity = s.play > 0.01 ? (Math.floor(s.t * 2) % 2 ? '0.25' : '1') : '0.5';
+  },
+};
+
+// mic (a voice, a recording, a podcast): a capsule on a stand; play sends waves out both sides, active lights its top
+OK.O.mic = {
+  vb: [-64, -134, 128, 158],
+  svg: () => {
+    const [cx, cy] = OK.iso(0, 0, 82);
+    const waves = [0, 1].map((i) => [-1, 1].map((side) => { const R = 40 + 16 * i, x = f1(cx + side * R * 0.5);
+      return `<path class="ln" data-p="w${i}${side > 0 ? 'r' : 'l'}" d="M${x},${f1(cy - R * 0.866)} A${R},${R} 0 0 ${side > 0 ? 1 : 0} ${x},${f1(cy + R * 0.866)}" style="opacity:0"/>`;
+    }).join('')).join('');
+    return OK.cyl(0, 0, 0, 30, 6) + OK.box(-4, -4, 6, 8, 8, 48) + OK.cyl(0, 0, 54, 22, 52, {id: 'cap'})
+      + [66, 78, 90].map((z) => OK.poly([[25.5, 5.7, z], [5.7, 25.5, z], [5.7, 25.5, z + 4], [25.5, 5.7, z + 4]], 'fd')).join('') + waves;
+  },
+  pose: (P, s, T) => {
+    P.cap.lastChild.style.fill = s.active > 0.5 ? T.accent : '';
+    for (const i of [0, 1]) for (const side of ['l', 'r'])
+      P['w' + i + side].style.opacity = (s.play * Math.pow(0.5 + 0.5 * Math.sin(s.t * 6 - i * 1.2), 2)).toFixed(3);
+  },
+};
+
+// montage (editing, cuts): a film strip with scissors over it; struck cuts the strip (its halves part),
+// open opens the blades, play snips
+const PV = [-40, 72];
+const blade = (phi) => {
+  const dx = Math.cos(phi), dz = Math.sin(phi), nx = -dz * 6, nz = dx * 6;
+  return [[PV[0] + nx, PV[1] + nz], [PV[0] + 64 * dx, PV[1] + 64 * dz], [PV[0] - nx, PV[1] - nz]];
+};
+const grip = (phi) => circ(PV[0] - 34 * Math.cos(phi), PV[1] - 34 * Math.sin(phi), 11, 16);
+OK.O.montage = {
+  vb: [-106, -146, 212, 210],
+  svg: () => [0, 1].map((h) => `<g data-p="h${h}">${OK.box(h ? 2 : -92, -18, 0, 90, 36, 6)}`
+      + [0, 1, 2, 3].map((k) => { const x0 = (h ? 10 : -84) + k * 21;
+        return OK.poly([[x0, -10, 6], [x0 + 16, -10, 6], [x0 + 16, 10, 6], [x0, 10, 6]], 'fd'); }).join('') + '</g>').join('')
+    + face(blade(-0.9), 0, 'ft', 'b0') + face(blade(-0.9), 0, 'ft', 'b1')
+    + face(grip(-0.9), 0, 'fl', 'g0') + face(grip(-0.9), 0, 'fl', 'g1')
+    + face(circ(PV[0], PV[1], 4, 10), 0, 'fa'),
+  pose: (P, s) => {
+    const th = 0.06 + 0.3 * c01(s.open + s.play * 0.5 * (1 + Math.sin(s.t * 9))), d = 8 * s.struck;
+    for (const [i, sg] of [[0, 1], [1, -1]]) {
+      const phi = -0.9 + sg * th;
+      P['b' + i].setAttribute('points', pts(blade(phi).map(([x, z]) => [x, 0, z])));
+      P['g' + i].setAttribute('points', pts(grip(phi).map(([x, z]) => [x, 0, z])));
+    }
+    P.h0.setAttribute('transform', `translate(${f1(-d * 0.866)} ${f1(-d * 0.5)})`);
+    P.h1.setAttribute('transform', `translate(${f1(d * 0.866)} ${f1(d * 0.5)})`);
+  },
+};
 })();

@@ -110,6 +110,10 @@ test("object kit, part 1: the work desk — nine objects in both themes, every p
   await checkObjects(["document", "laptop", "terminal", "browser", "phone", "chat", "code", "graph", "server"]);
 });
 
+test("object kit, part 2: tools — nine objects in both themes, every pose inside its box", { timeout: 120000 }, async () => {
+  await checkObjects(["cloud", "lock", "gear", "magnifier", "star", "plugin", "camera", "mic", "montage"]);
+});
+
 // ---------- object scene ----------
 
 const scene = (cfg) => `<title>x</title><script>OK.run(${JSON.stringify(cfg)});</script>`;
