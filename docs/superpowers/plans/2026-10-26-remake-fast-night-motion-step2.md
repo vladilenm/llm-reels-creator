@@ -2399,7 +2399,7 @@ clip("03-tools", 8.70, 12.02, "panel", "OK.run", (L) => ({
   mode: "panel", theme: "night",
   chapter: { idx: "02 — решение", l1: "3 бесплатных", l2: "инструмента", y: 170, tin: L(W("три", 9)) },
   items: [{ id: "ag", kind: "agent", x: 540, y: 470, size: 190, tin: L(W("Поэтому", 9)), label: { text: "агент", dy: 40 } },
-    ...tools.map(([id, kind, x, label], i) => ({ id, kind, x, y: 820, size: 200, tin: L(W("бесплатных", 9)) + i * 0.12,
+    ...tools.map(([id, kind, x, label], i) => ({ id, kind, x, y: 800, size: 200, tin: L(W("бесплатных", 9)) + i * 0.12,
       label: { text: label }, check: L(W("исправляют", 11)) + i * 0.1,
       ...(id === "db" ? { active: [[L(11.70), 1]], states: [[L(11.70), { open: 1 }]] } : {}) }))],
   links: tools.map(([id], i) => ({ from: "ag", to: id, tin: L(W("инструмента", 10)) + i * 0.08, dur: 0.45 })),
