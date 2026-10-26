@@ -323,14 +323,18 @@ test("screen kit night: no title plate, typed chapter index, the frame draws in,
   } finally { await c.browser.close(); }
 });
 
-test("screen kit night: glass list rows, a night card, a pulled name flies to its place, the window assembles from cells and opens into layers", { timeout: 90000 }, async () => {
+test("screen kit night: glass list rows, a night card, a pulled name flies to its place, the window assembles from cells and opens into layers", { timeout: 120000 }, async () => {
   const d = tmp("png-"); ff("-f", "lavfi", "-i", "testsrc2=size=640x360", "-frames:v", "1", join(d, "a.png"));
-  const files = { "a.png": readFileSync(join(d, "a.png")) };
+  ff("-f", "lavfi", "-i", "color=c=white:size=640x360", "-frames:v", "1", join(d, "b.png"));
+  const files = { "a.png": readFileSync(join(d, "a.png")), "b.png": readFileSync(join(d, "b.png")) };
   const sk = (cfg) => `<title>x</title><script>SK.run(${JSON.stringify(cfg)});</script>`;
   let c = await openClip(sk({ T: 2, mode: "card", theme: "night", tin: 0, title: { l1: "Три", l2: "ссылки", y: 260, tin: 0 }, win: { tin: 999 },
-    list: { y: 500, w: 760, row: 92, items: [{ name: "Openverse API", t: 0.2 }, { name: "Real SFX", t: 0.3 }] } }), files);
+    list: { y: 500, w: 760, row: 92, items: [{ name: "Openverse API", stars: "411", t: 0.2 }, { name: "Real SFX", t: 0.3 }] } }), files);
   try {
     assert.equal(await c.at(1, () => getComputedStyle(document.querySelector(".sk-rp")).backgroundColor), "rgb(26, 20, 40)", "glass row");
+    assert.ok((await c.at(1, () => getComputedStyle(document.querySelector(".sk-rp")).boxShadow)).includes("3px"), "3 px ring on the row");
+    const star = await c.at(1, () => { const s = getComputedStyle(document.querySelector(".sk-rs")); return [s.boxShadow, s.fontSize]; });
+    assert.ok(star[0].includes("3px") && star[1] === "30px", `star pill: ring 3 px, label 30 px ${star}`);
     assert.equal(await c.at(1, () => getComputedStyle(document.querySelector(".sk-rt")).color), "rgb(245, 243, 250)");
     assert.ok(await c.at(1, () => !!document.querySelector("#sk .sk-grid")), "the night card has the grid");
     assert.deepEqual(c.errors, []);
@@ -358,8 +362,45 @@ test("screen kit night: glass list rows, a night card, a pulled name flies to it
     for (const [disp, o, tf] of ly) { assert.equal(disp, "block"); assert.ok(o > 0.5 && /rotateX\(2\d(\.\d+)?deg\)/.test(tf), tf); }
     assert.notEqual(await c.at(3.4, () => getComputedStyle(document.querySelector(".sk-win")).transform), "none");
     assert.equal(await c.at(3.4, () => document.querySelector("#sk-ly-0 .sk-lyl").textContent), "pop");     // the deepest layer is first in the DOM, so ask for the nearest one by id
+    // the title paints after (over) the layers, the deepest layer first
+    assert.ok(await c.at(3.4, () => document.getElementById("sk-ly-0").compareDocumentPosition(document.querySelector(".sk-t1")) & Node.DOCUMENT_POSITION_FOLLOWING), "title after the layers");
+    assert.ok(await c.at(3.4, () => document.getElementById("sk-ly-1").compareDocumentPosition(document.getElementById("sk-ly-0")) & Node.DOCUMENT_POSITION_FOLLOWING), "the deepest layer first");
     assert.deepEqual(c.errors, []);
   } finally { await c.browser.close(); }
+  // the pulled piece lives on its own: the shot changes and the window leaves, the piece stays the same
+  // (data: images keep the canvases readable; a file: image would taint them)
+  const uri = (n) => "data:image/png;base64," + files[n].toString("base64");
+  c = await openClip(sk({ T: 5, mode: "dark", theme: "night", tin: 0, title: { l1: "Инструмент 2", l2: "", y: 470, tin: 0 },
+    win: { x: 540, y: 700, w: 900, h: 480, tin: 0, enter: "grid", tout: 3.0 },
+    media: { a: { src: uri("a.png") }, b: { src: uri("b.png") } }, shots: [[0, "a", [0, 0, 640]], [3.0, "b", [0, 0, 640], "whip"]],
+    marks: [{ kind: "pull", rect: [200, 100, 160, 40], t: 1.2, dur: 0.6, to: [540, 600], scale: 2, tout: 4.5 }] }), files);
+  try {
+    const piece = () => { const e = document.getElementById("sk-pull-0"), d = e.getContext("2d").getImageData(0, 0, e.width, e.height).data;
+      let a = 0, h = 0; for (let i = 0; i < d.length; i++) { a += d[i]; h = (h * 31 + d[i]) >>> 0; }
+      const b = e.getBoundingClientRect(); return { sum: a, hash: h, w: e.width, h: e.height, display: getComputedStyle(e).display, op: +e.style.opacity, cx: b.left + b.width / 2, cy: b.top + b.height / 2 }; };
+    const p2 = await c.at(2.0, piece), p3 = await c.at(3.05, piece), p4 = await c.at(3.6, piece);
+    assert.ok(p2.sum > 0 && p2.w === 225 && p2.h === 56, `the piece holds the media rect at the window's scale: ${JSON.stringify(p2)}`);
+    for (const q of [p3, p4]) assert.ok(q.display !== "none" && q.op > 0.99 && Math.abs(q.cx - 540) < 4 && Math.abs(q.cy - 600) < 4, `the piece stays on its place ${JSON.stringify(q)}`);
+    assert.deepEqual([p4.sum, p4.hash], [p2.sum, p2.hash], "the pixels do not follow the shot change or the window");
+    const wDisp = await c.at(3.6, () => getComputedStyle(document.querySelector(".sk-win")).display);
+    assert.equal(wDisp, "none", "the window is gone, the piece is not");
+    assert.equal((await c.at(4.9, piece)).display, "none", "the piece leaves after its tout");
+    // the source dim sits on the window only while the pull's shot is on
+    const area = () => { const d = document.querySelector(".sk-cv").getContext("2d").getImageData(281, 140, 225, 56).data; let a = 0; for (let i = 0; i < d.length; i += 4) a += d[i] + d[i + 1] + d[i + 2]; return a; };
+    const before = await c.at(1.0, area), dimmed = await c.at(2.0, area);
+    assert.ok(before > 0 && dimmed < before * 0.8, `the source dims after the pull: ${before} → ${dimmed}`);
+    const white = await c.at(3.25, () => [...document.querySelector(".sk-cv").getContext("2d").getImageData(393, 168, 1, 1).data]);
+    assert.deepEqual(white, [255, 255, 255, 255], "the new shot is not dimmed");
+    assert.deepEqual(c.errors, []);
+  } finally { await c.browser.close(); }
+  // wrong configs stop with a named error
+  const errs = async (cfg) => { const k = await openClip(sk(cfg), files); try { return k.errors; } finally { await k.browser.close(); } };
+  const noTo = await errs({ T: 2, mode: "dark", theme: "night", tin: 0, media: { a: { src: "a.png" } }, shots: [[0, "a", [0, 0, 640]]], marks: [{ kind: "hl", rect: [0, 0, 9, 9], t0: 0, t1: 1 }, { kind: "pull", rect: [200, 100, 160, 40], t: 1 }] });
+  assert.ok(noTo.some((m) => m.includes("SK: marks[1] kind 'pull' needs rect and to")), `pull without to: ${noTo}`);
+  const noRect = await errs({ T: 2, mode: "dark", theme: "night", tin: 0, media: { a: { src: "a.png" } }, shots: [[0, "a", [0, 0, 640]]], marks: [{ kind: "pull", to: [540, 600], t: 1 }] });
+  assert.ok(noRect.some((m) => m.includes("SK: marks[0] kind 'pull' needs rect and to")), `pull without rect: ${noRect}`);
+  const noGrid = await errs({ T: 2, mode: "light", theme: "night", tin: 0, win: { enter: "grid" } });
+  assert.ok(noGrid.some((m) => m.includes("SK: win.enter 'grid' needs mode 'dark' or 'card' (the cells sit on the clip's grid)")), `grid entry in light mode: ${noGrid}`);
 });
 
 // ---------- captions ----------

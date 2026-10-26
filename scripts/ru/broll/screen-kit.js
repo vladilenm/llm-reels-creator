@@ -14,7 +14,9 @@
        win.enter:'fly' (arrives from depth after an object scene's fly) | 'grid' (assembles from the grid's cells),
        win.layers:{t, dur:0.9, n:3, gap:80, tilt:22, orbit:5, labels:[]} (opens into a stack of glass layers),
        marks kind 'lens' {keys:[[t,x,y]], r, zoom, t0, t1}, kind 'pull' {rect:[x,y,w,h] media px, t, dur:0.8, to:[x,y]
-       frame px, scale:1.5, tout} (a piece leaves the window and lands on its place), glass list rows, a night card
+       frame px, scale:1.5, tout} (a piece leaves the window and lands on its place; it is cut from the media of the shot at
+       t and lives on its own until tout + 0.3, whatever the window does; the flight starts from the untilted window, so put
+       a pull before win.layers.t), glass list rows, a night card
      title:{l1, l2, y:372, tin?, tout?},          captions ≈1000–1070, the head starts ≈1095 (SHOOT.md)
      titles:[{l1, l2, y?, tin, tout}],            several titles in turn over one window (sections of a long clip)
      icons:{y:548, size:56, items:[{label, src?}], active:[[t, index]], tin?, tout?},
@@ -171,15 +173,16 @@ SK.run = (cfg)=>{
   const ctx = cv.getContext('2d');
   // «сборка из сетки»: the cells inside the window rect light up, then the window fills in (night, enter:'grid')
   let gridIn = null;
+  if(wc.enter === 'grid' && night && !(dark || card)) throw new Error("SK: win.enter 'grid' needs mode 'dark' or 'card' (the cells sit on the clip's grid)");
   if(night && wc.enter === 'grid'){
     gridIn = OK.gridCells(root, [g0.x-g0.w/2, g0.y, g0.w, g0.h], {t:(wc.tin ?? tin), dur:0.8, id:'sk-cells'});
     root.insertBefore(gridIn.el, win);
   }
-  // «слои в глубину»: glass layers behind the window (the deepest first in the DOM), the stack tilts and slowly turns
+  // «слои в глубину»: glass layers behind the window and the titles (the deepest first in the DOM), the stack tilts and slowly turns
   const LY = night && wc.layers ? wc.layers : null;
   const ghosts = [];
   if(LY) for(let i=0; i<(LY.n ?? 3)-1; i++){
-    const g = el('a sk-ly'); g.id = 'sk-ly-'+i; root.insertBefore(g, ghosts[i-1] || win);
+    const g = el('a sk-ly'); g.id = 'sk-ly-'+i; root.insertBefore(g, ghosts[i-1] || titles[0]?.t1 || win);
     if(LY.labels?.[i]){ const lb = el('sk-lyl', g); lb.textContent = LY.labels[i]; }
     ghosts.push(g);
   }
@@ -300,16 +303,12 @@ SK.run = (cfg)=>{
         rr(cx-(w/2+10)*sc, cy-(h/2+8)*sc, (w+20)*sc, (h+16)*sc, 14*sc); ctx.stroke(); ctx.restore();
       }
     }
-    for(const p of pulls){
+    for(const p of pulls){      // the place the piece left dims, while the pull's own shot is on
       const m = p.m;
-      if(t < m.t || (m.tout!=null && t > m.tout+0.3)) continue;
+      if(t < m.t || shotAt(t) !== p.shot || (m.tout!=null && t > m.tout+0.3)) continue;
       const [x,y,k] = map(m.rect[0], m.rect[1]), w = m.rect[2]*k, h = m.rect[3]*k;
-      const pw = Math.max(1, Math.round(w)), ph = Math.max(1, Math.round(h));
-      if(p.c.width!==pw || p.c.height!==ph){ p.c.width = pw; p.c.height = ph; p.c.style.width = pw+'px'; p.c.style.height = ph+'px'; }
-      p.cx.clearRect(0,0,pw,ph); p.cx.drawImage(cv, x, y, w, h, 0, 0, pw, ph);
-      const u = ex((t-m.t)/(m.dur ?? 0.8));
+      const u = ex((t-m.t)/(m.dur ?? 0.8))*pullFade(m, t);
       ctx.save(); ctx.fillStyle = `rgba(14,11,20,${(0.6*u).toFixed(3)})`; rr(x-4, y-4, w+8, h+8, 8); ctx.fill(); ctx.restore();
-      p.src = {x, y, w, h, u};
     }
     if(cpath && t >= cfg.cursor.keys[0][0] && t <= (cfg.cursor.until ?? T)){
       const c = cpath(t), [x,y] = map(c.x, c.y), s = 0.95*(1-0.13*cpress(t));
@@ -321,10 +320,25 @@ SK.run = (cfg)=>{
   };
 
   // «вытягивание»: a piece of the window (a name, a line) leaves it and flies to its own place in the frame
-  const pulls = (cfg.marks||[]).filter(m=>m.kind==='pull').map((m,i)=>{
+  // The piece is a pure function of the pull moment m.t: its pixels come from the media of the shot on at m.t (never from
+  // the live window), its start from the window and camera at m.t; it lives from m.t to m.tout + 0.3 on its own.
+  const pulls = (cfg.marks||[]).map((m,mi)=>[m,mi]).filter(([m])=>m.kind==='pull').map(([m,mi],i)=>{
+    if(!Array.isArray(m.rect) || !Array.isArray(m.to)) throw new Error(`SK: marks[${mi}] kind 'pull' needs rect and to`);
+    if(!shots.length) throw new Error(`SK: marks[${mi}] kind 'pull' needs a shot to cut the piece from`);
+    const shot = shotAt(m.t), [wx, wy, ww] = wgeo(m.t), [cx, cy, cwid] = cam(Math.max(m.t, shots[shot][0]));
+    const k0 = Math.round(ww)/cwid, pw = Math.max(1, Math.round(m.rect[2]*k0)), ph = Math.max(1, Math.round(m.rect[3]*k0));
     const c = el('a sk-pull', root, 'canvas'); c.id = 'sk-pull-'+i;
-    return {m, c, cx:c.getContext('2d'), src:null};
+    c.width = pw; c.height = ph; c.style.width = pw+'px'; c.style.height = ph+'px';
+    return {m, c, shot, pw, ph, x0: wx-ww/2+(m.rect[0]-cx)*k0, y0: wy+bar+(m.rect[1]-cy)*k0, drawn:false};
   });
+  const pullReady = (p)=>{       // the media load asynchronously: cut the piece once, on the first draw that has them
+    if(p.drawn) return true;
+    const s = shots[p.shot], bm = BM[s[1]], im = bm?.frame(p.m.t - s[0]);
+    if(!im) return false;
+    p.c.getContext('2d').drawImage(im, p.m.rect[0], p.m.rect[1], p.m.rect[2], p.m.rect[3], 0, 0, p.pw, p.ph);
+    return p.drawn = true;
+  };
+  const pullFade = (m, t)=>m.tout==null ? 1 : 1-clamp((t-m.tout)/0.3);
 
   // ---------- list («top N»: number, blurred name, stars) ----------
   let list = null;
@@ -341,10 +355,10 @@ SK.run = (cfg)=>{
       if(c.mono){ nm.style.fontFamily = "'SK Mono',monospace"; nm.style.fontWeight = 500; }
       if(it.stars!=null){ const st = el('sk-rs', r); st.innerHTML = '★ Star <b></b>'; st.querySelector('b').textContent = it.stars; if(c.rh) st.style.height = c.rh+'px'; }
       if(night){
-        Object.assign(pill.style, {background:'#1A1428', boxShadow:`0 0 0 2px ${rgba(B.accent_light,.35)},0 10px 26px -14px rgba(0,0,0,.6)`});
+        Object.assign(pill.style, {background:'#1A1428', boxShadow:`0 0 0 3px ${rgba(B.accent_light,.35)},0 10px 26px -14px rgba(0,0,0,.6)`});
         nm.style.color = B.ink; pill.firstChild.style.background = rgba(B.accent_light,.25);
         const st = r.querySelector('.sk-rs');
-        if(st){ Object.assign(st.style, {background:'#1A1428', boxShadow:`0 0 0 2px ${rgba(B.accent_light,.35)}`, color:'rgba(245,243,250,.7)'}); st.querySelector('b').style.color = B.ink; }
+        if(st){ Object.assign(st.style, {background:'#1A1428', boxShadow:`0 0 0 3px ${rgba(B.accent_light,.35)}`, color:'rgba(245,243,250,.7)', fontSize:'30px'}); st.querySelector('b').style.color = B.ink; }
       }
       // it.lit: the number lights up and stays (a count); c.active: one row at a time
       const keys = it.lit!=null ? [[it.lit, 1, M.FAST]] : (c.active||[]).map(([t,k])=>[t, k===i?1:0, M.FAST]);
@@ -435,7 +449,6 @@ SK.run = (cfg)=>{
     }
 
     const [x,y,w,h] = wgeo(t);
-    for(const p of pulls) p.src = null;
     if(gridIn) gridIn.draw(t);
     let wv = vis(t, wc.tin ?? tin, wc.tout === undefined ? tout : wc.tout, {lin:0.34});
     if(night){
@@ -472,13 +485,13 @@ SK.run = (cfg)=>{
       drawCanvas(t, cw, ch);
     }
     for(const p of pulls){
-      const m = p.m, s = p.src;
-      p.c.style.display = s && wv.o>0.002 ? '' : 'none';
-      if(!s) continue;
-      const sc = 1+((m.scale ?? 1.5)-1)*s.u, x0 = x-w/2+s.x, y0 = y+bar+s.y, x1 = m.to[0]-s.w*sc/2, y1 = m.to[1]-s.h*sc/2;
-      p.c.style.left = (x0+(x1-x0)*s.u).toFixed(1)+'px'; p.c.style.top = (y0+(y1-y0)*s.u).toFixed(1)+'px';
+      const m = p.m, on = t >= m.t && (m.tout==null || t <= m.tout+0.3) && pullReady(p);
+      p.c.style.display = on ? '' : 'none';
+      if(!on) continue;
+      const u = ex((t-m.t)/(m.dur ?? 0.8)), sc = 1+((m.scale ?? 1.5)-1)*u, x1 = m.to[0]-p.pw*sc/2, y1 = m.to[1]-p.ph*sc/2;
+      p.c.style.left = (p.x0+(x1-p.x0)*u).toFixed(1)+'px'; p.c.style.top = (p.y0+(y1-p.y0)*u).toFixed(1)+'px';
       p.c.style.transform = `scale(${sc.toFixed(4)})`;
-      p.c.style.opacity = (m.tout==null ? 1 : 1-clamp((t-m.tout)/0.3)).toFixed(3);
+      p.c.style.opacity = (clamp((t-m.t)/0.12)*pullFade(m, t)).toFixed(3);
     }
 
     if(list){
