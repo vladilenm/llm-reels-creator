@@ -18,7 +18,7 @@ file — полный слой .mp4 (OK.run mode 'full') от корня про�
 
 fx/fx.json "cine": true (только с маской; дизайн docs/superpowers/specs/2026-10-26-night-cine-slice-design.md) — кино-слой
 scripts/ru/wide/cine.py: планы спикера из work/shots.json со смазом на проездах, наезды только в mid, грейд, свет фона на
-краях, ключ со стороны графики, вспышка ореола на ночных акцентах; зерна в базе нет — его даёт финиш assemble.mjs."""
+краях, свет за плечами едет со спикером, ключ со стороны графики, вспышка ореола на ночных акцентах; зерна в базе нет — его даёт финиш assemble.mjs."""
 import json, os, shutil, subprocess, sys, pathlib, tempfile
 import numpy as np
 from PIL import Image, ImageDraw, ImageFilter
@@ -59,17 +59,43 @@ def grid_alpha():
     return a
 
 
+def glow_top():
+    """свечение сверху (g2 из glow()) поверх тёмного фона — без пятна за плечами: оно в кино-режиме ездит за спикером"""
+    yy, xx = np.mgrid[0:H, 0:W].astype(np.float32)
+    g2 = np.exp(-(((xx - 540) / 700) ** 2 + ((yy + 120) / 520) ** 2)) * .35
+    return DARK[None, None] + g2[..., None] * (ACCENT_L - DARK) * .16
+
+
 GLOW, GRID = glow(), grid_alpha()
+GLOW_TOP = glow_top()
+G1_COL = np.exp(-(((np.arange(H, dtype=np.float32) - 1900) / 700) ** 2))[:, None]     # g1 по y: одна колонка на все кадры
+G1_K = (ACCENT - DARK) * .55                                                          # сила пятна за плечами по каналам
+X_AXIS = np.arange(W, dtype=np.float32)
 
 
-def night_bg(f, fps_, grain=True):
-    """ночной фон кадра f: свечение, сетка с плавным дрейфом вверх (доли пикселя — смесь соседних сдвигов), зерно
-    (grain=False — без зерна: в кино-режиме его даёт финиш кадра)"""
+def grid_over(glow_, f, fps_):
+    """сетка с плавным дрейфом вверх (доли пикселя — смесь соседних сдвигов) поверх свечения glow_ (H×W×3);
+    общая для night_bg и night_bg_at, чтобы сетка у них не разошлась"""
     off = f / fps_ * DRIFT
     o0, fr = int(off) % GRID_STEP, off - int(off)
     a = (GRID[o0:o0 + H] * (1 - fr) + GRID[o0 + 1:o0 + 1 + H] * fr)[..., None]
-    bg = GLOW * (1 - a) + ACCENT_L[None, None] * a
+    return glow_ * (1 - a) + ACCENT_L[None, None] * a
+
+
+def night_bg(f, fps_, grain=True):
+    """ночной фон кадра f: свечение, сетка с плавным дрейфом вверх, зерно
+    (grain=False — без зерна: в кино-режиме его даёт финиш кадра)"""
+    bg = grid_over(GLOW, f, fps_)
     return bg + np.random.default_rng(f).normal(0, GRAIN, (H, W, 1)).astype(np.float32) if grain else bg
+
+
+def night_bg_at(f, fps_, dx):
+    """ночной фон кино-режима, без зерна: как night_bg(grain=False), но свет «за плечами» (g1) стоит в x = 540 + dx —
+    там, где сейчас спикер (dx — сдвиг плана, cine.state(...)[1]); свечение сверху и сетка на месте. g1 — внешнее
+    произведение готовой колонки по y и строки по x, поэтому кадр стоит несколько мс"""
+    row = np.exp(-(((X_AXIS - np.float32(540 + dx)) / 620) ** 2))
+    g1 = G1_COL * row[None, :]
+    return grid_over(GLOW_TOP + g1[..., None] * G1_K, f, fps_)
 
 
 def halo(m):
@@ -181,12 +207,12 @@ def punch_cine(f, ctx):
 
 
 def compose_cine(fr, f, ctx):
-    """кадр кино-режима: фон (акцент или ночь без зерна) и back-клипы; спикер в плане work/shots.json — на проезде
+    """кадр кино-режима: фон (акцент или ночь без зерна, свет за плечами — в x спикера) и back-клипы; спикер в плане work/shots.json — на проезде
     среднее 4 положений затвора; грейд на карточке до трансформации, края карточки в ноль, свет фона на краях, ключ,
     ореол со вспышкой (на светлом акценте — тень)"""
     F, sh = ctx["fps"], ctx["shots"]; t = f / F
     acc, kind = ctx["accent"](f)
-    bg = acc.astype(np.float32) if acc is not None else night_bg(f, F, grain=False)
+    bg = acc.astype(np.float32) if acc is not None else night_bg_at(f, F, cine.state(sh, t)[1])   # свет за плечами едет со спикером
     bg = ctx["back"](f, bg)
     pr = Image.fromarray(cine.grade(np.asarray(person_rgb(fr), np.float32)).astype(np.uint8)).resize((PW, PH), Image.BICUBIC)
     pm = mask_at(ctx["masks"], f, ctx["cuts"]).resize((PW, PH), Image.BICUBIC)
@@ -358,7 +384,7 @@ def main():
     try: fxj = json.loads(fxp.read_text()) if fxp.is_file() else {}
     except ValueError as e: raise SystemExit(f"fx/fx.json: {e}")
     if not isinstance(fxj, dict): raise SystemExit("fx/fx.json: нужен объект {…}")
-    cin = bool(fxj.get("cine"))
+    cin = fxj.get("cine") is True                   # как readCine в assemble.mjs: финиш включает только true, не 1 и не "true"
     if cin and card: print("⚠ cine работает только с маской: --card собирается как раньше"); cin = False
     until = None
     if "--until" in a:

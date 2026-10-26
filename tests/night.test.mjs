@@ -1093,6 +1093,33 @@ test("night_base cine: punch-in toggles stay in mid and 0.3 s away from a move; 
   assert.match(r.stdout, /наезды \[10, 40\]/);     // joins at frames 10/20/30/40, the old rule keeps ≥ 1 s between toggles
 });
 
+test("night_base cine glow: night_bg_at(dx = 0) is the plain night background, the shoulder glow follows dx", { timeout: 60000 }, () => {
+  const r = py(`import sys, json; sys.path.insert(0, "scripts/ru/wide")
+import numpy as np
+import night_base as nb
+plain = nb.night_bg(10, 25, grain=False)
+at0, at240 = nb.night_bg_at(10, 25, 0), nb.night_bg_at(10, 25, 240)
+tot = lambda im, x, y: float(im[y, x].sum())
+print(json.dumps({"shape": list(at0.shape), "dtype": str(at0.dtype), "diff": float(np.abs(at0 - plain).max()),
+                  "l0": tot(at0, 300, 1900), "r0": tot(at0, 780, 1900), "l240": tot(at240, 300, 1900), "r240": tot(at240, 780, 1900),
+                  "top": float(np.abs(at240[:400] - at0[:400]).max())}))`);
+  assert.equal(r.status, 0, r.stderr);
+  const o = JSON.parse(r.stdout.trim().split("\n").pop());
+  assert.deepEqual(o.shape, [1920, 1080, 3]); assert.equal(o.dtype, "float32");
+  assert.ok(o.diff < 1e-3, `dx 0 is night_bg without grain: max diff ${o.diff}`);
+  near(o.l0, o.r0);
+  assert.ok(o.r240 > o.l240 + 20, `dx 240 puts the brightest part under the speaker: right ${o.r240}, left ${o.l240}`);
+  assert.ok(o.top < 5, `the top glow and the grid stay where they are: ${o.top}`);
+});
+
+test("night_base cine: only \"cine\": true turns the cine layer on, any other value reads as off (assemble.mjs does the same)", { timeout: 120000 }, () => {
+  for (const v of [1, "true"]) {
+    const P = cineProject("cine5-", { fx: { look: "night", cine: v } });
+    const r = nb(P); assert.equal(r.status, 0, r.stderr + r.stdout);
+    assert.match(r.stdout, /кино выкл/, `cine ${JSON.stringify(v)}`);
+  }
+});
+
 test("night_base: a back clip lies behind the speaker, a missing back file stops the run; assemble does not overlay it again", { timeout: 120000 }, async () => {
   const P = cineProject("back-");
   ff("-f", "lavfi", "-i", "color=c=black@0.0:s=1080x1920:r=25:d=0.4,format=rgba,drawbox=x=0:y=1200:w=1080:h=100:color=0x00FF00@1:t=fill:replace=1",
