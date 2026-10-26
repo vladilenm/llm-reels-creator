@@ -276,7 +276,7 @@ const LT = upright([[-30, 80], [-66, 50], [-30, 20], [-22, 30], [-48, 50], [-22,
 const RT = upright([[30, 80], [66, 50], [30, 20], [22, 30], [48, 50], [22, 70]]);
 const SL = upright([[4, 86], [13, 86], [-4, 14], [-13, 14]]);
 OK.O.code = {
-  vb: [-68, -96, 144, 90],
+  vb: [-78, -96, 162, 90],
   svg: () => plate(LT, 8, {id: 'lt'}) + plate(SL, 8, {id: 'sl'}) + plate(RT, 8, {id: 'rt'}),
   pose: (P, s, T) => {
     const d = 6 * s.play * Math.abs(Math.sin(s.t * 3));
