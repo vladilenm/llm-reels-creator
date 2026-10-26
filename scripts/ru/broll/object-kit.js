@@ -77,8 +77,8 @@ OK.O.agent = {
   vb: [-90, -128, 180, 182],
   svg: () => OK.box(-45, -45, 0, 90, 90, 72)
     + OK.poly([[-34, 45, 12], [34, 45, 12], [34, 45, 60], [-34, 45, 60]], 'ft')
-    + OK.poly([[-22, 45, 30], [-10, 45, 30], [-10, 45, 44], [-22, 45, 44]], 'fi', 'e0')
-    + OK.poly([[10, 45, 30], [22, 45, 30], [22, 45, 44], [10, 45, 44]], 'fi', 'e1')
+    + OK.poly([[-22, 45, 30], [-10, 45, 30], [-10, 45, 44], [-22, 45, 44]], 'fd', 'e0')
+    + OK.poly([[10, 45, 30], [22, 45, 30], [22, 45, 44], [10, 45, 44]], 'fd', 'e1')
     + line([0, 0, 72], [0, 0, 96])
     + `<circle class="fa" data-p="tip" cx="${at(0, 0, 102)[0]}" cy="${at(0, 0, 102)[1]}" r="7"/>`,
   pose: (P, s, T) => {
@@ -92,7 +92,7 @@ OK.O.turntable = {
   vb: [-140, -108, 280, 192],
   svg: () => OK.box(-75, -75, 0, 150, 150, 22)
     + OK.cyl(-8, -8, 22, 56, 8, {id: 'plat'})
-    + OK.cyl(-8, -8, 30, 16, 1, {id: 'lab', s: 'fd', t: 'fd'})
+    + `<g data-p="lab"><ellipse class="fd" cx="${at(-8, -8, 31)[0]}" cy="${at(-8, -8, 31)[1]}" rx="${f1(OK.ellipse(16)[0])}" ry="${f1(OK.ellipse(16)[1])}"/></g>`
     + `<ellipse class="fi" data-p="mark" rx="5" ry="3"/>`
     + OK.box(50, -62, 22, 12, 12, 18)
     + line([56, -56, 40], [8, 14, 34])
@@ -129,9 +129,9 @@ OK.O.key = {
   svg: () => OK.cyl(-52, 0, 0, 26, 9)
     + `<ellipse class="fl" cx="${at(-52, 0, 9)[0]}" cy="${at(-52, 0, 9)[1]}" rx="${f1(OK.ellipse(11)[0])}" ry="${f1(OK.ellipse(11)[1])}"/>`
     + OK.box(-28, -7, 0, 88, 14, 9) + OK.box(42, 7, 0, 9, 9, 9) + OK.box(56, 7, 0, 9, 14, 9)
-    + `<line class="ln" data-p="strike" x1="-100" y1="-56" x2="100" y2="40" pathLength="1" style="stroke-dasharray:1;stroke-dashoffset:1"/>`,
+    + `<line class="ln" data-p="strike" x1="-100" y1="-56" x2="100" y2="40" pathLength="1" style="vector-effect:none;stroke-dasharray:1;stroke-dashoffset:1"/>`,
   pose: (P, s, T) => {
-    P.strike.style.stroke = T.accent; P.strike.style.strokeWidth = '7';
+    P.strike.style.stroke = T.accent; P.strike.style.strokeWidth = '8';
     P.strike.style.strokeDashoffset = (1 - s.struck).toFixed(4);
   },
 };
