@@ -258,3 +258,32 @@ test("sound_review apply: approved track downloaded into tracks.json with its cr
   const sig = JSON.parse(readFileSync(join(f.d, "sfx", "signature.json"), "utf8"));
   assert.equal(sig.chosen, "B"); assert.equal(sig.layers[0].role, "whoosh");
 });
+
+// ---------- reel: sound.py ----------
+
+function soundProject() {
+  const P = tmp("sound-");
+  mkdirSync(join(P, "renders")); mkdirSync(join(P, "fx"));
+  ff("-f", "lavfi", "-i", "color=c=gray:s=108x192:r=30:d=3", "-f", "lavfi", "-i", "sine=f=220:d=3:sample_rate=48000",
+    "-shortest", "-c:v", "libx264", "-c:a", "aac", join(P, "renders/clean.mp4"));
+  ff("-f", "lavfi", "-i", "aevalsrc=0.8*sin(2*PI*55*t)*exp(-25*mod(t-0.1\\,0.5))*gte(t\\,0.1):s=48000:d=8", join(P, "music.wav"));
+  writeFileSync(join(P, "EDL.json"), JSON.stringify({ keep_ranges: [{ start: 0, end: 1.5 }, { start: 4, end: 5.5 }] }));
+  writeFileSync(join(P, "transcript.clean.json"), JSON.stringify({ audio_duration_secs: 3, words: [
+    { text: "раз", start: 0.2, end: 0.9 }, { text: "два", start: 1.7, end: 2.2 }, { text: "три", start: 2.4, end: 2.8 }] }));
+  writeFileSync(join(P, "fx/fx.json"), JSON.stringify({ sound: { music: { src: "music.wav", bpm: 120, fade_out: 0.2 } } }));
+  return P;
+}
+
+test("sound.py --plan writes only the aligned music; --sfx mixes another SFX track", { timeout: 120000 }, () => {
+  const P = soundProject();
+  let r = spawnSync("python3", ["scripts/ru/fx/sound.py", P, "--plan", "--variant", "p"], { cwd: ROOT, encoding: "utf8" });
+  assert.equal(r.status, 0, r.stderr);
+  assert.ok(existsSync(join(P, "work/sound/music.p.wav")));
+  assert.ok(!existsSync(join(P, "fx/mix.p.wav")));
+  assert.ok(Math.abs(JSON.parse(readFileSync(join(P, "fx/sound.p.json"), "utf8")).music.bpm - 120) < 1);
+  ff("-f", "lavfi", "-i", "sine=f=1000:d=0.2:sample_rate=48000", "-ac", "2", join(P, "fx/sfx.alt.wav"));
+  r = spawnSync("python3", ["scripts/ru/fx/sound.py", P, "--variant", "q", "--sfx", "fx/sfx.alt.wav"], { cwd: ROOT, encoding: "utf8" });
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(JSON.parse(readFileSync(join(P, "fx/sound.q.json"), "utf8")).sfx.src, "fx/sfx.alt.wav");
+  assert.ok(existsSync(join(P, "fx/mix.q.wav")));
+});
