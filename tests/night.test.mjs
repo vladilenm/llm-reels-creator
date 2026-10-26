@@ -974,3 +974,78 @@ print(json.dumps({"g": g[0].round(1).tolist(), "edge": w[100, 52].tolist(), "cen
   assert.equal(o.k0, true, "side 0: no key");
   near(o.pulse[0], 1); near(o.pulse[1], 1); near(o.pulse[2], 1.6); assert.ok(o.pulse[3] > 1 && o.pulse[3] < 1.05); near(o.pulse[4], 1);
 });
+
+// ---------- night base: кино-режим ----------
+
+function frameRGB(video, n) {
+  const r = spawnSync("ffmpeg", ["-v", "error", "-i", video, "-vf", `select=eq(n\\,${n})`, "-frames:v", "1", "-f", "rawvideo", "-pix_fmt", "rgb24", "-"], { maxBuffer: 1 << 26 });
+  assert.equal(r.status, 0, String(r.stderr));
+  const w = r.stdout.length / 3 / 1920;
+  return (x, y) => { const i = (y * w + x) * 3; return [r.stdout[i], r.stdout[i + 1], r.stdout[i + 2]]; };
+}
+
+function cineProject(prefix, { fx, shots, dur = 0.4 } = {}) {
+  const P = tmp(prefix);
+  for (const d of ["assets", "renders", "broll", "work", "fx/masks"]) mkdirSync(join(P, d), { recursive: true });
+  writeFileSync(join(P, "assets/raw.mp4"), "");
+  writeFileSync(join(P, "PROBE.json"), JSON.stringify({ summary: { fps: 25 } }));
+  writeFileSync(join(P, "EDL.json"), JSON.stringify({ keep_ranges: [{ start: 0, end: dur }] }));
+  ff("-f", "lavfi", "-i", `color=c=red:s=1080x1920:r=25:d=${dur}`, "-f", "lavfi", "-i", `sine=f=220:d=${dur}:sample_rate=48000`,
+    "-shortest", "-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "aac", join(P, "renders/clean.mp4"));
+  const r = py(`from PIL import Image, ImageDraw
+import pathlib
+d = pathlib.Path(${JSON.stringify(join(P, "fx/masks"))})
+for i in range(${Math.round(dur * 25)}):
+    m = Image.new("L", (989, 822), 0); ImageDraw.Draw(m).rectangle((300, 200, 700, 600), fill=255); m.save(d / f"{i:05d}.png")`);
+  assert.equal(r.status, 0, r.stderr);
+  if (fx) writeFileSync(join(P, "fx/fx.json"), JSON.stringify(fx));
+  if (shots) writeFileSync(join(P, "work/shots.json"), JSON.stringify({ shots }));
+  return P;
+}
+const nb = (P, ...a) => spawnSync("python3", ["scripts/ru/wide/night_base.py", P, ...a], { cwd: ROOT, encoding: "utf8" });
+const frameCount = (video) => spawnSync("ffprobe", ["-v", "error", "-count_frames", "-select_streams", "v:0", "-show_entries", "stream=nb_read_frames", "-of", "csv=p=0", video], { encoding: "utf8" }).stdout.trim();
+
+test("night_base cine: side-right puts the speaker right and smaller, shots need cine, the grade darkens the speaker", { timeout: 120000 }, () => {
+  const P = cineProject("cine1-", { fx: { look: "night", cine: true }, shots: [{ at: 0, shot: "side-right", dur: 0 }] });
+  const out = join(P, "renders/picture.base.mp4");
+  let r = nb(P); assert.equal(r.status, 0, r.stderr + r.stdout);
+  let px = frameRGB(out, 5);
+  assert.ok(px(900, 1500)[0] > 150 && px(900, 1500)[1] < 70, `speaker on the right ${px(900, 1500)}`);
+  assert.ok(px(400, 1500)[0] < 70, `night where mid had the speaker ${px(400, 1500)}`);
+  writeFileSync(join(P, "fx/fx.json"), JSON.stringify({ look: "night" }));
+  r = nb(P); assert.equal(r.status, 0, r.stderr + r.stdout);
+  px = frameRGB(out, 5);
+  assert.ok(px(400, 1500)[0] > 150, "without cine work/shots.json is ignored: the speaker stays mid");
+  const plain = px(547, 1456)[0];
+  writeFileSync(join(P, "fx/fx.json"), JSON.stringify({ look: "night", cine: true }));
+  rmSync(join(P, "work/shots.json"));
+  r = nb(P); assert.equal(r.status, 0, r.stderr + r.stdout);
+  const graded = frameRGB(out, 5)(547, 1456)[0];
+  assert.ok(graded < plain - 15 && graded > 170, `grade ${plain} → ${graded}`);
+  assert.match(r.stdout, /кино вкл/);
+});
+
+test("night_base cine: a move smears the speaker's edges only while it moves; --until cuts the base", { timeout: 120000 }, () => {
+  const P = cineProject("cine2-", { fx: { look: "night", cine: true }, shots: [{ at: 0.08, shot: "side-right", dur: 0.24 }] });
+  const out = join(P, "renders/picture.base.mp4");
+  const r = nb(P); assert.equal(r.status, 0, r.stderr + r.stdout);
+  const soft = (n) => {                       // half-red pixels on a row: the speaker's edges blended with the night
+    const px = frameRGB(out, n); let k = 0;
+    for (let x = 150; x < 1060; x++) { const [R, G] = px(x, 1500); if (R - G > 60 && R - G < 170) k++; }
+    return k;
+  };
+  const still = soft(9), moving = soft(3);
+  assert.ok(still <= 14, `static edges are sharp: ${still}`);
+  assert.ok(moving >= 24, `moving edges are smeared: ${moving}`);
+  const u = nb(P, "--until", "0.2"); assert.equal(u.status, 0, u.stderr + u.stdout);
+  assert.equal(frameCount(out), "5");
+});
+
+test("night_base cine: a non-mid shot in a night accent window stops the run and names the key", { timeout: 60000 }, () => {
+  const P = cineProject("cine3-", { fx: { look: "night", cine: true }, shots: [{ at: 0, shot: "close", dur: 0 }] });
+  ff("-f", "lavfi", "-i", "color=c=green:s=1080x1920:r=25:d=0.16", "-c:v", "libx264", "-pix_fmt", "yuv420p", join(P, "broll/acc.mp4"));
+  writeFileSync(join(P, "work/accents.json"), JSON.stringify({ accents: [{ id: "a", in: 0.04, out: 0.2, kind: "night", file: "broll/acc.mp4" }] }));
+  const r = nb(P);
+  assert.notEqual(r.status, 0);
+  assert.match(r.stderr, /окне акцента 0\.04–0\.20.*at 0/);
+});
