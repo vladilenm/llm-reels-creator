@@ -104,11 +104,12 @@ fast copy `renders/preview.x<F>.mp4` at the speed F from `vladilen-reels` S7 (by
   shoulder → `night_base.py --card`. Name the choice in the preview report;
 - vladilen-reels S3 writes the motion storyboard `PLAN.json` `motion` and runs `motion-check.mjs` → `MOTION.md`;
   S4 builds night clips (screen-kit `theme: 'night'`, `OK.run` scenes and accents); S4b's base is `night_base.py`;
-- the preview report adds the `MOTION.md` table (time · word · verb · what is in the frame).
+  run `motion-check.mjs` again after S4/S4b, once `work/accents.json` and `broll/plan.json` exist, before the preview;
+- the preview report adds that run's `MOTION.md` table (time · word · verb · what is in the frame).
 
 **Preview — stop.** Show `renders/preview.x<F>.mp4` and `renders/preview.mp4` to the customer (SendUserFile,
 plus the paths), what differs from `SCRIPT.md`, the automatic decisions, one line from `REVIEW.md`,
-the sound line. One question: «Ок или правки?» Corrections → apply, re-render what changed,
+the `MOTION.md` table and the base choice (mask or card), the sound line. One question: «Ок или правки?» Corrections → apply, re-render what changed,
 show the preview again.
 
 ## F3 · «ок» → final (`<reel>` = the reel project from F2)

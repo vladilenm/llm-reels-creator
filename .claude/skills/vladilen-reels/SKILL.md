@@ -176,8 +176,10 @@ for `gate_b_changes`.
 `{at, word, verb, what}` — `at` is the start of `word` on the clean timeline, verbs from `scripts/ru/motion-check.mjs`
 (16: fly, pull, live, layers, lens, grid, materialize, rebuild, tree, physics, callouts, active, chapter, return, morph,
 prompt). No verb twice in a row, at least 5 different ones, one hero scene built by hand for the tool (usually the hook
-or the main claim), 1–2 light accents on the strongest moments, the rest of the background swaps are night ones.
-`node scripts/ru/motion-check.mjs $P` must PASS; it writes `MOTION.md` for the preview report.
+or the main claim), 1–2 light accents on the strongest moments, the rest of the accents are night ones.
+`node scripts/ru/motion-check.mjs $P` must PASS. It runs at S3 before `work/accents.json` and `broll/plan.json`
+exist, so run it again after S4/S4b, once the accents exist, before the preview; that run's `MOTION.md` goes into
+the preview report.
 
 ### S4 Графика — no stop
 
@@ -199,7 +201,7 @@ Playwright `colorScheme: 'dark'`; glass list and night card; `pull`, `enter: 'gr
 and accents: `OK.run` (`scripts/ru/broll/object-scene.js`, schema in its header) with objects from
 `scripts/ru/broll/object-kit.js` (32 objects listed in its header). A missing object: draw it in the reel's generator
 from `OK.box/cyl/disc/face/plate/circ` in the same style; reusable → add it to `object-kit.js` with a `checkObjects`
-test. Accents are full `OK.run` layers listed in `work/accents.json` (`kind: night | light`), not in `broll/plan.json`;
+test. Accents are full `OK.run` layers listed in `work/accents.json` (`kind: night | light`; schema in the header of `night_base.py`), not in `broll/plan.json`;
 a light full insert carries `theme: "light"` in `broll/plan.json`. Joins: full clips and panels butt (out = the next
 in); a full clip that follows a frame with the speaker starts its entry 0.08–0.1 s before the cut. Lines ≥ 3 px,
 labels ≥ 30 px, entries expo-out 0.6–0.9 s, exits 0.3–0.4 s, no bouncing springs.
@@ -303,7 +305,7 @@ location change. Propose them in the S3 plan as `fx` events.
 **OBS-template takes** (1080×1920 from his OBS scene: placeholders on top, the camera as a rounded card
 from y 1098). The base is `python3 scripts/ru/wide/obs_base.py $P [--mix]` — brand canvas, the card as
 recorded, punch-ins 1.00 ↔ 1.07 on the joins — not `fx_picture.py`.
-With `look: "night"` the base is `python3 scripts/ru/wide/night_base.py $P --prep` (Vision masks for the whole reel) →
+With `look: "night"` the base is `python3 scripts/ru/wide/night_base.py $P --prep` (Vision masks for the whole reel; chair or clutter at the shoulder: skip `--prep`, use `--card`; `--allow-missing` only when you know why masks are missing) →
 `--stills <t,…>` (check the mask edges, the halo, every accent) → `--mix`: the night background drawn in code, the
 speaker by the mask ×1.1 from the bottom with a halo (a soft shadow on light accents), punch-ins 1.00 ↔ 1.05 on the
 joins, accents from `work/accents.json` under him — the word is always behind the head. `obs_base.py` and `obs_swaps.py`
@@ -320,7 +322,7 @@ Captions are hidden (`captions.hide`) over a swap whose big text repeats the wor
 
 Also default (customer, 2026-10-12): quiet SFX on every visual event (`scripts/ru/fx/sfx.py`:
 whoosh on transitions, click on presses, pop on appearances, one hit on the key word) and
-small smooth animated transitions on every card — spring in/out with a short blur, morph
+small smooth animated transitions on every card — spring in/out with a short blur (night look: expo-out with a long brake, no bounce), morph
 between states (motion-broll `M.vis` / `SEQ`), never a hard pop-in.
 
 **Real sounds instead of the synth (since 2026-10-25).** `sfx.py` plays `brand/sfx/<kind>.wav`
