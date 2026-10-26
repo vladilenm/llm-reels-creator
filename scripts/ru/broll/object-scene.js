@@ -294,7 +294,8 @@ OK.run = (cfg) => {
       C.plate.style.top = (by - 26).toFixed(1) + 'px';
       C.plate.style.left = (dx >= 0 ? bx + 10 : bx - 10).toFixed(1) + 'px';
       C.plate.style.transform = dx >= 0 ? '' : 'translateX(-100%)';
-      C.plate.style.clipPath = wipe(ex((a - 0.25) / 0.5));
+      const pu = ex((a - 0.25) / 0.5);              // left-to-right wipe that keeps 20 px around for the ring and glow
+      C.plate.style.clipPath = `inset(-20px calc(${(100 - 100 * pu).toFixed(2)}% + ${(20 - 40 * pu).toFixed(1)}px) -20px -20px round 14px)`;
     }
 
     if (cfg.returns) {

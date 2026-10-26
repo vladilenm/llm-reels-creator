@@ -179,6 +179,7 @@ test("object scene: «перестройка» moves an item and its link follow
     assert.equal(await c.at(0.4, vis, "ok-co-0"), false, "the plate waits for its word");
     assert.equal(await c.at(1.3, vis, "ok-co-0"), true);
     assert.equal(await c.at(1.3, () => document.getElementById("ok-co-0").textContent), "whoosh");
+    assert.ok((await c.at(1.3, () => getComputedStyle(document.getElementById("ok-co-0")).clipPath)).includes("-20px"), "the plate's clip leaves room for its ring");
     assert.ok(await c.at(1.3, () => document.getElementById("ok-co-0").getBoundingClientRect().right) < 780, "dx < 0 puts the plate left of its item");
     assert.equal(await c.at(1.9, () => getComputedStyle(document.getElementById("ok-ret-0")).display), "none");
     const ho = (n) => +getComputedStyle(document.getElementById("ok-ret-head-" + n)).opacity;
