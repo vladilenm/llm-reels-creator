@@ -143,3 +143,31 @@ test("object scene terminal: the command types, output lines arrive on their wor
     assert.deepEqual(c.errors, []);
   } finally { await c.browser.close(); }
 });
+
+// ---------- screen kit night ----------
+
+test("screen kit night: no title plate, typed chapter index, the frame draws in, edge light on a shot change, lens runs", { timeout: 60000 }, async () => {
+  const d = tmp("png-"); ff("-f", "lavfi", "-i", "testsrc2=size=640x360", "-frames:v", "1", join(d, "a.png"));
+  const c = await openClip(`<title>x</title><script>SK.run(${JSON.stringify({ T: 3, mode: "light", theme: "night", tin: 0,
+    title: { idx: "01 — тест", l1: "Claude", l2: "делает", y: 200, tin: 0 },
+    win: { x: 540, y: 380, w: 900, h: 480, tin: 0 }, media: { a: { src: "a.png" } },
+    shots: [[0, "a", [0, 0, 640]], [1.5, "a", [100, 0, 500], "cut"]],
+    marks: [{ kind: "lens", keys: [[1.8, 320, 180], [2.4, 400, 200]], r: 100, zoom: 2, t0: 1.8, t1: 2.6 }] })});</script>`,
+    { "a.png": readFileSync(join(d, "a.png")) });
+  try {
+    const plate = await c.at(0.8, () => { const s = getComputedStyle(document.querySelector(".sk-t2")); return [s.backgroundColor, s.color]; });
+    assert.deepEqual(plate, ["rgba(0, 0, 0, 0)", "rgb(183, 156, 255)"]);
+    const idx = () => document.querySelector(".sk-idx").textContent;
+    assert.ok((await c.at(0.15, idx)).length < "01 — тест".length);
+    assert.equal(await c.at(0.8, idx), "01 — тест");
+    const off = () => +document.querySelector(".sk-draw rect").style.strokeDashoffset;
+    const mid = await c.at(0.2, off);
+    assert.ok(mid > 0.02 && mid < 0.98, `dashoffset ${mid}`);
+    assert.ok(await c.at(0.9, off) < 0.01);
+    const edge = () => [+document.querySelector(".sk-edge").style.opacity, parseFloat(document.querySelector(".sk-edge").style.left)];
+    const [o1, l1] = await c.at(1.7, edge), [o2, l2] = await c.at(2.0, edge);
+    assert.ok(o2 > 0.2 && l2 > l1, `edge ${o1} ${l1} → ${o2} ${l2}`);
+    await c.at(2.2, () => 0);
+    assert.deepEqual(c.errors, []);
+  } finally { await c.browser.close(); }
+});

@@ -8,7 +8,10 @@
    and render.js / beats.js wait for window.READY before the first seek.
 
    SK.run({
-     T, mode:'light'|'dark'|'card', tin:0, tout:null,
+     T, mode:'light'|'dark'|'card', tin:0, tout:null, theme?:'night',
+       night look (2026-10-26): no title plate (wipes, italic in accent_light, title.idx = typed chapter index),
+       glass window whose frame draws in by a line, light running along its top edge on entry and shot changes,
+       win.enter:'fly' (arrives from depth after an object scene's fly), marks kind 'lens' {keys:[[t,x,y]], r, zoom, t0, t1}
      title:{l1, l2, y:372, tin?, tout?},          captions ≈1000–1070, the head starts ≈1095 (SHOOT.md)
      titles:[{l1, l2, y?, tin, tout}],            several titles in turn over one window (sections of a long clip)
      icons:{y:548, size:56, items:[{label, src?}], active:[[t, index]], tin?, tout?},
@@ -59,6 +62,10 @@ const css = `
 .sk-rt{font-weight:600;font-size:30px;color:${INK_DARK};letter-spacing:-.01em;white-space:nowrap}
 .sk-rs{height:62px;border-radius:16px;background:#fff;display:flex;align-items:center;gap:10px;padding:0 20px;box-shadow:0 0 0 1.5px #E3DFEA,0 10px 26px -14px rgba(30,15,60,.35);font-weight:600;font-size:26px;color:#4A4458;white-space:nowrap}
 .sk-rs b{font-family:'SK Mono',monospace;font-weight:500;color:${INK_DARK}}
+.sk-idx{left:0;width:${W}px;text-align:center;font-family:'SK Mono',monospace;font-weight:500;font-size:30px;letter-spacing:.06em;color:${B.accent_light};white-space:nowrap}
+.sk-edge{width:140px;height:3px;border-radius:2px;background:linear-gradient(90deg,${rgba(B.accent_light,0)},#F1E9FF,${rgba(B.accent_light,0)});box-shadow:0 0 14px 3px ${rgba(B.accent_light,.8)}}
+.sk-draw{overflow:visible}
+.sk-grid{left:-200px;top:-200px;width:${W+400}px;height:${H+400}px;background-image:linear-gradient(${rgba(B.accent_light,.10)} 2px,transparent 2px),linear-gradient(90deg,${rgba(B.accent_light,.10)} 2px,transparent 2px);background-size:84px 84px}
 `;
 
 // keyed interpolation: [{t, v:[...], dur, ease}] → t => v; a new key starts from wherever the last one was
@@ -76,9 +83,10 @@ function keyed(keys){
   return t=>at(t, keys.length);
 }
 const SPRINGY = x=>M.S(x*0.9,9.5,0.82);   // eased spring on a 0..1 clock (slight settle)
+const ex = x=>x<=0?0:x>=1?1:1-Math.pow(2,-10*x);    // expo-out: the long brake of the night look
 
 SK.run = (cfg)=>{
-  const T = cfg.T, dark = cfg.mode==='dark', card = cfg.mode==='card';
+  const T = cfg.T, dark = cfg.mode==='dark', card = cfg.mode==='card', night = cfg.theme==='night';
   const tin = cfg.tin ?? 0, tout = cfg.tout ?? null;
   const st = document.createElement('style'); st.textContent = css; document.head.appendChild(st);
   const root = document.createElement('div'); root.id='sk'; document.getElementById('stage').appendChild(root);
@@ -86,16 +94,22 @@ SK.run = (cfg)=>{
   const vis = (t, a, b, o)=>M.vis(t, a ?? tin, b === undefined ? tout : b, o);
 
   const haze = dark ? el('a sk-glow') : el('a sk-haze');
-  if(card) haze.style.display = 'none';
+  if(card || (night && !dark)) haze.style.display = 'none';
+  if(night && dark) el('a sk-grid');
 
   // ---------- titles ----------
   const titles = (cfg.titles || (cfg.title ? [cfg.title] : [])).map((c)=>{
     const y = c.y ?? cfg.title?.y ?? 372;
     const t1 = el('a sk-t1'); t1.textContent = c.l1 || ''; t1.style.top = y+'px';
-    if(dark) t1.style.color = B.ink;
+    if(dark || night) t1.style.color = B.ink;
     const w2 = el('a sk-t2w'); w2.style.top = (y+66)+'px';
     const t2 = el('sk-t2', w2); const tx = el('', t2, 'span'); tx.textContent = c.l2 || '';
-    return {c, t1, w2, t2, tx};
+    let idx = null;
+    if(night){
+      Object.assign(t2.style, {background:'transparent', boxShadow:'none', padding:'0 4px 8px', color:B.accent_light});
+      if(c.idx){ idx = el('a sk-idx'); idx.style.top = (y-52)+'px'; }
+    }
+    return {c, t1, w2, t2, tx, idx};
   });
 
   // ---------- icons ----------
@@ -131,6 +145,20 @@ SK.run = (cfg)=>{
   const barEl = el('sk-bar', win); barEl.style.height = bar+'px';
   ['#FF5F57','#FEBC2E','#28C840'].forEach((c,i)=>{const d=el('sk-dot',barEl); d.style.background=c; d.style.left=(22+i*25)+'px';});
   const urlEl = el('sk-url', barEl);
+  let drawSvg = null, drawRect = null, edge = null;
+  if(night){
+    win.style.background = '#18122A';
+    win.style.boxShadow = `0 0 0 2px ${rgba(B.accent_light,.45)},0 0 44px 4px ${rgba(B.accent,.28)},0 30px 80px -20px rgba(0,0,0,.7)`;
+    Object.assign(barEl.style, {background:'rgba(255,255,255,.04)', borderBottom:`1px solid ${rgba(B.accent_light,.18)}`});
+    Object.assign(urlEl.style, {background:'rgba(255,255,255,.06)', color:'rgba(245,243,250,.68)', fontFamily:"'SK Mono',monospace"});
+    if(wc.enter !== 'fly'){
+      drawSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); drawSvg.setAttribute('class', 'a sk-draw'); root.appendChild(drawSvg);
+      drawRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+      for(const [k,v] of Object.entries({x:2, y:2, rx:26, fill:'none', stroke:B.accent_light, 'stroke-width':3, pathLength:1, 'stroke-dasharray':1})) drawRect.setAttribute(k, v);
+      drawSvg.appendChild(drawRect);
+    }
+    edge = el('a sk-edge');
+  }
   const pgEl = wc.pager ? el('sk-pg', barEl) : null;
   if(pgEl) pgEl.textContent = wc.pager;
   const cv = el('sk-cv', win, 'canvas'); cv.style.top = bar+'px';
@@ -184,6 +212,22 @@ SK.run = (cfg)=>{
   const CUR = new Path2D('M3 3 L3 41 L12.5 32 L19 47 L25.5 44.2 L19.2 29.8 L32 29.8 Z');
 
   const rr = (x,y,w,h,r)=>{ctx.beginPath(); ctx.roundRect(x,y,w,h,r);};
+  // lens (night look): outside dims, the circle shows the media under it ×zoom, a ring in accent_light
+  const lensCv = document.createElement('canvas'), lctx = lensCv.getContext('2d');
+  const drawLens = (m, t, map, cw, ch)=>{
+    const r = m.r ?? 110, z = m.zoom ?? 1.9, at = m._p || (m._p = M.path(m.keys));
+    const p = at(t), [sx, sy] = map(p.x, p.y);
+    const o = clamp((t-m.t0)/0.2) * (m.t1!=null ? 1-clamp((t-m.t1)/0.2) : 1);
+    if(o<=0.002) return;
+    const d = Math.ceil(2*r), src = r/z;
+    if(lensCv.width!==d){ lensCv.width = d; lensCv.height = d; }
+    lctx.clearRect(0,0,d,d); lctx.drawImage(cv, sx-src, sy-src, 2*src, 2*src, 0, 0, d, d);
+    ctx.save(); ctx.globalAlpha = o;
+    ctx.beginPath(); ctx.rect(0,0,cw,ch); ctx.arc(sx, sy, r, 0, Math.PI*2, true); ctx.fillStyle = 'rgba(14,11,20,.62)'; ctx.fill('evenodd');
+    ctx.save(); ctx.beginPath(); ctx.arc(sx, sy, r, 0, Math.PI*2); ctx.clip(); ctx.drawImage(lensCv, sx-r, sy-r); ctx.restore();
+    ctx.beginPath(); ctx.arc(sx, sy, r, 0, Math.PI*2); ctx.lineWidth = 3; ctx.strokeStyle = B.accent_light;
+    ctx.shadowColor = rgba(B.accent_light,.9); ctx.shadowBlur = 18; ctx.stroke(); ctx.restore();
+  };
 
   const drawCanvas = (t, cw, ch)=>{
     ctx.clearRect(0,0,cw,ch); ctx.fillStyle = '#fff'; ctx.fillRect(0,0,cw,ch);
@@ -214,6 +258,7 @@ SK.run = (cfg)=>{
     for(const m of (cfg.marks||[])){
       if(t < m.t0 || (m.t1!=null && t > m.t1+0.2)) continue;
       if(m.shot!=null && m.shot!==shots[i][1]) continue;
+      if(m.kind==='lens'){ drawLens(m, t, map, cw, ch); continue; }
       const [x,y,k] = map(m.rect[0], m.rect[1]), w = m.rect[2]*k, h = m.rect[3]*k;
       const out = m.t1!=null ? 1-eo((t-m.t1)/0.2) : 1;
       if(m.kind==='blur'){
@@ -223,8 +268,8 @@ SK.run = (cfg)=>{
       }
       if(m.kind==='hl'){
         const p = eio((t-m.t0)/(m.dur ?? 0.38));
-        ctx.save(); ctx.globalCompositeOperation='multiply'; ctx.globalAlpha=0.9*out;
-        ctx.fillStyle = dark ? rgba(B.accent_light,.55) : '#D9CBFF';
+        ctx.save(); ctx.globalCompositeOperation = night ? 'screen' : 'multiply'; ctx.globalAlpha=0.9*out;
+        ctx.fillStyle = night ? rgba(B.accent,.6) : dark ? rgba(B.accent_light,.55) : '#D9CBFF';
         rr(x-4, y-3, (w+8)*p, h+6, 6); ctx.fill(); ctx.restore();
       }else if(m.kind==='ring'){
         const a = M.S(t-m.t0, 16, 0.62), sc = 1.18-0.18*a, cx = x+w/2, cy = y+h/2;
@@ -276,8 +321,40 @@ SK.run = (cfg)=>{
       cols.push(strip);
     }
     if(c.suffix){ const s = el('', num, 'span'); s.textContent = c.suffix; }
+    if(night){
+      Object.assign(box.style, {background:'#18122A', boxShadow:`0 0 0 2px ${rgba(B.accent_light,.9)},0 0 46px 4px ${rgba(B.accent,.35)}`});
+      Object.assign(num.style, {color:B.ink, fontFamily:"'SK Mono',monospace", fontWeight:500}); lbl.style.color = 'rgba(245,243,250,.7)';
+    }
     counter = {c, box, cols, digits};
   }
+
+  // night titles: a wipe left → right, the italic line in accent_light without a plate, the chapter index typed
+  const nightTitle = (title, t, a, b)=>{
+    const o = (t < a ? 0 : 1) * (b==null ? 1 : 1-clamp((t-b)/0.3));
+    for(const e of [title.t1, title.w2, title.idx]) if(e){ e.style.display = o>0.002 ? '' : 'none'; e.style.opacity = o.toFixed(3); }
+    if(o<=0.002) return;
+    title.t1.style.clipPath = `inset(-20% ${(100-100*ex((t-a)/0.7)).toFixed(2)}% -20% 0)`;
+    title.t2.style.clipPath = `inset(-20% ${(100-100*ex((t-a-0.12)/0.7)).toFixed(2)}% -20% 0)`;
+    if(title.idx){ const s = title.c.idx; M.setText(title.idx, s.slice(0, Math.round(s.length*clamp((t-a)/0.4)))); }
+  };
+  // the line that draws the window frame on entry, then the light along the top edge on entry and every shot change
+  const edgeTimes = night ? [...(wc.enter === 'fly' ? [] : [(wc.tin ?? tin) + 0.45]), ...shots.slice(1).map(s=>s[0])] : [];
+  const nightFrame = (t, x, y, w, h, wa, o)=>{
+    if(drawSvg){
+      Object.assign(drawSvg.style, {left:(x-w/2-2)+'px', top:(y-2)+'px', width:(w+4)+'px', height:(h+4)+'px'});
+      drawSvg.setAttribute('width', w+4); drawSvg.setAttribute('height', h+4);
+      drawRect.setAttribute('width', w); drawRect.setAttribute('height', h);
+      drawRect.style.strokeDashoffset = (1-ex(wa/0.6)).toFixed(4);
+      drawSvg.style.opacity = (o*(1-clamp((wa-0.6)/0.3))).toFixed(3);
+      drawSvg.style.display = wa < 0 || o<=0.002 ? 'none' : '';
+    }
+    let u = -1; for(const te of edgeTimes){ const v = (t-te)/0.8; if(v>=0 && v<1) u = v; }
+    edge.style.display = u<0 || o<=0.002 ? 'none' : '';
+    if(u>=0){
+      edge.style.left = (x-w/2-140+(w+140)*eio(u)).toFixed(1)+'px'; edge.style.top = (y-2).toFixed(1)+'px';
+      edge.style.opacity = (Math.sin(Math.PI*u)*o).toFixed(3);
+    }
+  };
 
   let lastW = 0, lastH = 0;
   const draw = (t)=>{
@@ -286,6 +363,7 @@ SK.run = (cfg)=>{
 
     for(const title of titles){
       const c = title.c, a = c.tin ?? tin + 0.1, b = c.tout === undefined ? tout : c.tout;
+      if(night){ nightTitle(title, t, a, b); continue; }
       M.apply(title.t1, vis(t, a, b));
       const v2 = vis(t, a+0.12, b, {lin:0.3});
       if(M.apply(title.w2, {...v2, blur:0, s:1})){
@@ -313,7 +391,14 @@ SK.run = (cfg)=>{
     }
 
     const [x,y,w,h] = wgeo(t);
-    const wv = vis(t, wc.tin ?? tin, wc.tout === undefined ? tout : wc.tout, {lin:0.34});
+    let wv = vis(t, wc.tin ?? tin, wc.tout === undefined ? tout : wc.tout, {lin:0.34});
+    if(night){
+      const wa = t - (wc.tin ?? tin), wo = wc.tout === undefined ? tout : wc.tout;
+      const o = (wa < 0 ? 0 : 1) * (wo==null ? 1 : 1-clamp((t-wo)/0.3));
+      if(wc.enter === 'fly'){ const u = ex(wa/0.6); wv = {o:o*clamp(wa/0.25), blur:(1-u)*6, s:0.35+0.65*u}; }
+      else { wv = {o, blur:0, s:1}; win.style.clipPath = `inset(0 ${(100-100*ex((wa-0.15)/0.6)).toFixed(2)}% 0 0 round 26px)`; }
+      nightFrame(t, x, y, w, h, wa, o);
+    }
     if(M.apply(win, wv)){
       win.style.left = (x-w/2).toFixed(2)+'px'; win.style.top = y.toFixed(2)+'px';
       win.style.width = w.toFixed(2)+'px'; win.style.height = h.toFixed(2)+'px';
