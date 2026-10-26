@@ -267,16 +267,21 @@ OK.O.chat = {
   },
 };
 
-// code (</>): an extruded glyph; active lights the slash, play breathes the brackets apart
-const LT = [[-20, 90], [-60, 55], [-20, 20], [-8, 32], [-36, 55], [-8, 78]];
-const SL = [[6, 96], [18, 96], [-6, 14], [-18, 14]];
+// code (</>): an extruded glyph that faces the camera like a sign (drawn in screen coordinates u right / v up and
+// mapped onto the plane y 0, so the chevrons stay upright under the iso shear); active lights the slash,
+// play breathes the brackets outward
+const upright = (uv) => uv.map(([u, v]) => { const x = u / 0.866; return [x, 0.5 * x + v]; });
+// the brackets stand 8 units clear of the slash at rest: the depth plate sits 7 units right of its front, so less looks touching
+const LT = upright([[-30, 80], [-66, 50], [-30, 20], [-22, 30], [-48, 50], [-22, 70]]);
+const RT = upright([[30, 80], [66, 50], [30, 20], [22, 30], [48, 50], [22, 70]]);
+const SL = upright([[4, 86], [13, 86], [-4, 14], [-13, 14]]);
 OK.O.code = {
-  vb: [-62, -112, 130, 106],
-  svg: () => plate(LT, 8, {id: 'lt'}) + plate(SL, 8, {id: 'sl'}) + plate(LT.map(([x, z]) => [-x, z]), 8, {id: 'rt'}),
+  vb: [-68, -96, 144, 90],
+  svg: () => plate(LT, 8, {id: 'lt'}) + plate(SL, 8, {id: 'sl'}) + plate(RT, 8, {id: 'rt'}),
   pose: (P, s, T) => {
-    const d = 6 * s.play * Math.sin(s.t * 3);
-    P.lt.setAttribute('transform', `translate(${f1(-d * 0.866)} ${f1(-d * 0.5)})`);
-    P.rt.setAttribute('transform', `translate(${f1(d * 0.866)} ${f1(d * 0.5)})`);
+    const d = 6 * s.play * Math.abs(Math.sin(s.t * 3));
+    P.lt.setAttribute('transform', `translate(${f1(-d)} 0)`);
+    P.rt.setAttribute('transform', `translate(${f1(d)} 0)`);
     P.sl.lastChild.style.fill = s.active > 0.5 ? T.accent : '';
   },
 };
