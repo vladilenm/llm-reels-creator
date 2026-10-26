@@ -12,6 +12,10 @@
                                                                      «перестройка» (keys move and resize, tout leaves)
      callouts:[{at:'id'|[x, y], text, t, dx:170, dy:-90, tout}],      «выноски»: a dotted elbow to a glass label
      returns:{to, from:[ids], t, gap:0.12, dur:0.5, bend:0.25, tout},  «возврат»: arrows back to the first item
+     drops:[{into:'id'|[x, y], kind:'document', n:1, t, gap:0.22, size:70, from:-320|[x, y]}],   «физика предмета»
+     morph:{from, t, dur:0.8, x:540, y, w:760, dots:[{at:0..1, t, on}], head:{t0, t1}},          «морф значка»
+     prompt:{x:540, y, w:900, text, t, dur:0.9, send, reply:{t, text}, tout},                      «строка ввода»
+     assemble:{rect:[x, y, w, h], t, dur:0.8, then:'id'},      «сборка из сетки» (full mode: cells match the clip's grid)
      links:[{from, to, tin, dur:0.5, dash:false}],                    «дерево и связи»: an elbow from → to
      fly:{id, t, dur:0.4},                                            «сквозной пролёт» into an item
      words:[{text, font:'display'|'serif'|'sans'|'mono', size, y, x:540, t, color}],   accent words: a wipe
@@ -19,9 +23,12 @@
      counter:{t, to, label, y, dur:1.2},
      terminal:{x, y, w, h, title, tin:-1, lines:[{t, text, kind:'cmd'|'out'|'ok', dur:0.55}]},   «живой интерфейс»
    })
+   OK.gridCells(parent, rect, {t, dur, step:84, ox:52, oy:52, drift:0, color, id:'ok-cells'}) → {el, draw(t)}: the grid's
+   cells inside rect light in a sweep from its centre and fade (screen-kit win.enter:'grid' uses it too).
    Items: x, y = frame px of the object's floor centre, size = drawn width. DOM ids (tests, debugging): ok-scene,
    ok-item-<id>, ok-label-<id>, ok-check-<id>, ok-link-<n>, ok-idx, ok-flip, ok-grid, ok-count, ok-term, ok-row-<n>,
-   ok-co-<n>, ok-co-line-<n>, ok-ret-<n>, ok-ret-head-<n>. */
+   ok-co-<n>, ok-co-line-<n>, ok-ret-<n>, ok-ret-head-<n>, ok-drop-<n>-<j>, ok-tl, ok-tl-dot-<i>, ok-tl-head, ok-prompt,
+   ok-prompt-text, ok-prompt-send, ok-prompt-reply, ok-cells. */
 (function(){
 const OK = window.OK;
 const {clamp, eo, eio} = M;
@@ -32,6 +39,31 @@ const fontOf = (kind, size) => ({display: `800 ${size}px 'SK Display','SK Serif'
 const mix = (a, b, u) => { const A = M.hex(a), B = M.hex(b); return `rgb(${A.map((x, i) => Math.round(x + (B[i] - x) * clamp(u))).join(',')})`; };
 const groups = (n) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
 const wipe = (u, pad = '-20%') => `inset(${pad} ${(100 - 100 * u).toFixed(2)}% ${pad} 0)`;
+
+// «сборка из сетки»: the cells of the background grid inside rect light up in a sweep from its centre, then fade.
+// Cells sit on the clip grid (OK and SK grids start at −200 px: lines at 52 + 84·n), drift follows a drifting grid.
+OK.gridCells = (parent, rect, o = {}) => {
+  const step = o.step ?? 84, ox = o.ox ?? 52, oy = o.oy ?? 52, [rx, ry, rw, rh] = rect, color = o.color || '183,156,255';
+  const box = document.createElement('div'); box.id = o.id || 'ok-cells';
+  Object.assign(box.style, {position: 'absolute', left: '0', top: '0', width: W + 'px', height: H + 'px', pointerEvents: 'none'});
+  parent.appendChild(box);
+  const cells = [], cx = rx + rw / 2, cy = ry + rh / 2, R = Math.hypot(rw / 2, rh / 2) || 1;
+  for (let gx = ox + Math.floor((rx - ox) / step) * step; gx < rx + rw; gx += step)
+    for (let gy = oy + Math.floor((ry - oy) / step) * step; gy < ry + rh; gy += step) {
+      const e = document.createElement('div');
+      Object.assign(e.style, {position: 'absolute', left: (gx + 2) + 'px', top: (gy + 2) + 'px', width: (step - 2) + 'px', height: (step - 2) + 'px',
+        background: `rgba(${color},.34)`, boxShadow: `0 0 18px rgba(${color},.45)`, opacity: '0'});
+      box.appendChild(e);
+      cells.push({e, d: Math.hypot(gx + step / 2 - cx, gy + step / 2 - cy) / R});
+    }
+  const dur = o.dur ?? 0.8;
+  return {el: box, draw: (t) => {
+    const a = (t - o.t) / dur, live = a >= 0 && a <= 1.05;
+    box.style.display = live ? '' : 'none';
+    box.style.transform = `translateY(${(-(o.drift ?? 0) * t).toFixed(1)}px)`;
+    for (const c of cells) c.e.style.opacity = live ? (ex((a - c.d * 0.45) / 0.18) * (1 - clamp((a - 0.6) / 0.4))).toFixed(3) : '0';
+  }};
+};
 
 OK.run = (cfg) => {
   const T = cfg.T, theme = cfg.theme || 'night', TH = OK.THEMES[theme], full = cfg.mode === 'full';
@@ -50,7 +82,10 @@ OK.run = (cfg) => {
 #ok .okterm{border-radius:22px;overflow:hidden;padding:24px 30px;font:500 26px/40px 'SK Mono',monospace;white-space:pre}
 #ok .okcar{display:inline-block;width:14px;height:30px;margin-left:4px;vertical-align:-5px}
 #ok .okc{left:0;width:${W}px;text-align:center}
-#ok .okco{padding:8px 20px;border-radius:14px;font:500 30px 'SK Mono',monospace;white-space:nowrap}`;
+#ok .okco{padding:8px 20px;border-radius:14px;font:500 30px 'SK Mono',monospace;white-space:nowrap}
+#ok .okpr{height:96px;border-radius:48px;padding:0 110px 0 40px;display:flex;align-items:center;font:500 32px 'SK Mono',monospace;white-space:pre;overflow:hidden;box-sizing:border-box}
+#ok .okbtn{position:absolute;right:16px;top:16px;width:64px;height:64px;border-radius:32px;display:flex;align-items:center;justify-content:center}
+#ok .okrep{font:500 30px 'SK Mono',monospace;white-space:nowrap}`;
   document.head.appendChild(st);
   const root = document.createElement('div'); root.id = 'ok'; root.className = `ok-${theme}`;
   document.getElementById('stage').appendChild(root);
@@ -191,6 +226,72 @@ OK.run = (cfg) => {
     return {id, n, p, head, len: 0, d: ''};
   });
 
+  // drops («физика предмета»): small objects fall into an item or onto a point one after another, land with a squash,
+  // sink in and fade; the target dips on each landing
+  const FALL = 0.55;
+  const drops = (cfg.drops || []).flatMap((D, n) => {
+    if (typeof D.into === 'string') need(D.into, `drops[${n}].into`);
+    const O = OK.O[D.kind || 'document']; if (!O) throw new Error(`OK: drops[${n}].kind → unknown object ${D.kind}`);
+    return Array.from({length: D.n ?? 1}, (_, j) => {
+      const size = D.size ?? 70, [vx, vy, vw, vh] = O.vb, k = size / vw;
+      const svg = document.createElementNS(NS, 'svg'); svg.id = `ok-drop-${n}-${j}`;
+      svg.setAttribute('viewBox', O.vb.join(' ')); svg.setAttribute('width', size); svg.setAttribute('height', (vh * k).toFixed(1));
+      Object.assign(svg.style, {position: 'absolute', overflow: 'visible', transformOrigin: '50% 100%'});
+      svg.innerHTML = `<g class="okobj">${O.svg()}</g>`;
+      scene.appendChild(svg);
+      const P = {}; svg.querySelectorAll('[data-p]').forEach((e) => { P[e.dataset.p] = e; });
+      O.pose(P, {t: 0, active: 0, open: 0, spin: 0, struck: 0, play: 0, on: 0, fill: 0}, TH);
+      return {D, j, svg, k, vx, vy, t0: D.t + j * (D.gap ?? 0.22)};
+    });
+  });
+  const dropTarget = (D) => { if (Array.isArray(D.into)) return D.into; const I = items[D.into]; return [I.at.x, I.at.y + I.O.vb[1] * I.at.k * 0.55]; };
+
+  // morph («морф значка»): an item folds into a dot and a line grows out of it into a timeline; dots pop on their
+  // times; a playhead sweeps and lights the dots it passes
+  let morph = null;
+  if (cfg.morph) {
+    const m = cfg.morph, line = document.createElementNS(NS, 'line'); line.id = 'ok-tl';
+    need(m.from, 'morph.from');
+    for (const [key, v] of Object.entries({stroke: TH.line, 'stroke-width': 3, 'stroke-linecap': 'round'})) line.setAttribute(key, v);
+    lsvg.appendChild(line);
+    const dots = (m.dots || []).map((d, i) => {
+      const c = document.createElementNS(NS, 'circle'); c.id = 'ok-tl-dot-' + i;
+      for (const [key, v] of Object.entries({r: 11, stroke: TH.line, 'stroke-width': 3, fill: TH.left})) c.setAttribute(key, v);
+      lsvg.appendChild(c); return {d, c};
+    });
+    const head = m.head ? el('a', scene, 'div', 'ok-tl-head') : null;
+    if (head) Object.assign(head.style, {width: '4px', height: '140px', borderRadius: '2px', background: TH.on, boxShadow: `0 0 18px 3px rgba(${TH.glow},.8)`});
+    morph = {m, line, dots, head};
+  }
+
+  // prompt («строка ввода»): a glass input bar over the head; the query types, the send button lights, the reply comes
+  let prompt = null;
+  if (cfg.prompt) {
+    const c = cfg.prompt, w = c.w ?? 900, x = (c.x ?? 540) - w / 2;
+    const bar = el('a okpr', root, 'div', 'ok-prompt');
+    Object.assign(bar.style, {left: x + 'px', top: c.y + 'px', width: w + 'px', color: TH.ink,
+      background: theme === 'night' ? 'rgba(24,18,38,.94)' : '#FFFFFF', boxShadow: `0 0 0 3px rgba(${TH.glow},.45),0 0 40px 2px rgba(124,58,237,.22)`});
+    const tx = el('okx', bar, 'span', 'ok-prompt-text'), car = el('okcar', bar, 'span'); car.style.background = TH.on;
+    const btn = el('okbtn', bar, 'div', 'ok-prompt-send');
+    btn.innerHTML = '<svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg>';
+    let reply = null;
+    if (c.reply) {
+      reply = el('a okrep', root, 'div', 'ok-prompt-reply'); reply.textContent = c.reply.text;
+      Object.assign(reply.style, {left: (x + 30) + 'px', top: (c.y + 124) + 'px', color: TH.on});
+    }
+    prompt = {c, bar, tx, car, btn, reply};
+  }
+
+  // assemble («сборка из сетки»): full mode only; the item `then` appears as the cells fade
+  let cellsA = null;
+  if (cfg.assemble) {
+    const A = cfg.assemble;
+    if (A.then) need(A.then, 'assemble.then');
+    cellsA = OK.gridCells(scene, A.rect, {t: A.t, dur: A.dur, drift: full && theme === 'night' ? 6 : 0, color: TH.glow});
+    scene.insertBefore(cellsA.el, scene.firstChild);
+    if (A.then) { items[A.then].it.tin = A.t + (A.dur ?? 0.8) * 0.55; items[A.then].it.ghost = false; }
+  }
+
   // ---------- above the scene ----------
   const words = (cfg.words || []).map((w) => {
     const e = el('a okw'); e.textContent = w.text; e.style.font = fontOf(w.font, w.size);
@@ -247,11 +348,18 @@ OK.run = (cfg) => {
     }
 
     for (const I of Object.values(items)) place(I, t);
+    const dip = {};
+    for (const d of drops) {
+      if (typeof d.D.into !== 'string') continue;
+      const l = t - d.t0 - FALL;
+      if (l >= 0 && l < 0.18) dip[d.D.into] = (dip[d.D.into] || 0) + 5 * Math.sin(Math.PI * l / 0.18);
+    }
     for (const I of Object.values(items)) {
-      const it = I.it, a = t - it.tin, gone = it.tout == null ? 0 : ex((t - it.tout) / 0.35);
-      I.gone = gone;                                  // links and arrows to a departed item leave with it
+      const it = I.it, a = t - it.tin, out = it.tout == null ? 0 : ex((t - it.tout) / 0.35);
+      const folded = morph && morph.m.from === it.id ? ex((t - morph.m.t) / 0.35) : 0, gone = Math.max(out, folded);
+      I.gone = gone;                                  // links and arrows to a departed or folded item leave with it
       const show = a >= 0 && gone < 0.999;
-      for (const e of [I.svg, I.lb, I.ck]) if (e) e.style.display = show ? '' : 'none';
+      for (const e of [I.svg, I.lb, I.ck]) if (e) { e.style.display = show ? '' : 'none'; if (!show) e.style.opacity = '0'; }   // a hidden item holds no stale opacity: its state is a function of t
       if (!show) continue;
       const e = ex(a / 0.5);
       if (it.ghost === false) { I.g.setAttribute('fill-opacity', '1'); I.g.setAttribute('stroke-opacity', '1'); }
@@ -261,7 +369,7 @@ OK.run = (cfg) => {
       for (const [n, f] of Object.entries(I.tracks)) s[n] = f(t);
       I.O.pose(I.P, s, TH);
       I.svg.style.filter = `drop-shadow(0 0 ${(4 + 14 * s.active).toFixed(1)}px rgba(${TH.glow},${(0.35 + 0.4 * s.active).toFixed(2)}))`;
-      I.svg.style.transform = `translateY(${((1 - e) * 16).toFixed(1)}px) scale(${(1 - 0.1 * gone).toFixed(4)})`;
+      I.svg.style.transform = `translateY(${((1 - e) * 16 + (dip[it.id] || 0)).toFixed(1)}px) scale(${(1 - 0.1 * out - 0.8 * folded).toFixed(4)})`;
       if (I.lb) {
         const la = t - (it.label.tin ?? it.tin + 0.3);
         I.lb.style.display = la < 0 ? 'none' : '';
@@ -328,6 +436,41 @@ OK.run = (cfg) => {
       }
     }
 
+    for (const d of drops) {
+      const a = t - d.t0, land = a - FALL, [tx, ty] = dropTarget(d.D);
+      d.svg.style.display = a < 0 || land > 0.2 ? 'none' : '';
+      if (a < 0 || land > 0.2) continue;
+      const from = d.D.from ?? -320, [fx, fy] = Array.isArray(from) ? from : [tx + (d.j % 2 ? 18 : -18), ty + from];
+      const u = clamp(a / FALL), sink = clamp(land / 0.2), sq = land > 0 ? Math.sin(Math.PI * clamp(land / 0.12)) * 0.12 : 0;
+      const x = fx + (tx - fx) * u, y = fy + (ty - fy) * u * u + 22 * sink;
+      d.svg.style.left = (x + d.vx * d.k).toFixed(1) + 'px'; d.svg.style.top = (y + d.vy * d.k).toFixed(1) + 'px';
+      d.svg.style.transform = `rotate(${((1 - u) * (d.j % 2 ? 14 : -14)).toFixed(2)}deg) scale(${(1 + sq * 0.5).toFixed(3)}, ${(1 - sq).toFixed(3)})`;
+      d.svg.style.opacity = (1 - sink).toFixed(3);
+    }
+
+    if (morph) {
+      const m = morph.m, [cx, cy] = centre(items[m.from]), X = m.x ?? 540, Y = m.y ?? cy, w = m.w ?? 760;
+      const a = t - m.t, u = ex((a - 0.15) / (m.dur ?? 0.8));
+      morph.line.style.display = a >= 0.15 ? '' : 'none';
+      const y = cy + (Y - cy) * u;
+      morph.line.setAttribute('x1', (cx + (X - w / 2 - cx) * u).toFixed(1)); morph.line.setAttribute('x2', (cx + (X + w / 2 - cx) * u).toFixed(1));
+      morph.line.setAttribute('y1', y.toFixed(1)); morph.line.setAttribute('y2', y.toFixed(1));
+      const hp = m.head ? eio(clamp((t - m.head.t0) / (m.head.t1 - m.head.t0))) : null;
+      if (morph.head) {
+        morph.head.style.display = t >= m.head.t0 && t <= m.head.t1 + 0.3 ? '' : 'none';
+        morph.head.style.left = (X - w / 2 + w * hp - 2).toFixed(1) + 'px'; morph.head.style.top = (Y - 70).toFixed(1) + 'px';
+        morph.head.style.opacity = (1 - clamp((t - m.head.t1) / 0.3)).toFixed(3);
+      }
+      for (const {d, c} of morph.dots) {
+        const b = t - d.t;
+        c.style.display = b < 0 ? 'none' : '';
+        c.setAttribute('cx', (X - w / 2 + w * d.at).toFixed(1)); c.setAttribute('cy', Y.toFixed(1));
+        c.setAttribute('r', (11 * (0.4 + 0.6 * ex(b / 0.35))).toFixed(2));
+        const lit = (m.head && t >= m.head.t0 && hp >= d.at) || (d.on != null && t >= d.on);
+        c.setAttribute('fill', lit ? TH.on : TH.left);
+      }
+    }
+
     if (cfg.fly) {
       const f = cfg.fly, I = items[f.id], u = eio(clamp((t - f.t) / (f.dur ?? 0.4))), [cx, cy] = centre(I);
       scene.style.transformOrigin = `${cx.toFixed(1)}px ${cy.toFixed(1)}px`;
@@ -368,6 +511,27 @@ OK.run = (cfg) => {
         }
       }
     }
+
+    if (prompt) {
+      const c = prompt.c, a = t - c.t, out = c.tout == null ? 0 : clamp((t - c.tout) / 0.3), on = a >= 0 && out < 1;
+      prompt.bar.style.display = on ? '' : 'none';
+      if (prompt.reply) prompt.reply.style.display = on && t >= c.reply.t ? '' : 'none';
+      if (on) {
+        const u = ex(a / 0.6);
+        prompt.bar.style.clipPath = `inset(-60px calc(${(100 - 100 * u).toFixed(2)}% + ${(60 - 120 * u).toFixed(1)}px) -60px -60px round 48px)`;
+        prompt.bar.style.opacity = (1 - out).toFixed(3);
+        const n = Math.round(c.text.length * clamp((a - 0.25) / (c.dur ?? 0.9)));
+        M.setText(prompt.tx, c.text.slice(0, n));
+        prompt.car.style.opacity = n < c.text.length || Math.floor(t * 2.5) % 2 === 0 ? '1' : '0';
+        prompt.btn.style.background = mix(theme === 'night' ? '#2C2342' : '#E4DFEC', TH.accent, c.send == null ? 0 : ex((t - c.send) / 0.3));
+        prompt.btn.style.transform = `scale(${(1 + 0.12 * Math.sin(Math.PI * clamp((t - (c.send ?? 1e9)) / 0.3))).toFixed(3)})`;
+        if (prompt.reply && t >= c.reply.t) {
+          const r = ex((t - c.reply.t) / 0.4);
+          prompt.reply.style.opacity = (r * (1 - out)).toFixed(3); prompt.reply.style.transform = `translateY(${((1 - r) * 10).toFixed(1)}px)`;
+        }
+      }
+    }
+    if (cellsA) cellsA.draw(t);
   };
 
   window.READY = Promise.resolve();

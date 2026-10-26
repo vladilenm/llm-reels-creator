@@ -194,6 +194,42 @@ test("object scene: «перестройка» moves an item and its link follow
   } finally { await c.browser.close(); }
 });
 
+test("object scene: drops fall into a folder, the morph grows a timeline the playhead lights, the prompt types and sends, cells assemble an item", { timeout: 60000 }, async () => {
+  const c = await openClip(scene({ T: 5, mode: "full", theme: "night",
+    items: [{ id: "f", kind: "folder", x: 300, y: 700, size: 200, tin: 0, states: [[0.2, { open: 1 }]] },
+      { id: "tt", kind: "turntable", x: 540, y: 1100, size: 220, tin: 0 },
+      { id: "g", kind: "gear", x: 800, y: 700, size: 160, tin: 9 }],
+    drops: [{ into: "f", kind: "document", n: 2, t: 0.3, gap: 0.2, size: 70 }],
+    morph: { from: "tt", t: 1.5, dur: 0.6, y: 1150, w: 700, dots: [{ at: 0.2, t: 2.2 }, { at: 0.8, t: 2.3 }], head: { t0: 2.4, t1: 3.0 } },
+    prompt: { y: 300, w: 860, text: "стеклянный звон", t: 0.5, dur: 0.6, send: 1.4, reply: { t: 1.6, text: "0 результатов" } },
+    assemble: { rect: [720, 560, 168, 168], t: 3.2, dur: 0.6, then: "g" } }));
+  try {
+    const box = (id) => { const e = document.getElementById(id); return getComputedStyle(e).display === "none" ? null : e.getBoundingClientRect().toJSON(); };
+    const d0a = await c.at(0.5, box, "ok-drop-0-0"), d0b = await c.at(0.75, box, "ok-drop-0-0");
+    assert.ok(d0a && d0b && d0b.top > d0a.top + 40, "the first file falls");
+    assert.equal(await c.at(1.3, box, "ok-drop-0-0"), null, "and sinks into the folder");
+    assert.equal(await c.at(0.35, box, "ok-drop-0-1"), null, "the second waits for its gap");
+    assert.ok(await c.at(2.2, () => +document.getElementById("ok-item-tt").style.opacity) < 0.05, "the turntable folds away");
+    const tl = () => { const l = document.getElementById("ok-tl"); return +l.getAttribute("x2") - +l.getAttribute("x1"); };
+    assert.ok(Math.abs(await c.at(2.6, tl) - 700) < 2, "the timeline reaches its width");
+    const fill = (i) => document.getElementById("ok-tl-dot-" + i).getAttribute("fill");
+    assert.equal(await c.at(2.6, fill, 0), "#B79CFF", "the playhead lit the first dot");
+    assert.notEqual(await c.at(2.6, fill, 1), "#B79CFF", "not yet the second");
+    assert.equal(await c.at(3.1, fill, 1), "#B79CFF");
+    const txt = () => document.getElementById("ok-prompt-text").textContent;
+    assert.ok((await c.at(0.9, txt)).length < "стеклянный звон".length);
+    assert.equal(await c.at(1.4, txt), "стеклянный звон");
+    assert.equal(await c.at(1.9, () => getComputedStyle(document.getElementById("ok-prompt-send")).backgroundColor), "rgb(124, 58, 237)", "send lights in the accent");
+    assert.equal(await c.at(1.5, () => getComputedStyle(document.getElementById("ok-prompt-reply")).display), "none");
+    assert.equal(await c.at(2.2, () => document.getElementById("ok-prompt-reply").textContent), "0 результатов");
+    const lit = () => [...document.querySelectorAll("#ok-cells > div")].filter((e) => +e.style.opacity > 0.3).length;
+    assert.ok(await c.at(3.45, lit) >= 2, "cells light up");
+    assert.equal(await c.at(3.95, lit), 0, "and are gone as the gear appears");
+    assert.ok(await c.at(3.95, () => +document.getElementById("ok-item-g").style.opacity) > 0.8, "the gear is assembled");
+    assert.deepEqual(c.errors, []);
+  } finally { await c.browser.close(); }
+});
+
 test("object scene full: light canvas wipes over the night, counter counts, objects drawn in the dark line", { timeout: 60000 }, async () => {
   const c = await openClip(scene({ T: 2, mode: "full", theme: "light", bg: { flip: [0, 0.35] },
     chapter: { idx: "01 — x", l1: "В Openverse", l2: "звуки", y: 420, tin: 0.1 },
