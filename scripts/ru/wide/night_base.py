@@ -9,8 +9,10 @@
   python3 scripts/ru/wide/night_base.py <project> --stills 0.5,6.2  → review/night-<t>.png
   python3 scripts/ru/wide/night_base.py <project> [--card] [--mix]  → renders/picture.base.mp4 [+ renders/picture.mp4 со звуком fx/mix.wav]
   --card: без маски — карточка камеры на ночном фоне с тонкой светлой рамкой (кресло или мебель у плеча)
+  --allow-missing: не останавливаться, если больше 5 % кадров без своей маски (по умолчанию это стоп: маски от другой версии ролика)
 
 work/accents.json: {"accents": [{"id", "in", "out", "kind": "night" | "light", "file"}]} — время чистого таймлайна,
+kind "light" — светлый акцент: за спикером мягкая нейтральная тень вместо фиолетового ореола.
 file — полный слой .mp4 (OK.run mode 'full') от корня проекта; в broll/plan.json эти клипы не попадают."""
 import json, os, shutil, subprocess, sys, pathlib, tempfile
 import numpy as np
@@ -31,6 +33,8 @@ ACCENT_L = np.array((0xB7, 0x9C, 0xFF), np.float32)
 FRAME_LINE = (90, 76, 126)                       # accent_light на 45 % поверх фона: рамка карточки в --card
 GRID_STEP, GRID_A, DRIFT = 84, 0.10, 6.0         # шаг сетки, её непрозрачность, дрейф вверх px/с
 GRAIN, HALO = 2.5, 0.55                          # зерно (σ, уровни), сила контрового света
+INK_DARK = np.array((0x17, 0x14, 0x1C), np.float32)
+SHADOW, MISS_MAX, REACH = 0.35, 0.05, 3           # тень на светлом акценте; доля кадров без маски до стопа; поиск соседа ±3
 PW, PH = round(CW * S), round(CH * S)
 PX, PY = round(540 + S * (CX0 - 540)), round(1920 + S * (CY0 - 1920))
 
@@ -53,9 +57,10 @@ GLOW, GRID = glow(), grid_alpha()
 
 
 def night_bg(f, fps_):
-    """ночной фон кадра f: свечение, сетка с дрейфом вверх, детерминированное зерно"""
-    off = int(f / fps_ * DRIFT) % GRID_STEP
-    a = GRID[off:off + H][..., None]
+    """ночной фон кадра f: свечение, сетка с плавным дрейфом вверх (доли пикселя — смесь соседних сдвигов), зерно"""
+    off = f / fps_ * DRIFT
+    o0, fr = int(off) % GRID_STEP, off - int(off)
+    a = (GRID[o0:o0 + H] * (1 - fr) + GRID[o0 + 1:o0 + 1 + H] * fr)[..., None]
     bg = GLOW * (1 - a) + ACCENT_L[None, None] * a
     return bg + np.random.default_rng(f).normal(0, GRAIN, (H, W, 1)).astype(np.float32)
 
@@ -66,15 +71,32 @@ def halo(m):
     return np.clip(blur - m, 0, 1) * HALO
 
 
+def shadow(m):
+    """тень за силуэтом на светлом акценте: мягкая, только снаружи маски"""
+    blur = np.asarray(Image.fromarray((m * 255).astype(np.uint8)).filter(ImageFilter.GaussianBlur(14)), np.float32) / 255
+    return np.clip(blur - m, 0, 1) * SHADOW
+
+
+def mask_src(masks, f, cuts):
+    """кадр, чья маска идёт в кадр f: свой; нет своего — ближайший сосед до ±3 кадров по эту сторону склейки
+    (склейка c — первый кадр нового плана); иначе None"""
+    if f in masks: return f
+    for d in range(1, REACH + 1):
+        for k in (f - d, f + d):
+            if k in masks and not any(min(k, f) < c <= max(k, f) for c in cuts): return k
+    return None
+
+
 def mask_at(masks, f, cuts):
-    """маска кадра f (masks — {номер кадра: png}, имена fx/masks/%05d.png): среднее по f-1, f, f+1 (0.25/0.5/0.25), но не
-    через склейку и без соседей, у которых маски нет; мягкий край; уголки карточки снизу заполнены соседним столбцом
-    (свитер). Нет маски самого кадра (Vision не нашёл человека) — пустая маска: спикера и ореола в этом кадре нет."""
-    if f not in masks: return Image.new("L", (CW, CH), 0)
+    """маска кадра f (masks — {номер кадра: png}, имена fx/masks/%05d.png). Своей нет — берётся маска соседа (mask_src);
+    нет и её — пустая маска: спикера и ореола в кадре нет. Среднее по src-1, src, src+1 (0.25/0.5/0.25), но не через
+    склейку и без соседей без маски; мягкий край; уголки карточки снизу заполнены соседним столбцом (свитер)."""
+    src = mask_src(masks, f, cuts)
+    if src is None: return Image.new("L", (CW, CH), 0)
     acc, ws = None, 0.0
-    for k, w in ((f - 1, .25), (f, .5), (f + 1, .25)):
+    for k, w in ((src - 1, .25), (src, .5), (src + 1, .25)):
         if k not in masks: continue
-        if (k == f - 1 and f in cuts) or (k == f + 1 and f + 1 in cuts): continue
+        if (k == src - 1 and src in cuts) or (k == src + 1 and src + 1 in cuts): continue
         m = Image.open(masks[k]).convert("L")
         if m.size != (CW, CH): m = m.resize((CW, CH), Image.BILINEAR)
         m = np.asarray(m, np.float32) / 255
@@ -103,7 +125,7 @@ def card_over(bg, fr):
 
 
 def compose(fr, f, ctx):
-    acc = ctx["accent"](f)
+    acc, kind = ctx["accent"](f)
     bg = acc.astype(np.float32) if acc is not None else night_bg(f, ctx["fps"])
     if ctx["card"]: return card_over(bg, fr)
     seg = sum(1 for r in ctx["toggles"] if f >= r)
@@ -117,8 +139,10 @@ def compose(fr, f, ctx):
         lay = lay.transform((W, H), Image.AFFINE, A, resample=Image.BICUBIC)
         lm = lm.transform((W, H), Image.AFFINE, A, resample=Image.BICUBIC)
     m = np.asarray(lm, np.float32) / 255
-    h = halo(m)[..., None]
-    bg = bg * (1 - h) + ACCENT_L[None, None] * h
+    if kind == "light":                              # светлый акцент: нейтральная тень, фиолетовый ореол там не виден
+        h = shadow(m)[..., None]; bg = bg * (1 - h) + INK_DARK[None, None] * h
+    else:
+        h = halo(m)[..., None]; bg = bg * (1 - h) + ACCENT_L[None, None] * h
     out = bg * (1 - m[..., None]) + np.asarray(lay, np.float32) * m[..., None]
     return np.clip(out, 0, 255).astype(np.uint8)
 
@@ -126,6 +150,18 @@ def compose(fr, f, ctx):
 def tail(f, n=8):
     f.seek(0)
     return "\n".join(f.read().decode("utf-8", "replace").strip().splitlines()[-n:])
+
+
+def rel(P, path):
+    """путь для сообщения: от корня проекта, если внутри него"""
+    try: return str(pathlib.Path(path).relative_to(P))
+    except ValueError: return str(path)
+
+
+def frame_count(path, fps_):
+    r = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", str(path)],
+                       capture_output=True, text=True, check=True)
+    return round(float(r.stdout.strip()) * fps_)
 
 
 def frames(path, fps_):
@@ -157,21 +193,24 @@ def grab(path, t, last=False):
 
 
 def accents(P, fps_):
-    """(функция f → кадр слоя акцента или None для покадрового прохода, окна [(f0, f1, path)])"""
+    """(функция f → (кадр слоя акцента, вид) или (None, None) для покадрового прохода, окна [(f0, f1, path, kind)])"""
     p = P / "work" / "accents.json"
-    win = [(round(a["in"] * fps_), round(a["out"] * fps_), P / a["file"]) for a in (json.loads(p.read_text())["accents"] if p.exists() else [])]
-    gone = sorted({str(path.relative_to(P)) for _, _, path in win if not path.is_file()})
+    raw = json.loads(p.read_text())["accents"] if p.exists() else []
+    bad = [a.get("id", "?") for a in raw if a.get("kind", "night") not in ("night", "light")]
+    if bad: raise SystemExit("work/accents.json: kind бывает night или light — не так у " + ", ".join(bad))
+    win = [(round(a["in"] * fps_), round(a["out"] * fps_), P / a["file"], a.get("kind", "night")) for a in raw]
+    gone = sorted({rel(P, path) for _, _, path, _ in win if not path.is_file()})
     if gone: raise SystemExit("work/accents.json: нет файлов слоя акцента: " + ", ".join(gone))
     its, last = {}, {}                              # читатель и последний кадр — на окно (один файл в двух окнах стартует с начала)
     def at(f):
-        for i, (f0, f1, path) in enumerate(win):
+        for i, (f0, f1, path, kind) in enumerate(win):
             if f0 <= f < f1:
                 if i not in its: its[i] = frames(path, fps_)
                 fr = next(its[i], None)
                 if fr is not None: last[i] = fr
-                elif i not in last: raise SystemExit(f"{path.relative_to(P)}: в слое акцента нет кадров")
-                return last[i]                      # клип короче окна — держим его последний кадр
-        return None
+                elif i not in last: raise SystemExit(f"{rel(P, path)}: в слое акцента нет кадров")
+                return last[i], kind                # клип короче окна — держим его последний кадр
+        return None, None
     return at, win
 
 
@@ -184,9 +223,12 @@ def fresh_dir(d):
 
 
 def prep(P, F):
+    clean = P / "renders" / "clean.mp4"
+    if not clean.is_file(): raise SystemExit(f"нет {rel(P, clean)}: сначала чистый ролик (S2)")
+    if not shutil.which("swift"): raise SystemExit("нет swift (Xcode Command Line Tools): маски Vision не посчитать — выбери --card")
     fr, out = P / "work" / "card-frames", P / "fx" / "masks"
     fresh_dir(fr); fresh_dir(out)                   # кадры и маски прошлого запуска не должны смешаться с новыми
-    subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", str(P / "renders" / "clean.mp4"), "-vf", f"fps={F:g},crop={CW}:{CH}:{CX0}:{CY0}",
+    subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", str(clean), "-vf", f"fps={F:g},crop={CW}:{CH}:{CX0}:{CY0}",
                     "-start_number", "0", str(fr / "%05d.png")], check=True)
     subprocess.run(["swift", str(ROOT / "scripts/ru/fx/person-mask.swift"), str(fr), str(out)], check=True)
     got, total = len(list(out.glob("*.png"))), len(list(fr.glob("*.png")))
@@ -205,24 +247,32 @@ def main():
     toggles = []
     for j in joins(P):
         fj = round(j * F)
-        if any(f0 / F - 0.3 <= j <= f1 / F + 0.3 for f0, f1, _ in win): continue
+        if any(f0 / F - 0.3 <= j <= f1 / F + 0.3 for f0, f1, _, _ in win): continue
         if not toggles or fj - toggles[-1] >= F: toggles.append(fj)
     ctx = {"fps": F, "card": card, "masks": masks, "cuts": {round(j * F) for j in joins(P)}, "toggles": toggles, "accent": accent}
     clean = P / "renders" / "clean.mp4"
+    cuts = ctx["cuts"]
+    if not card:
+        total = frame_count(clean, F)
+        own = [f for f in range(total) if f not in masks]
+        if len(own) > max(3, MISS_MAX * total) and "--allow-missing" not in a:
+            raise SystemExit(f"кадров без своей маски: {len(own)} из {total} (первые: {', '.join(map(str, own[:5]))}) — маски от другой "
+                             f"версии ролика? Запусти --prep заново или добавь --allow-missing")
 
     if "--stills" in a:
         out = P / "review"; out.mkdir(exist_ok=True)
         for t in (float(x) for x in a[a.index("--stills") + 1].split(",")):
             f = round(t * F)
-            layer = None
-            for f0, f1, path in win:
+            layer, kind = None, None
+            for f0, f1, path, k in win:
                 if f0 <= f < f1:
-                    layer = grab(path, (f - f0) / F)
+                    layer, kind = grab(path, (f - f0) / F), k
                     if layer is None: layer = grab(path, 0, last=True)      # клип короче окна: его последний кадр
-                    if layer is None: raise SystemExit(f"{path.relative_to(P)}: в слое акцента нет кадров")
+                    if layer is None: raise SystemExit(f"{rel(P, path)}: в слое акцента нет кадров")
                     break
-            if not card and f not in masks: print(f"  ⚠ у кадра {f} нет маски: спикера не будет")
-            im = compose(grab(clean, f / F), f, dict(ctx, accent=lambda _f, layer=layer: layer))
+            if not card and f not in masks:
+                print(f"  ⚠ у кадра {f} нет своей маски: " + ("взята у соседа" if mask_src(masks, f, cuts) is not None else "спикера не будет"))
+            im = compose(grab(clean, f / F), f, dict(ctx, accent=lambda _f, layer=layer, kind=kind: (layer, kind)))
             Image.fromarray(im).save(out / f"night-{t:05.2f}.png"); print("→", f"review/night-{t:05.2f}.png")
         return
 
@@ -238,14 +288,18 @@ def main():
             enc.stdin.write(compose(fr, f, ctx).tobytes()); n += 1
             if f % 250 == 0: print(f"  {f}", flush=True)
         enc.stdin.close()
-    except BrokenPipeError:
-        pass                                        # кодировщик умер: причина в его stderr ниже
+    except BrokenPipeError:                         # кодировщик умер: причина в его stderr ниже
+        try: enc.stdin.close()
+        except OSError: pass
     except BaseException:
         enc.kill(); raise
     rc = enc.wait()
     if rc != 0: raise SystemExit(f"ffmpeg (кодировщик) завершился с кодом {rc}, {base} не готов:\n{tail(err)}")
-    if missing: print(f"⚠ кадров без маски: {len(missing)} (первые: {', '.join(map(str, missing[:5]))}): спикера на них нет — проверь fx/masks или запусти --prep заново")
-    print(f"→ {base.relative_to(P.parents[1])} · кадров {n} · {'карточка' if card else 'маска'} · наезды {toggles} · акцентов {len(win)}")
+    if missing:
+        empty = [f for f in missing if mask_src(masks, f, cuts) is None]
+        print(f"⚠ кадров без своей маски: {len(missing)} (первые: {', '.join(map(str, missing[:5]))}) · взяты у соседей: "
+              f"{len(missing) - len(empty)} · пустых: {len(empty)}" + (" — на пустых спикера нет, проверь fx/masks" if empty else ""))
+    print(f"→ {base.relative_to(P.parents[1])} · кадров {n} · {'карточка' if card else 'маска'} · наезды {'—' if card else toggles} · акцентов {len(win)}")
     if "--mix" in a:
         pic = P / "renders" / "picture.mp4"
         subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", str(base), "-i", str(P / "fx" / "mix.wav"), "-map", "0:v", "-map", "1:a",

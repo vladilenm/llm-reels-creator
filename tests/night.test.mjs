@@ -498,13 +498,11 @@ for i in range(10):
   assert.equal(r0.status, 0, r0.stderr);
   let r = spawnSync("python3", ["scripts/ru/wide/night_base.py", P], { cwd: ROOT, encoding: "utf8" });
   assert.equal(r.status, 0, r.stderr + r.stdout);
-  assert.match(r.stdout, /кадров без маски: 1 \(первые: 3\)/);
+  assert.match(r.stdout, /кадров без своей маски: 1 \(первые: 3\) · взяты у соседей: 1 · пустых: 0/);
   const out = join(P, "renders/picture.base.mp4");
   const n = spawnSync("ffprobe", ["-v", "error", "-count_frames", "-select_streams", "v:0", "-show_entries", "stream=nb_read_frames", "-of", "csv=p=0", out], { encoding: "utf8" });
   assert.equal(n.stdout.trim(), "10", "every frame of clean.mp4 is rendered");
-  assert.ok(pixel(out, 3, 547, 1456)[0] < 100, "frame 3 has no mask: no speaker");
-  const g3 = pixel(out, 3, 100, 300);
-  assert.ok(g3[0] < 50 && g3[1] < 50 && g3[2] < 70, `frame 3 stays night ${g3}`);
+  assert.ok(pixel(out, 3, 547, 1456)[0] > 170, "frame 3 has no mask of its own: it borrows the neighbour's, the speaker stays");
   assert.ok(pixel(out, 4, 547, 1456)[0] > 170, "frame 4 (a neighbour of the gap) keeps its speaker");
   assert.ok(pixel(out, 7, 547, 1456)[0] > 170, "frame 7 keeps its speaker");
   const a1 = pixel(out, 1, 100, 300);
@@ -519,6 +517,45 @@ for i in range(10):
   r = spawnSync("python3", ["scripts/ru/wide/night_base.py", P], { cwd: ROOT, encoding: "utf8" });
   assert.notEqual(r.status, 0, "a missing accent file stops the run");
   assert.match(r.stderr, /broll\/missing\.mp4/);
+});
+
+test("night_base: a light accent puts a soft neutral shadow behind the speaker, too many frames without a mask stop the run", { timeout: 120000 }, () => {
+  const P = tmp("nb4-");
+  for (const d of ["assets", "renders", "broll", "work", "fx/masks"]) mkdirSync(join(P, d), { recursive: true });
+  writeFileSync(join(P, "assets/raw.mp4"), "");
+  writeFileSync(join(P, "PROBE.json"), JSON.stringify({ summary: { fps: 25 } }));
+  writeFileSync(join(P, "EDL.json"), JSON.stringify({ keep_ranges: [{ start: 0, end: 0.4 }] }));
+  ff("-f", "lavfi", "-i", "color=c=red:s=1080x1920:r=25:d=0.4", "-f", "lavfi", "-i", "sine=f=220:d=0.4:sample_rate=48000",
+    "-shortest", "-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "aac", join(P, "renders/clean.mp4"));
+  ff("-f", "lavfi", "-i", "color=c=white:s=1080x1920:r=25:d=0.2", "-c:v", "libx264", "-pix_fmt", "yuv420p", join(P, "broll/light.mp4"));
+  writeFileSync(join(P, "work/accents.json"), JSON.stringify({ accents: [{ id: "l", in: 0.04, out: 0.2, kind: "light", file: "broll/light.mp4" }] }));
+  const masks = (skip) => py(`from PIL import Image, ImageDraw
+import pathlib
+d = pathlib.Path(${JSON.stringify(join(P, "fx/masks"))})
+for p in d.glob("*.png"): p.unlink()
+for i in range(10):
+    if i in ${JSON.stringify(skip)}: continue
+    m = Image.new("L", (989, 822), 0); ImageDraw.Draw(m).rectangle((300, 200, 700, 600), fill=255); m.save(d / f"{i:05d}.png")`);
+  assert.equal(masks([]).status, 0);
+  let r = spawnSync("python3", ["scripts/ru/wide/night_base.py", P], { cwd: ROOT, encoding: "utf8" });
+  assert.equal(r.status, 0, r.stderr + r.stdout);
+  const out = join(P, "renders/picture.base.mp4");
+  const far = pixel(out, 2, 100, 300), near = pixel(out, 2, 322, 1456);
+  assert.ok(far[0] > 240 && far[1] > 240 && far[2] > 240, `the light canvas ${far}`);
+  assert.ok(near[0] < far[0] - 10, `a shadow next to the silhouette ${near}`);
+  assert.ok(near[0] < far[0] - 20, `the shadow is the 35 % ink one, not the faint purple halo ${near}`);
+  assert.ok(Math.abs(near[0] - near[2]) < 12, `neutral, not a purple halo ${near}`);
+  assert.ok(pixel(out, 2, 547, 1456)[0] > 170, "the speaker stays over the light accent");
+  assert.equal(masks([3, 4, 5, 6, 7, 8]).status, 0);
+  r = spawnSync("python3", ["scripts/ru/wide/night_base.py", P], { cwd: ROOT, encoding: "utf8" });
+  assert.notEqual(r.status, 0, "6 of 10 frames without a mask: stale masks, stop");
+  assert.match(r.stderr, /без своей маски/);
+  r = spawnSync("python3", ["scripts/ru/wide/night_base.py", P, "--allow-missing"], { cwd: ROOT, encoding: "utf8" });
+  assert.equal(r.status, 0, r.stderr + r.stdout);
+  writeFileSync(join(P, "work/accents.json"), JSON.stringify({ accents: [{ id: "x", in: 0.04, out: 0.2, kind: "dark", file: "broll/light.mp4" }] }));
+  r = spawnSync("python3", ["scripts/ru/wide/night_base.py", P], { cwd: ROOT, encoding: "utf8" });
+  assert.notEqual(r.status, 0, "an unknown accent kind stops the run");
+  assert.match(r.stderr, /kind/);
 });
 
 test("night_base --prep: stale frames and masks are cleared, a symlinked fx/masks is unlinked and its target is never touched", { timeout: 120000 }, () => {
