@@ -135,3 +135,31 @@ test("music_screen: a steady 100 BPM track passes with its tempo, a long intro a
   assert.deepEqual(s.intro.reasons, ["intro"]);
   assert.ok(s.clip.reasons.includes("clipping"));
 });
+
+test("sfx_screen: clipped, hissy and wrong-length files go to rejected/, the best per role stay, approved never move", { timeout: 60000 }, () => {
+  const d = tmp("sfxs-"), lib = join(d, "library");
+  for (const f of ["click", "whoosh"]) mkdirSync(join(lib, f), { recursive: true });
+  const gen = (rel, expr, dur) => ff("-f", "lavfi", "-i", `aevalsrc=${expr}:s=44100:d=${dur}`, join(lib, rel));
+  gen("click/good1.wav", "0.8*sin(2*PI*3000*t)*exp(-200*t)", 0.3);
+  gen("click/good2.wav", "0.7*sin(2*PI*2500*t)*exp(-150*t)", 0.3);
+  gen("click/good3.wav", "0.6*sin(2*PI*1000*t)*exp(-150*t)", 0.3);
+  gen("click/clipped.wav", "4*sin(2*PI*3000*t)*exp(-20*t)", 0.3);
+  gen("click/hissy.wav", "0.05*(2*random(0)-1)+0.8*sin(2*PI*3000*t)*exp(-200*(t-0.1))*gte(t\\,0.1)", 0.3);
+  gen("whoosh/long.wav", "0.5*sin(2*PI*800*t)*sin(PI*t/3)", 3);
+  writeFileSync(join(lib, "credits.json"), JSON.stringify({ "brand/sfx/library/click/clipped.wav": { kind: "click" },
+    "brand/sfx/library/click/good3.wav": { kind: "click", approved: "2026-10-26" } }));
+  const r = spawnSync("python3", ["scripts/ru/sfx_screen.py", "--lib", lib, "--per-role", "1"], { cwd: ROOT, encoding: "utf8" });
+  assert.equal(r.status, 0, r.stderr);
+  const s = JSON.parse(readFileSync(join(lib, "screen.json"), "utf8"));
+  assert.equal(s["click/good1.wav"].status, "shortlist", JSON.stringify(s["click/good1.wav"]));
+  assert.equal(s["click/good2.wav"].status, "reserve");
+  assert.equal(s["click/good3.wav"].status, "approved");
+  assert.ok(s["click/clipped.wav"].reasons.includes("clipping"));
+  assert.ok(s["click/hissy.wav"].reasons.includes("noisy"), JSON.stringify(s["click/hissy.wav"]));
+  assert.deepEqual(s["whoosh/long.wav"].reasons, ["length"]);
+  assert.ok(existsSync(join(d, "rejected", "click", "clipped.wav")));
+  assert.ok(existsSync(join(d, "reserve", "click", "good2.wav")));
+  assert.ok(existsSync(join(lib, "click", "good1.wav")) && existsSync(join(lib, "click", "good3.wav")));
+  const credits = JSON.parse(readFileSync(join(lib, "credits.json"), "utf8"));
+  assert.ok("brand/sfx/rejected/click/clipped.wav" in credits, Object.keys(credits).join(", "));
+});

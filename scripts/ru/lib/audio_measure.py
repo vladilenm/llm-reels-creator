@@ -4,7 +4,17 @@ import subprocess
 import numpy as np
 
 
+def channels(path):
+    r = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "a:0", "-show_entries", "stream=channels",
+                        "-of", "csv=p=0", str(path)], capture_output=True, text=True)
+    return int(r.stdout.strip() or 0)
+
+
 def decode(path, sr=22050, seconds=None, start=0.0, mono=True):
+    # ffmpeg's mono → stereo upmix lowers each channel by 3 dB and would hide clipping: duplicate instead
+    if not mono and channels(path) == 1:
+        x = decode(path, sr, seconds, start, mono=True)
+        return np.stack([x, x], 1)
     a = ["ffmpeg", "-v", "error"] + (["-ss", str(start)] if start else []) + ["-i", str(path)]
     a += (["-t", str(seconds)] if seconds else []) + ["-vn", "-ac", "1" if mono else "2", "-ar", str(sr), "-f", "f32le", "-"]
     r = subprocess.run(a, capture_output=True)
