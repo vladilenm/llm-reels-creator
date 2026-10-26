@@ -289,6 +289,42 @@ def accents(P, fps_):
     return at, win
 
 
+def back_clips(P, fps_):
+    """клипы broll/plan.json с "layer": "back" — [(f0, f1, путь)]: они ложатся за спикера (слой .mov с альфой);
+    assemble.mjs их пропускает. Нет файла клипа — SystemExit"""
+    p = P / "broll" / "plan.json"
+    if not p.is_file(): return []
+    raw = [c for c in json.loads(p.read_text()).get("clips", []) if c.get("layer") == "back"]
+    win = [(round(c["in"] * fps_), round(c["out"] * fps_), P / "broll" / c["file"]) for c in raw]
+    gone = sorted({rel(P, path) for _, _, path in win if not path.is_file()})
+    if gone: raise SystemExit("broll/plan.json: нет файлов back-клипов: " + ", ".join(gone))
+    return win
+
+
+def backs(P, fps_, seq=True):
+    """(функция (f, фон) → фон с back-клипами кадра f поверх по альфе, окна). seq — читать кадры по порядку (проход),
+    иначе брать кадр по времени (--stills). Клип короче окна держит последний кадр; back-клипов нет — фон как есть"""
+    win = back_clips(P, fps_)
+    if not win: return (lambda f, bg: bg), win
+    its, last = {}, {}
+    def over(f, bg):
+        for i, (f0, f1, path) in enumerate(win):
+            if not f0 <= f < f1: continue
+            if seq:
+                if i not in its: its[i] = frames(path, fps_, 4)
+                fr = next(its[i], None)
+                if fr is not None: last[i] = fr
+            else:
+                fr = grab(path, (f - f0) / fps_, ch=4)
+                if fr is None: fr = grab(path, 0, last=True, ch=4)
+                if fr is not None: last[i] = fr
+            if i not in last: raise SystemExit(f"{rel(P, path)}: в back-клипе нет кадров")
+            a = last[i][..., 3:4].astype(np.float32) / 255
+            bg = bg * (1 - a) + last[i][..., :3].astype(np.float32) * a
+        return bg
+    return over, win
+
+
 def fresh_dir(d):
     """пустая настоящая папка на месте d. Симлинк (fx/masks часто ведёт в папку другого, утверждённого проекта) снимается
     самим собой, цель не трогаем: rmtree сквозь ссылку стёр бы чужие файлы"""
@@ -341,8 +377,9 @@ def main():
             s, dx, _ = cine.state(shots, j)
             if abs(s - 1) > 1e-6 or abs(dx) > 1e-6 or cine.moving(shots, j, 0.3): continue
         if not toggles or fj - toggles[-1] >= F: toggles.append(fj)
+    back, bwin = backs(P, F, seq="--stills" not in a)
     ctx = {"fps": F, "card": card, "masks": masks, "cuts": {round(j * F) for j in joins(P)}, "toggles": toggles, "accent": accent,
-           "back": lambda f, bg: bg, "cine": cin, "shots": shots, "night_starts": [f0 / F for f0, _, _, k in win if k == "night"]}
+           "back": back, "cine": cin, "shots": shots, "night_starts": [f0 / F for f0, _, _, k in win if k == "night"]}
     cuts = ctx["cuts"]
     if not card:
         total = frame_count(clean, F)
@@ -393,7 +430,7 @@ def main():
         print(f"⚠ кадров без своей маски: {len(missing)} (первые: {', '.join(map(str, missing[:5]))}) · взяты у соседей: "
               f"{len(missing) - len(empty)} · пустых: {len(empty)}" + (" — на пустых спикера нет, проверь fx/masks" if empty else ""))
     print(f"→ {base.relative_to(P.parents[1])} · кадров {n} · {'карточка' if card else 'маска'} · наезды {'—' if card else toggles} · "
-          f"акцентов {len(win)} · кино {'вкл' if cin else 'выкл'}" + (f" · планов {len(shots)}" if cin else ""))
+          f"акцентов {len(win)} · back-клипов {len(bwin)} · кино {'вкл' if cin else 'выкл'}" + (f" · планов {len(shots)}" if cin else ""))
     if "--mix" in a:
         pic = P / "renders" / "picture.mp4"
         subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", str(base), "-i", str(P / "fx" / "mix.wav"), "-map", "0:v", "-map", "1:a",

@@ -1074,3 +1074,30 @@ test("night_base cine: punch-in toggles stay in mid and 0.3 s away from a move; 
   r = nb(P, "--until", "0.2"); assert.equal(r.status, 0, r.stderr + r.stdout);
   assert.match(r.stdout, /наезды \[10, 40\]/);     // joins at frames 10/20/30/40, the old rule keeps ≥ 1 s between toggles
 });
+
+test("night_base: a back clip lies behind the speaker, a missing back file stops the run; assemble does not overlay it again", { timeout: 120000 }, async () => {
+  const P = cineProject("back-");
+  ff("-f", "lavfi", "-i", "color=c=black@0.0:s=1080x1920:r=25:d=0.4,format=rgba,drawbox=x=0:y=1200:w=1080:h=100:color=0x00FF00@1:t=fill:replace=1",
+    "-c:v", "prores_ks", "-profile:v", "4", "-pix_fmt", "yuva444p10le", join(P, "broll/back.mov"));
+  const clip = { id: "w", in: 0, out: 0.4, kind: "panel", file: "back.mov" };
+  const plan = (c) => writeFileSync(join(P, "broll/plan.json"), JSON.stringify({ video: "../renders/picture.mp4", clips: [c] }));
+  plan({ ...clip, layer: "back" });
+  let r = nb(P); assert.equal(r.status, 0, r.stderr + r.stdout);
+  const px = frameRGB(join(P, "renders/picture.base.mp4"), 5);
+  assert.ok(px(100, 1250)[1] > 150 && px(100, 1250)[0] < 90, `back clip over the night ${px(100, 1250)}`);
+  assert.ok(px(547, 1260)[0] > 170 && px(547, 1260)[1] < 70, `the speaker covers it ${px(547, 1260)}`);
+
+  ff("-f", "lavfi", "-i", "color=c=blue:s=1080x1920:r=25:d=0.4", "-c:v", "libx264", "-pix_fmt", "yuv420p", join(P, "renders/picture.mp4"));
+  const { composite } = await import(new URL("../scripts/ru/assemble.mjs", import.meta.url));
+  const back = composite(P, join(P, "work/c-back.mov"));
+  assert.equal(back.clips, 0);
+  assert.ok(frameRGB(join(P, "work/c-back.mov"), 5)(100, 1250)[1] < 90, "a back clip is already in the base");
+  plan(clip);
+  composite(P, join(P, "work/c-front.mov"));
+  assert.ok(frameRGB(join(P, "work/c-front.mov"), 5)(100, 1250)[1] > 150, "a clip without layer stays in front");
+
+  plan({ ...clip, layer: "back" }); rmSync(join(P, "broll/back.mov"));
+  r = nb(P);
+  assert.notEqual(r.status, 0);
+  assert.match(r.stderr, /нет файлов back-клипов: broll\/back\.mov/);
+});

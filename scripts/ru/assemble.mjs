@@ -39,6 +39,9 @@ export function loadPlan(project) {
   return plan;
 }
 
+// Clips over the speaker. "layer": "back" clips are already in the base, behind the speaker (night_base.py).
+export const frontClips = (clips = []) => clips.filter((c) => c.layer !== "back");
+
 // One ffmpeg pass: base video, then each clip overlaid in its window, then captions.
 // Base picture: broll/plan.json `video` (relative to broll/, e.g. a renders/picture.mp4
 // with edit effects and SFX baked in), else renders/clean.mp4. Its audio is the mix.
@@ -52,12 +55,13 @@ export function basePicture(project, plan = loadPlan(project), video) {
 export function composite(project, out, { scale = 1, video } = {}) {
   const plan = loadPlan(project);
   const clean = basePicture(project, plan, video);
+  const clips = frontClips(plan.clips);
   const captions = join(project, "renders/kit/captions.mov");
-  const inputs = [clean, ...plan.clips.map((c) => c.path), ...(existsSync(captions) ? [captions] : [])];
+  const inputs = [clean, ...clips.map((c) => c.path), ...(existsSync(captions) ? [captions] : [])];
   const W = Math.round(1080 * scale), H = Math.round(1920 * scale);
   const f = [`[0:v]scale=${W}:${H},setsar=1,format=yuva444p[b0]`];
   let last = "b0";
-  plan.clips.forEach((c, i) => {
+  clips.forEach((c, i) => {
     const k = i + 1;
     f.push(`[${k}:v]scale=${W}:${H},format=yuva444p,tpad=stop_mode=clone:stop_duration=30,setpts=PTS-STARTPTS+${c.in}/TB[c${k}]`);
     f.push(`[${last}][c${k}]overlay=0:0:enable='between(t,${c.in},${c.out})':eof_action=pass[b${k}]`);
@@ -73,7 +77,7 @@ export function composite(project, out, { scale = 1, video } = {}) {
   const args = ["-v", "error", "-y", ...inputs.flatMap((p) => ["-i", p]), "-filter_complex", f.join(";"), "-map", "[v]", "-map", "0:a?", "-c:v", "libx264", "-crf", "12", "-preset", "fast", "-c:a", "pcm_s16le", "-shortest", out];
   const r = spawnSync("ffmpeg", args, { encoding: "utf8" });
   if (r.status !== 0) throw new Error(`composite failed: ${r.stderr.slice(-1200)}`);
-  return { out, clips: plan.clips.length, captions: existsSync(captions) };
+  return { out, clips: clips.length, captions: existsSync(captions) };
 }
 
 export function buildKit(project) {
@@ -85,7 +89,7 @@ export function buildKit(project) {
   if (basename(base) !== "clean.mp4") copyFileSync(base, join(kit, basename(base)));
   const slug = basename(project);
   const rows = [];
-  plan.clips.forEach((c, i) => {
+  frontClips(plan.clips).forEach((c, i) => {
     const name = `${String(i + 1).padStart(2, "0")}-${String(c.id).replace(/^\d+-?/, "") || "clip"}_${tc(c.in)}${extname(c.path)}`;
     copyFileSync(c.path, join(kit, "broll", name));
     rows.push(`| broll/${name} | ${fmt(c.in)} | ${fmt(c.out)} | ${c.kind === "panel" ? "панель поверх (ProRes 4444, альфа) — дорожка над видео" : "полноэкранная врезка (MP4) — заменяет кадр"} | ${String(c.line ?? "").replaceAll("|", "/")} |`);
@@ -96,7 +100,8 @@ export function buildKit(project) {
   // English TIMING.md, so ours (Russian, with captions) is written after it.
   const preview = join(project, "renders/preview.mp4");
   if (existsSync(preview) && existsSync(join(project, "broll/plan.json"))) {
-    const kitPlan = { ...JSON.parse(readFileSync(join(project, "broll/plan.json"), "utf8")), video: relative(join(project, "broll"), join(kit, "clean.mp4")) };
+    const raw = JSON.parse(readFileSync(join(project, "broll/plan.json"), "utf8"));
+    const kitPlan = { ...raw, clips: frontClips(raw.clips), video: relative(join(project, "broll"), join(kit, "clean.mp4")) };
     const tmpPlan = join(project, "broll/plan.kit.json");
     writeFileSync(tmpPlan, JSON.stringify(kitPlan, null, 2));
     copyFileSync(preview, join(kit, "preview.mp4"));
@@ -118,7 +123,7 @@ export function buildKit(project) {
     "Звук мной не прослушан: громкость, музыку и склейки по интонации проверь на слух.",
     "",
   ].join("\n"));
-  return { kit: relative(ROOT, kit), clips: plan.clips.length };
+  return { kit: relative(ROOT, kit), clips: frontClips(plan.clips).length };
 }
 
 function main() {
