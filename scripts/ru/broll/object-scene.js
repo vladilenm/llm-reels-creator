@@ -198,7 +198,7 @@ OK.run = (cfg) => {
       const e = ex(a / 0.5);
       if (it.ghost === false) { I.g.setAttribute('fill-opacity', '1'); I.g.setAttribute('stroke-opacity', '1'); I.svg.style.opacity = e.toFixed(3); }
       else { I.g.setAttribute('stroke-opacity', clamp(a / 0.2).toFixed(3)); I.g.setAttribute('fill-opacity', ex((a - 0.15) / 0.35).toFixed(3)); }
-      const s = {t, active: clamp(I.act(t)), open: 0, spin: 0, struck: 0, play: 0};
+      const s = {t, active: clamp(I.act(t)), open: 0, spin: 0, struck: 0, play: 0, on: 0, fill: 0};
       for (const [n, f] of Object.entries(I.tracks)) s[n] = f(t);
       I.O.pose(I.P, s, TH);
       I.svg.style.filter = `drop-shadow(0 0 ${(4 + 14 * s.active).toFixed(1)}px rgba(${TH.glow},${(0.35 + 0.4 * s.active).toFixed(2)}))`;

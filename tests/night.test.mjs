@@ -73,6 +73,43 @@ test("object kit: true isometric projection, iso circles, six objects with a box
   assert.match(OK.css("light"), /\.ok-light \.ln\{fill:none;stroke:#17141C/);
 });
 
+// every object of a batch: drawn in both themes, every pose extreme (t 0.2: all states 0; t 1.6: all 1) stays
+// inside its vb (±4 units), nothing throws. A failure prints the bbox: widen that object's vb, never move the drawing.
+async function checkObjects(kinds) {
+  const items = kinds.map((kind, i) => ({ id: "o" + i, kind, x: 140 + (i % 4) * 260, y: 300 + Math.floor(i / 4) * 330, size: 200, tin: 0, ghost: false,
+    states: [[0.5, { open: 1, fill: 1, on: 1, spin: 0.5, play: 1, struck: 1 }, 0.2]], active: [[0.5, 1]] }));
+  for (const theme of ["night", "light"]) {
+    const c = await openClip(scene({ T: 2, mode: "full", theme, items }));
+    try {
+      for (const t of [0.2, 1.6]) {
+        const out = await c.at(t, (ids) => ids.map((id) => {
+          const svg = document.getElementById("ok-item-" + id), b = svg.querySelector(".okobj").getBBox();
+          return { id, vb: svg.getAttribute("viewBox").split(" ").map(Number), bb: [b.x, b.y, b.width, b.height] };
+        }), items.map((it) => it.id));
+        for (const o of out) {
+          const [x, y, w, h] = o.vb, [bx, by, bw, bh] = o.bb, kind = kinds[+o.id.slice(1)];
+          assert.ok(bw > 20 && bh > 20, `${kind} ${theme} t=${t}: drawn (${o.bb})`);
+          assert.ok(bx >= x - 4 && by >= y - 4 && bx + bw <= x + w + 4 && by + bh <= y + h + 4,
+            `${kind} ${theme} t=${t}: bbox ${o.bb.map(Math.round)} outside vb ${o.vb}`);
+        }
+      }
+      assert.deepEqual(c.errors, []);
+    } finally { await c.browser.close(); }
+  }
+}
+
+test("object kit, part 1: the work desk — nine objects in both themes, every pose inside its box", { timeout: 120000 }, async () => {
+  const ctx = { window: {} };
+  vm.createContext(ctx);
+  vm.runInContext(readFileSync(join(ROOT, "scripts/ru/broll/object-kit.js"), "utf8"), ctx);
+  const OK = ctx.window.OK;
+  assert.equal(typeof OK.face, "function");
+  assert.match(OK.face([[0, 0], [10, 0], [10, 10]], 0, "fl", "q"), /<polygon class="fl" data-p="q" points="0,0 8\.7,5 8\.7,-5"\/>/);
+  assert.match(OK.plate([[0, 0], [10, 0], [10, 10]], 8, { id: "p" }), /^<g data-p="p"><polygon class="fr"[^>]*\/><polygon class="fl"[^>]*\/><\/g>$/);
+  assert.equal(OK.circ(0, 0, 10, 4).length, 4);
+  await checkObjects(["document", "laptop", "terminal", "browser", "phone", "chat", "code", "graph", "server"]);
+});
+
 // ---------- object scene ----------
 
 const scene = (cfg) => `<title>x</title><script>OK.run(${JSON.stringify(cfg)});</script>`;

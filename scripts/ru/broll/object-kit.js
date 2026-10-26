@@ -8,9 +8,10 @@
    OK.O[kind] = {vb:[x, y, w, h], svg:() => markup, pose:(P, s, T) => void}
      vb    the drawing's box in iso screen units around the origin
      P     {part name: element} for every data-p in the markup
-     s     {t, active, open, spin, struck, play}: numbers, 0..1 except t (clip seconds) — pose is a pure function of s
+     s     {t, active, open, spin, struck, play, on, fill}: numbers, 0..1 except t (clip seconds) — pose is a pure function of s
      T     the theme (OK.THEMES.night | light)
-   A new object: compose it from OK.box / OK.cyl / OK.disc / OK.poly, give moving parts a data-p, write its pose. */
+   A new object: compose it from OK.box / OK.cyl / OK.disc / OK.poly / OK.face / OK.plate / OK.circ, give moving parts a
+   data-p, write its pose; its vb must hold every pose (tests/night.test.mjs checkObjects). */
 (function(){
 const OK = window.OK = window.OK || {};
 const C30 = Math.cos(Math.PI / 6);
@@ -57,6 +58,14 @@ OK.disc = (cx, cy, cz, r, plane = 'y', cls = 'ft', id) => {
   return OK.poly(list, cls, id);
 };
 const line = (a, b, id, extra = '') => `<line class="ln"${tag(id)} x1="${at(...a)[0]}" y1="${at(...a)[1]}" x2="${at(...b)[0]}" y2="${at(...b)[1]}"${extra}/>`;
+const c01 = (v) => Math.max(0, Math.min(1, v));
+// a polygon standing in the plane y from [x, z] pairs; a plate: the same outline at y −d (the side tone) and at y 0
+const face = OK.face = (xz, y = 0, cls = 'fl', id) => OK.poly(xz.map(([x, z]) => [x, y, z]), cls, id);
+const plate = OK.plate = (xz, d, c = {}) => `<g${tag(c.id)}>${face(xz, -d, c.b || 'fr')}${face(xz, 0, c.f || 'fl')}</g>`;
+// n points of a circle of radius r around (cx, cz) in the x-z plane, from the angle a0
+const circ = OK.circ = (cx, cz, r, n = 28, a0 = 0) => Array.from({length: n}, (_, i) => {
+  const a = a0 + i / n * Math.PI * 2; return [cx + r * Math.cos(a), cz + r * Math.sin(a)];
+});
 
 OK.O = {};
 
@@ -150,6 +159,153 @@ OK.O.folder = {
   pose: (P, s, T) => {
     P.front.setAttribute('points', pts(front(s.open)));
     P.front.style.fill = s.active > 0.5 ? `rgba(${T.glow},.35)` : '';
+  },
+};
+
+// ---------- the work desk ----------
+
+// document (a file, a README, a page): a sheet with a folded corner over two more; open slides the top sheet off,
+// fill lights its lines one by one (a page being read), active tints it
+const SHEET = [[-45, 0], [45, 0], [45, 100], [25, 120], [-45, 120]];
+OK.O.document = {
+  vb: [-62, -162, 120, 190],
+  svg: () => face(SHEET, -16, 'fr') + face(SHEET, -8, 'fr')
+    + `<g data-p="pg">${face(SHEET, 0, 'fl', 'sh')}${face([[25, 120], [25, 100], [45, 100]], 0, 'ft')}`
+    + [90, 76, 62, 48, 34].map((z, i) => { const x1 = i === 4 ? 6 : 30; return face([[-32, z], [x1, z], [x1, z + 6], [-32, z + 6]], 0, 'fd', 'l' + i); }).join('')
+    + '</g>',
+  pose: (P, s, T) => {
+    P.pg.setAttribute('transform', `translate(${f1(-18 * s.open)} ${f1(-14 * s.open)})`);
+    for (let i = 0; i < 5; i++) P['l' + i].style.fill = s.fill * 5 > i + 0.5 ? T.on : '';
+    P.sh.style.fill = s.active > 0.5 ? `rgba(${T.glow},.30)` : '';
+  },
+};
+
+// laptop (a computer, the work itself): a base with keys; open raises the lid (0 closed … 1 open), on lights the screen
+const lid = (o, inset = 0) => {
+  const a = o * 1.75, c = Math.cos(a), s = Math.sin(a), w = 66 - inset;
+  const p = (d) => [-50 + d * c, 8 + d * s], [ya, za] = p(inset), [yb, zb] = p(92 - inset);
+  return [[-w, ya, za], [w, ya, za], [w, yb, zb], [-w, yb, zb]];
+};
+OK.O.laptop = {
+  vb: [-110, -174, 232, 242],
+  svg: () => OK.box(-70, -50, 0, 140, 100, 8)
+    + [-30, -8, 14].map((y) => OK.poly([[-50, y, 8], [50, y, 8], [50, y + 14, 8], [-50, y + 14, 8]], 'fd')).join('')
+    + OK.poly(lid(1), 'fr', 'lid') + OK.poly(lid(1, 7), 'ft', 'scr'),
+  pose: (P, s, T) => {
+    P.lid.setAttribute('points', pts(lid(s.open)));
+    P.scr.setAttribute('points', pts(lid(s.open, 7)));
+    P.scr.style.display = s.open < 0.35 ? 'none' : '';
+    P.scr.style.fill = s.on > 0.01 ? `rgba(${T.glow},${(0.2 + 0.5 * s.on).toFixed(2)})` : '';
+  },
+};
+
+// terminal (a command line, a run): a dark panel; fill types its rows one by one, active blinks the accent caret
+const ROWS = [[66, 74], [50, 40], [34, 58], [18, 30]];
+OK.O.terminal = {
+  vb: [-70, -150, 148, 196],
+  svg: () => OK.box(-70, -8, 0, 140, 8, 100)
+    + face([[-70, 84], [70, 84], [70, 100], [-70, 100]], 0, 'ft')
+    + [-58, -48, -38].map((x) => face(circ(x, 92, 3.5, 10), 0, 'fd')).join('')
+    + ROWS.map(([z, w], i) => face([[-56, z], [-56 + w, z], [-56 + w, z + 7], [-56, z + 7]], 0, 'fd', 'r' + i)).join('')
+    + face([[0, 0], [6, 0], [6, 10], [0, 10]], 0, 'fa', 'car'),
+  pose: (P, s) => {
+    const n = s.fill * ROWS.length;
+    ROWS.forEach(([z, w], i) => {
+      const k = c01(n - i), r = P['r' + i];
+      r.style.opacity = k > 0 ? '1' : '0';
+      r.setAttribute('points', pts([[-56, 0, z], [-56 + w * k, 0, z], [-56 + w * k, 0, z + 7], [-56, 0, z + 7]]));
+    });
+    const i = Math.min(ROWS.length - 1, Math.floor(n)), [z, w] = ROWS[i], p = at(-52 + w * c01(n - i), 0, z - 1);
+    P.car.setAttribute('transform', `translate(${p[0]} ${p[1]})`);
+    P.car.style.opacity = s.active > 0.5 && Math.floor(s.t * 2.5) % 2 === 0 ? '1' : '0';
+  },
+};
+
+// browser (a site, a web app): a window with an address bar, a picture and text; active lights the picture,
+// fill highlights the text lines (a passage being read)
+OK.O.browser = {
+  vb: [-80, -164, 166, 214],
+  svg: () => OK.box(-80, -8, 0, 160, 8, 110)
+    + face([[-80, 94], [80, 94], [80, 110], [-80, 110]], 0, 'ft')
+    + face([[-40, 98], [52, 98], [52, 106], [-40, 106]], 0, 'fd')
+    + [-70, -62, -54].map((x) => face(circ(x, 102, 3, 10), 0, 'fd')).join('')
+    + face([[-66, 22], [-8, 22], [-8, 80], [-66, 80]], 0, 'ft', 'img')
+    + face([[-56, 30], [-36, 58], [-24, 44], [-16, 30]], 0, 'fd')
+    + [72, 58, 44, 30].map((z, i) => { const x1 = i % 2 ? 50 : 66; return face([[4, z], [x1, z], [x1, z + 6], [4, z + 6]], 0, 'fd', 'l' + i); }).join(''),
+  pose: (P, s, T) => {
+    P.img.style.fill = s.active > 0.01 ? `rgba(${T.glow},${(0.25 + 0.45 * s.active).toFixed(2)})` : '';
+    for (let i = 0; i < 4; i++) P['l' + i].style.fill = s.fill * 4 > i + 0.5 ? T.on : '';
+  },
+};
+
+// phone (a mobile app, a message): a slab with a screen; on lights the screen, fill slides a notification in
+OK.O.phone = {
+  vb: [-38, -148, 78, 172],
+  svg: () => OK.box(-30, -6, 0, 60, 6, 118)
+    + face([[-24, 8], [24, 8], [24, 108], [-24, 108]], 0, 'ft', 'scr')
+    + face([[-8, 111], [8, 111], [8, 114], [-8, 114]], 0, 'fd')
+    + face([[-20, 80], [20, 80], [20, 98], [-20, 98]], 0, 'fa', 'note'),
+  pose: (P, s, T) => {
+    P.scr.style.fill = s.on > 0.01 ? `rgba(${T.glow},${(0.2 + 0.45 * s.on).toFixed(2)})` : '';
+    P.note.style.opacity = s.fill.toFixed(3);
+    P.note.setAttribute('transform', `translate(0 ${f1(14 * (1 - s.fill))})`);
+  },
+};
+
+// chat (a conversation, an answer): a question bubble and an accent answer; fill brings the answer in,
+// play shows the typing dots in it
+OK.O.chat = {
+  vb: [-72, -158, 152, 216],
+  svg: () => OK.box(-70, -6, 60, 90, 6, 50) + face([[-60, 60], [-70, 46], [-44, 60]], 0, 'fl')
+    + face([[-56, 92], [6, 92], [6, 98], [-56, 98]], 0, 'fd') + face([[-56, 76], [-14, 76], [-14, 82], [-56, 82]], 0, 'fd')
+    + `<g data-p="b1">${OK.box(-20, -6, 4, 90, 6, 42, {l: 'fa'})}${face([[56, 4], [70, -8], [44, 4]], 0, 'fa')}`
+    + [8, 24, 40].map((x, i) => face(circ(x, 25, 4.5, 10), 0, 'fi', 'd' + i)).join('') + '</g>',
+  pose: (P, s) => {
+    P.b1.style.opacity = s.fill.toFixed(3);
+    P.b1.setAttribute('transform', `translate(${f1(10 * (1 - s.fill))} ${f1(8 * (1 - s.fill))})`);
+    for (let i = 0; i < 3; i++) P['d' + i].style.opacity = s.play > 0.01 ? (0.35 + 0.65 * Math.max(0, Math.sin(s.t * 7 - i * 0.9))).toFixed(3) : '1';
+  },
+};
+
+// code (</>): an extruded glyph; active lights the slash, play breathes the brackets apart
+const LT = [[-20, 90], [-60, 55], [-20, 20], [-8, 32], [-36, 55], [-8, 78]];
+const SL = [[6, 96], [18, 96], [-6, 14], [-18, 14]];
+OK.O.code = {
+  vb: [-62, -112, 130, 106],
+  svg: () => plate(LT, 8, {id: 'lt'}) + plate(SL, 8, {id: 'sl'}) + plate(LT.map(([x, z]) => [-x, z]), 8, {id: 'rt'}),
+  pose: (P, s, T) => {
+    const d = 6 * s.play * Math.sin(s.t * 3);
+    P.lt.setAttribute('transform', `translate(${f1(-d * 0.866)} ${f1(-d * 0.5)})`);
+    P.rt.setAttribute('transform', `translate(${f1(d * 0.866)} ${f1(d * 0.5)})`);
+    P.sl.lastChild.style.fill = s.active > 0.5 ? T.accent : '';
+  },
+};
+
+// graph (a knowledge graph, a pipeline): nodes on the floor; fill draws the edges one by one, active lights the hub
+const NODES = [[0, 0], [-62, -34], [62, -40], [-40, 62], [56, 50]];
+OK.O.graph = {
+  vb: [-112, -76, 224, 146],
+  svg: () => NODES.slice(1).map(([x, y], i) => { const a = at(0, 0, 10), b = at(x, y, 10);
+      return `<line class="ln" data-p="e${i}" x1="${a[0]}" y1="${a[1]}" x2="${b[0]}" y2="${b[1]}" pathLength="1" style="vector-effect:none;stroke-width:5;stroke-dasharray:1;stroke-dashoffset:1"/>`; }).join('')
+    + NODES.map(([x, y], i) => OK.cyl(x, y, 0, i ? 14 : 20, i ? 10 : 14, {id: 'n' + i})).join(''),
+  pose: (P, s, T) => {
+    for (let i = 0; i < 4; i++) P['e' + i].style.strokeDashoffset = (1 - c01(s.fill * 4 - i)).toFixed(4);
+    P.n0.lastChild.style.fill = s.active > 0.5 ? T.accent : '';
+  },
+};
+
+// server (a backend, hosting, an API): three rack units; active lights the LEDs, play makes them blink in turn
+OK.O.server = {
+  vb: [-86, -150, 172, 204],
+  svg: () => [0, 1, 2].map((i) => OK.box(-50, -40, i * 34, 100, 80, 28)
+    + OK.poly([[-38, 40, i * 34 + 10], [10, 40, i * 34 + 10], [10, 40, i * 34 + 16], [-38, 40, i * 34 + 16]], 'fd')
+    + OK.poly([[26, 40, i * 34 + 9], [36, 40, i * 34 + 9], [36, 40, i * 34 + 17], [26, 40, i * 34 + 17]], 'fd', 'led' + i)).join(''),
+  pose: (P, s, T) => {
+    for (let i = 0; i < 3; i++) {
+      const on = s.active > 0.5, blink = s.play > 0.01 && Math.floor(s.t * 4 + i) % 3 !== 0 ? 0.35 : 1;
+      P['led' + i].style.fill = on ? T.on : '';
+      P['led' + i].style.opacity = on ? String(blink) : '1';
+    }
   },
 };
 })();
