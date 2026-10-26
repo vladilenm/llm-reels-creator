@@ -159,6 +159,35 @@ test("object scene: ghost → glass, the label lights with the active item, link
   } finally { await c.browser.close(); }
 });
 
+test("object scene: «перестройка» moves an item and its link follows, tout takes it away; «выноски» and «возврат» draw on their words", { timeout: 60000 }, async () => {
+  const c = await openClip(scene({ T: 4, mode: "panel", theme: "night",
+    items: [{ id: "a", kind: "agent", x: 540, y: 600, size: 220, tin: 0, keys: [[1.0, { y: 420, size: 150 }, 0.6]], label: { text: "агент" } },
+      { id: "b", kind: "database", x: 300, y: 900, size: 160, tin: 0, tout: 3.0 },
+      { id: "c", kind: "speaker", x: 780, y: 900, size: 160, tin: 0 }],
+    links: [{ from: "a", to: "b", tin: 0.1, dur: 0.3 }],
+    callouts: [{ at: "c", text: "whoosh", t: 0.5, dx: -170, dy: -80 }, { at: [540, 1200], text: "точно в кадр", t: 1.2 }],
+    returns: { to: "a", from: ["b", "c"], t: 2.0, gap: 0.15, dur: 0.4 } }));
+  try {
+    const top = () => parseFloat(document.getElementById("ok-item-a").style.top);
+    const t0 = await c.at(0.9, top), t1 = await c.at(2.5, top);
+    assert.ok(t1 < t0 - 120, `the agent moved up ${t0} → ${t1}`);
+    assert.ok(Math.abs(await c.at(2.5, () => +document.getElementById("ok-item-a").getAttribute("width")) - 150) < 1, "and shrank to 150");
+    const linkY = () => +document.getElementById("ok-link-0").getAttribute("d").match(/^M[\d.]+,([\d.]+)/)[1];
+    assert.ok(await c.at(2.5, linkY) < await c.at(0.9, linkY) - 120, "the link starts under the moved agent");
+    const vis = (id) => { const s = getComputedStyle(document.getElementById(id)); return s.display !== "none" && +s.opacity > 0.5; };
+    assert.equal(await c.at(3.5, vis, "ok-item-b"), false, "b left on tout");
+    assert.equal(await c.at(0.4, vis, "ok-co-0"), false, "the plate waits for its word");
+    assert.equal(await c.at(1.3, vis, "ok-co-0"), true);
+    assert.equal(await c.at(1.3, () => document.getElementById("ok-co-0").textContent), "whoosh");
+    assert.ok(await c.at(1.3, () => document.getElementById("ok-co-0").getBoundingClientRect().right) < 780, "dx < 0 puts the plate left of its item");
+    assert.equal(await c.at(1.9, () => getComputedStyle(document.getElementById("ok-ret-0")).display), "none");
+    const ho = (n) => +getComputedStyle(document.getElementById("ok-ret-head-" + n)).opacity;
+    assert.ok(await c.at(2.2, ho, 1) < 0.1, "the second arrow comes after the first");
+    assert.ok(await c.at(2.9, ho, 0) > 0.9 && await c.at(2.9, ho, 1) > 0.9, "both arrows end with heads");
+    assert.deepEqual(c.errors, []);
+  } finally { await c.browser.close(); }
+});
+
 test("object scene full: light canvas wipes over the night, counter counts, objects drawn in the dark line", { timeout: 60000 }, async () => {
   const c = await openClip(scene({ T: 2, mode: "full", theme: "light", bg: { flip: [0, 0.35] },
     chapter: { idx: "01 — x", l1: "В Openverse", l2: "звуки", y: 420, tin: 0.1 },

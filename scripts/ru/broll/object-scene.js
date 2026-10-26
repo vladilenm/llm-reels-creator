@@ -7,8 +7,11 @@
                                                 and the glow flares. light: canvas + faint grid; flip = it wipes in
                                                 from the left over the night
      chapter:{idx, l1, l2, y:200, tin, keys:[[t, {idx, l1, l2}]]},     «глава»: stays, the text swaps on keys
-     items:[{id, kind, x, y, size, tin, label:{text, tin, dy:44}, states:[[t, {open:1}, dur]], active:[[t, 0|1]],
-             check:t, ghost:true}],                                  «материализация», «активный пункт»
+     items:[{id, kind, x, y, size, tin, tout, label:{text, tin, dy:44}, states:[[t, {open:1}, dur]], active:[[t, 0|1]],
+             check:t, ghost:true, keys:[[t, {x, y, size}, dur:0.7]]}],   «материализация», «активный пункт»,
+                                                                     «перестройка» (keys move and resize, tout leaves)
+     callouts:[{at:'id'|[x, y], text, t, dx:170, dy:-90, tout}],      «выноски»: a dotted elbow to a glass label
+     returns:{to, from:[ids], t, gap:0.12, dur:0.5, bend:0.25, tout},  «возврат»: arrows back to the first item
      links:[{from, to, tin, dur:0.5, dash:false}],                    «дерево и связи»: an elbow from → to
      fly:{id, t, dur:0.4},                                            «сквозной пролёт» into an item
      words:[{text, font:'display'|'serif'|'sans'|'mono', size, y, x:540, t, color}],   accent words: a wipe
@@ -17,7 +20,8 @@
      terminal:{x, y, w, h, title, tin:-1, lines:[{t, text, kind:'cmd'|'out'|'ok', dur:0.55}]},   «живой интерфейс»
    })
    Items: x, y = frame px of the object's floor centre, size = drawn width. DOM ids (tests, debugging): ok-scene,
-   ok-item-<id>, ok-label-<id>, ok-check-<id>, ok-link-<n>, ok-idx, ok-flip, ok-grid, ok-count, ok-term, ok-row-<n>. */
+   ok-item-<id>, ok-label-<id>, ok-check-<id>, ok-link-<n>, ok-idx, ok-flip, ok-grid, ok-count, ok-term, ok-row-<n>,
+   ok-co-<n>, ok-co-line-<n>, ok-ret-<n>, ok-ret-head-<n>. */
 (function(){
 const OK = window.OK;
 const {clamp, eo, eio} = M;
@@ -45,7 +49,8 @@ OK.run = (cfg) => {
 #ok .okck{width:52px;height:52px;border-radius:26px;display:flex;align-items:center;justify-content:center}
 #ok .okterm{border-radius:22px;overflow:hidden;padding:24px 30px;font:500 26px/40px 'SK Mono',monospace;white-space:pre}
 #ok .okcar{display:inline-block;width:14px;height:30px;margin-left:4px;vertical-align:-5px}
-#ok .okc{left:0;width:${W}px;text-align:center}`;
+#ok .okc{left:0;width:${W}px;text-align:center}
+#ok .okco{padding:8px 20px;border-radius:14px;font:500 30px 'SK Mono',monospace;white-space:nowrap}`;
   document.head.appendChild(st);
   const root = document.createElement('div'); root.id = 'ok'; root.className = `ok-${theme}`;
   document.getElementById('stage').appendChild(root);
@@ -88,14 +93,26 @@ OK.run = (cfg) => {
     });
   }
 
-  // items («материализация», «активный пункт»)
+  // «перестройка»: an item moves and resizes on keys [[t, {x, y, size}, dur]], expo-out from wherever it is
+  const geoTrack = (it) => {
+    const ks = [{t: -1e9, v: [it.x, it.y, it.size], d: 0}];
+    for (const [t, o, d] of (it.keys || []).slice().sort((a, b) => a[0] - b[0])) {
+      const p = ks[ks.length - 1].v; ks.push({t, v: [o.x ?? p[0], o.y ?? p[1], o.size ?? p[2]], d: d ?? 0.7});
+    }
+    return (t) => {
+      let v = ks[0].v;
+      for (let i = 1; i < ks.length && t >= ks[i].t; i++) { const u = ex((t - ks[i].t) / ks[i].d); v = v.map((a, j) => a + (ks[i].v[j] - a) * u); }
+      return v;
+    };
+  };
+
+  // items («материализация», «активный пункт», «перестройка»)
   const items = {};
   for (const it of cfg.items || []) {
     const O = OK.O[it.kind]; if (!O) throw new Error('OK: unknown object ' + it.kind);
-    const [vx, vy, vw, vh] = O.vb, k = it.size / vw;
     const svg = document.createElementNS(NS, 'svg'); svg.id = 'ok-item-' + it.id;
-    svg.setAttribute('viewBox', O.vb.join(' ')); svg.setAttribute('width', it.size); svg.setAttribute('height', vh * k);
-    Object.assign(svg.style, {position: 'absolute', left: (it.x + vx * k) + 'px', top: (it.y + vy * k) + 'px', overflow: 'visible'});
+    svg.setAttribute('viewBox', O.vb.join(' '));
+    Object.assign(svg.style, {position: 'absolute', overflow: 'visible'});
     svg.innerHTML = `<g class="okobj">${O.svg()}</g>`;
     scene.appendChild(svg);
     const P = {}; svg.querySelectorAll('[data-p]').forEach((n) => { P[n.dataset.p] = n; });
@@ -104,35 +121,69 @@ OK.run = (cfg) => {
     for (const n of names) tracks[n] = M.track(0, (it.states || []).filter(([, s]) => n in s).map(([t, s, d]) => [t, s[n], d ? [6 / d, 0.9] : M.FAST]));
     const act = M.track(0, (it.active || []).map(([t, v]) => [t, v, M.FAST]));
     let lb = null, ck = null;
-    if (it.label) {
-      lb = el('a oklb', scene, 'div', 'ok-label-' + it.id); lb.textContent = it.label.text;
-      lb.style.left = it.x + 'px'; lb.style.top = (it.y + (it.label.dy ?? 44)) + 'px';
-    }
+    if (it.label) { lb = el('a oklb', scene, 'div', 'ok-label-' + it.id); lb.textContent = it.label.text; }
     if (it.check != null) {
       ck = el('a okck', scene, 'div', 'ok-check-' + it.id); ck.style.background = TH.accent;
-      ck.style.left = (it.x + it.size * 0.3) + 'px'; ck.style.top = (it.y + vy * k * 0.75) + 'px';
       ck.innerHTML = '<svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>';
     }
-    items[it.id] = {it, O, svg, g: svg.firstChild, P, tracks, act, lb, ck, k};
+    items[it.id] = {it, O, svg, g: svg.firstChild, P, tracks, act, lb, ck, geo: geoTrack(it), at: null};
   }
+  // where an item stands at t; its svg, label and check follow
+  const place = (I, t) => {
+    const [x, y, size] = I.geo(t), [vx, vy, vw, vh] = I.O.vb, k = size / vw;
+    I.svg.setAttribute('width', size.toFixed(1)); I.svg.setAttribute('height', (vh * k).toFixed(1));
+    I.svg.style.left = (x + vx * k).toFixed(1) + 'px'; I.svg.style.top = (y + vy * k).toFixed(1) + 'px';
+    if (I.lb) { I.lb.style.left = x.toFixed(1) + 'px'; I.lb.style.top = (y + (I.it.label.dy ?? 44)).toFixed(1) + 'px'; }
+    if (I.ck) { I.ck.style.left = (x + size * 0.3).toFixed(1) + 'px'; I.ck.style.top = (y + vy * k * 0.75).toFixed(1) + 'px'; }
+    return (I.at = {x, y, k, size});
+  };
+  const centre = (I) => [I.at.x, I.at.y + (I.O.vb[1] + I.O.vb[3] / 2) * I.at.k];
 
-  // links («дерево и связи»)
+  // links («дерево и связи»): an elbow from under the parent (below its label) to the top of the child; the path
+  // follows items that move
+  const linkD = (L) => {
+    const a = items[L.from], b = items[L.to], A = a.at, Bq = b.at;
+    const x1 = A.x, y1 = A.y + (a.it.label ? (a.it.label.dy ?? 44) + 44 : 30), x2 = Bq.x, y2 = Bq.y + b.O.vb[1] * Bq.k - 16, ym = (y1 + y2) / 2;
+    const r = (v) => +v.toFixed(1);                                   // no trailing ".0": a still link reads M540,588 as before
+    return `M${r(x1)},${r(y1)} V${r(ym)} H${r(x2)} V${r(y2)}`;
+  };
   const links = (cfg.links || []).map((L, n) => {
-    const a = items[L.from], b = items[L.to];
-    const x1 = a.it.x, y1 = a.it.y + (a.it.label ? (a.it.label.dy ?? 44) + 44 : 30), x2 = b.it.x, y2 = b.it.y + b.O.vb[1] * b.k - 16, ym = (y1 + y2) / 2;
     const p = document.createElementNS(NS, 'path'); p.id = 'ok-link-' + n;
-    for (const [key, v] of Object.entries({d: `M${x1},${y1} V${ym} H${x2} V${y2}`, fill: 'none', stroke: TH.line, 'stroke-width': 3, 'stroke-linecap': 'round'})) p.setAttribute(key, v);
+    for (const [key, v] of Object.entries({fill: 'none', stroke: TH.line, 'stroke-width': 3, 'stroke-linecap': 'round'})) p.setAttribute(key, v);
     lsvg.appendChild(p);
-    const len = p.getTotalLength();
     let drawn = p;
     if (L.dash) {
       const m = document.createElementNS(NS, 'mask'); m.id = 'okm' + n; m.setAttribute('maskUnits', 'userSpaceOnUse');
-      const mp = p.cloneNode(); mp.removeAttribute('id'); mp.setAttribute('stroke', '#fff'); mp.setAttribute('stroke-width', '8');
+      const mp = document.createElementNS(NS, 'path');
+      for (const [key, v] of Object.entries({fill: 'none', stroke: '#fff', 'stroke-width': 8, 'stroke-linecap': 'round'})) mp.setAttribute(key, v);
       m.appendChild(mp); lsvg.appendChild(m);
       p.setAttribute('stroke-dasharray', '10 12'); p.setAttribute('mask', `url(#okm${n})`); drawn = mp;
     }
-    drawn.style.strokeDasharray = len;
-    return {L, p, drawn, len};
+    return {L, p, drawn, len: 0, d: ''};
+  });
+
+  // callouts («выноски»): a dot on the point, a dotted elbow, a glass plate with a mono label; one per word
+  const callouts = (cfg.callouts || []).map((c, n) => {
+    const p = document.createElementNS(NS, 'path'); p.id = 'ok-co-line-' + n;
+    for (const [key, v] of Object.entries({fill: 'none', stroke: TH.line, 'stroke-width': 3, 'stroke-linecap': 'round', 'stroke-dasharray': '1 10'})) p.setAttribute(key, v);
+    const m = document.createElementNS(NS, 'mask'); m.id = 'okcm' + n; m.setAttribute('maskUnits', 'userSpaceOnUse');
+    const mp = document.createElementNS(NS, 'path');
+    for (const [key, v] of Object.entries({fill: 'none', stroke: '#fff', 'stroke-width': 10, 'stroke-linecap': 'round'})) mp.setAttribute(key, v);
+    m.appendChild(mp); lsvg.appendChild(m); p.setAttribute('mask', `url(#okcm${n})`); lsvg.appendChild(p);
+    const dot = document.createElementNS(NS, 'circle'); dot.setAttribute('fill', TH.on); lsvg.appendChild(dot);
+    const plate = el('a okco', scene, 'div', 'ok-co-' + n); plate.textContent = c.text;
+    Object.assign(plate.style, {color: TH.ink, background: theme === 'night' ? 'rgba(24,18,38,.94)' : '#FFFFFF',
+      boxShadow: `0 0 0 3px rgba(${TH.glow},.45),0 0 30px rgba(${TH.glow},.18)`});
+    return {c, p, mp, dot, plate, len: 0, d: ''};
+  });
+
+  // returns («возврат»): curved arrows from items back to the one the scene started with, one after another
+  const returns = (cfg.returns?.from || []).map((id, n) => {
+    const p = document.createElementNS(NS, 'path'); p.id = 'ok-ret-' + n;
+    for (const [key, v] of Object.entries({fill: 'none', stroke: TH.on, 'stroke-width': 3, 'stroke-linecap': 'round'})) p.setAttribute(key, v);
+    const head = document.createElementNS(NS, 'polygon'); head.id = 'ok-ret-head-' + n; head.setAttribute('fill', TH.on);
+    lsvg.appendChild(p); lsvg.appendChild(head);
+    return {id, n, p, head, len: 0, d: ''};
   });
 
   // ---------- above the scene ----------
@@ -190,42 +241,86 @@ OK.run = (cfg) => {
       c.t2.style.clipPath = wipe(ex((t - c.s.t - 0.22) / 0.7));
     }
 
+    for (const I of Object.values(items)) place(I, t);
     for (const I of Object.values(items)) {
-      const it = I.it, a = t - it.tin;
-      const show = a >= 0;
+      const it = I.it, a = t - it.tin, gone = it.tout == null ? 0 : ex((t - it.tout) / 0.35);
+      const show = a >= 0 && gone < 0.999;
       for (const e of [I.svg, I.lb, I.ck]) if (e) e.style.display = show ? '' : 'none';
       if (!show) continue;
       const e = ex(a / 0.5);
-      if (it.ghost === false) { I.g.setAttribute('fill-opacity', '1'); I.g.setAttribute('stroke-opacity', '1'); I.svg.style.opacity = e.toFixed(3); }
+      if (it.ghost === false) { I.g.setAttribute('fill-opacity', '1'); I.g.setAttribute('stroke-opacity', '1'); }
       else { I.g.setAttribute('stroke-opacity', clamp(a / 0.2).toFixed(3)); I.g.setAttribute('fill-opacity', ex((a - 0.15) / 0.35).toFixed(3)); }
+      I.svg.style.opacity = ((it.ghost === false ? e : 1) * (1 - gone)).toFixed(3);
       const s = {t, active: clamp(I.act(t)), open: 0, spin: 0, struck: 0, play: 0, on: 0, fill: 0};
       for (const [n, f] of Object.entries(I.tracks)) s[n] = f(t);
       I.O.pose(I.P, s, TH);
       I.svg.style.filter = `drop-shadow(0 0 ${(4 + 14 * s.active).toFixed(1)}px rgba(${TH.glow},${(0.35 + 0.4 * s.active).toFixed(2)}))`;
-      I.svg.style.transform = `translateY(${((1 - e) * 16).toFixed(1)}px)`;
+      I.svg.style.transform = `translateY(${((1 - e) * 16).toFixed(1)}px) scale(${(1 - 0.1 * gone).toFixed(4)})`;
       if (I.lb) {
         const la = t - (it.label.tin ?? it.tin + 0.3);
         I.lb.style.display = la < 0 ? 'none' : '';
         I.lb.style.clipPath = wipe(ex(la / 0.5));
         I.lb.style.color = mix(TH.label, TH.on, s.active);
+        I.lb.style.opacity = (1 - gone).toFixed(3);
       }
       if (I.ck) {
         const ca = t - it.check;
         I.ck.style.display = ca < 0 ? 'none' : '';
-        I.ck.style.opacity = clamp(ca / 0.12).toFixed(3);
+        I.ck.style.opacity = (clamp(ca / 0.12) * (1 - gone)).toFixed(3);
         I.ck.style.transform = `scale(${(0.6 + 0.4 * ex(ca / 0.35)).toFixed(3)})`;
       }
     }
 
     for (const L of links) {
+      L.p.style.display = '';
+      const d = linkD(L.L);
+      if (d !== L.d) { L.p.setAttribute('d', d); if (L.drawn !== L.p) L.drawn.setAttribute('d', d); L.len = L.p.getTotalLength(); L.drawn.style.strokeDasharray = L.len; L.d = d; }
       L.p.style.display = t < L.L.tin ? 'none' : '';
       L.drawn.style.strokeDashoffset = (L.len * (1 - ex((t - L.L.tin) / (L.L.dur ?? 0.5)))).toFixed(2);
     }
 
+    for (const C of callouts) {
+      const c = C.c, a = t - c.t, out = c.tout == null ? 0 : clamp((t - c.tout) / 0.3), on = a >= 0 && out < 1;
+      for (const e of [C.p, C.dot, C.plate]) e.style.display = on ? '' : 'none';
+      if (!on) continue;
+      const [ax, ay] = typeof c.at === 'string' ? centre(items[c.at]) : c.at;
+      const dx = c.dx ?? 170, dy = c.dy ?? -90, bx = ax + dx, by = ay + dy;
+      const d = `M${ax.toFixed(1)},${ay.toFixed(1)} L${(ax + dx * 0.35).toFixed(1)},${by.toFixed(1)} L${bx.toFixed(1)},${by.toFixed(1)}`;
+      if (d !== C.d) { C.p.setAttribute('d', d); C.mp.setAttribute('d', d); C.len = C.mp.getTotalLength(); C.mp.style.strokeDasharray = C.len; C.d = d; }
+      C.mp.style.strokeDashoffset = (C.len * (1 - ex(a / 0.4))).toFixed(2);
+      C.dot.setAttribute('cx', ax.toFixed(1)); C.dot.setAttribute('cy', ay.toFixed(1)); C.dot.setAttribute('r', (7 * ex(a / 0.25)).toFixed(2));
+      const o = (1 - out).toFixed(3);
+      C.p.style.opacity = o; C.dot.style.opacity = o; C.plate.style.opacity = o;
+      C.plate.style.top = (by - 26).toFixed(1) + 'px';
+      C.plate.style.left = (dx >= 0 ? bx + 10 : bx - 10).toFixed(1) + 'px';
+      C.plate.style.transform = dx >= 0 ? '' : 'translateX(-100%)';
+      C.plate.style.clipPath = wipe(ex((a - 0.25) / 0.5));
+    }
+
+    if (cfg.returns) {
+      const R = cfg.returns, To = items[R.to], [bx, by] = centre(To), out = R.tout == null ? 0 : clamp((t - R.tout) / 0.3);
+      for (const r of returns) {
+        const I = items[r.id], [ax, ay] = centre(I), a = t - (R.t + r.n * (R.gap ?? 0.12)), on = a >= 0 && out < 1;
+        r.p.style.display = on ? '' : 'none'; r.head.style.display = on ? '' : 'none';
+        if (!on) continue;
+        const L = Math.hypot(bx - ax, by - ay) || 1, ux = (bx - ax) / L, uy = (by - ay) / L;
+        const sx = ax + ux * I.at.size * 0.42, sy = ay + uy * I.at.size * 0.42, tx = bx - ux * To.at.size * 0.5, ty = by - uy * To.at.size * 0.5;
+        const side = ax < bx - 1 ? -1 : ax > bx + 1 ? 1 : 0, bend = (R.bend ?? 0.25) * L * side;
+        const qx = (sx + tx) / 2 - uy * bend, qy = (sy + ty) / 2 + ux * bend;
+        const d = `M${sx.toFixed(1)},${sy.toFixed(1)} Q${qx.toFixed(1)},${qy.toFixed(1)} ${tx.toFixed(1)},${ty.toFixed(1)}`;
+        if (d !== r.d) { r.p.setAttribute('d', d); r.len = r.p.getTotalLength(); r.p.style.strokeDasharray = r.len; r.d = d; }
+        const u = ex(a / (R.dur ?? 0.5));
+        r.p.style.strokeDashoffset = (r.len * (1 - u)).toFixed(2);
+        const hl = Math.hypot(tx - qx, ty - qy) || 1, hx = (tx - qx) / hl, hy = (ty - qy) / hl;
+        r.head.setAttribute('points', [[tx, ty], [tx - hx * 16 - hy * 9, ty - hy * 16 + hx * 9], [tx - hx * 16 + hy * 9, ty - hy * 16 - hx * 9]].map((p) => p.map((v) => v.toFixed(1)).join(',')).join(' '));
+        r.head.style.opacity = (clamp((u - 0.85) / 0.15) * (1 - out)).toFixed(3);
+        r.p.style.opacity = (1 - out).toFixed(3);
+      }
+    }
+
     if (cfg.fly) {
-      const f = cfg.fly, I = items[f.id], u = eio(clamp((t - f.t) / (f.dur ?? 0.4)));
-      const cy = I.it.y + (I.O.vb[1] + I.O.vb[3] / 2) * I.k;
-      scene.style.transformOrigin = `${I.it.x}px ${cy.toFixed(1)}px`;
+      const f = cfg.fly, I = items[f.id], u = eio(clamp((t - f.t) / (f.dur ?? 0.4))), [cx, cy] = centre(I);
+      scene.style.transformOrigin = `${cx.toFixed(1)}px ${cy.toFixed(1)}px`;
       scene.style.transform = `scale(${(1 + 7 * u * u).toFixed(4)})`;
       scene.style.filter = u > 0.01 ? `blur(${(Math.sin(Math.PI * u) * 6).toFixed(2)}px)` : 'none';
       scene.style.opacity = (1 - clamp((u - 0.6) / 0.4)).toFixed(3);
