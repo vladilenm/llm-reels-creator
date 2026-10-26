@@ -156,16 +156,28 @@ def compose(fr, f, ctx):
     return np.clip(out, 0, 255).astype(np.uint8)
 
 
-def punch_cine(f, ctx):
-    """наезд в кино-режиме: только в mid вне проезда; склейки считаются с конца последнего проезда (в mid входим без
-    наезда); после последней склейки — 1,0, как в compose"""
-    F, sh = ctx["fps"], ctx["shots"]; t = f / F
-    s, dx, _ = cine.state(sh, t)
-    if abs(s - 1) > 1e-6 or abs(dx) > 1e-6 or cine.moving(sh, t): return 1.0
-    tg = ctx["toggles"]
+def mid_punch(f, ctx):
+    """наезд в mid на кадре f: чётность склеек с конца последнего завершённого проезда (в mid входим без наезда);
+    после последней склейки — 1,0, как в compose"""
+    F, sh, tg = ctx["fps"], ctx["shots"], ctx["toggles"]
     if tg and f >= tg[-1]: return 1.0
-    since = max([round((at + dur) * F) for at, _, dur in sh if at <= t] or [0])
+    since = max([round((at + dur) * F) for at, _, dur in sh if round((at + dur) * F) <= f] or [0])
     return (1.0, PUNCH)[sum(1 for r in tg if since <= r <= f) % 2]
+
+
+def punch_cine(f, ctx):
+    """наезд в кино-режиме: в mid — по склейкам (mid_punch); на проезде из mid наезд уходит в 1,0 вместе с проездом
+    (expo-out), без скачка на первом кадре; в остальных планах — 1,0"""
+    F, sh = ctx["fps"], ctx["shots"]; t = f / F
+    for at, _, dur in sh:
+        if dur > 0 and at <= t < at + dur:
+            s0, dx0, _ = cine.state(sh, at - 1e-6)
+            if abs(s0 - 1) > 1e-6 or abs(dx0) > 1e-6: return 1.0
+            p0 = mid_punch(round(at * F) - 1, ctx)
+            return 1 + (p0 - 1) * (1 - cine.ex((t - at) / dur))
+    s, dx, _ = cine.state(sh, t)
+    if abs(s - 1) > 1e-6 or abs(dx) > 1e-6: return 1.0
+    return mid_punch(f, ctx)
 
 
 def compose_cine(fr, f, ctx):
@@ -309,12 +321,14 @@ def main():
     fxp = P / "fx" / "fx.json"
     try: fxj = json.loads(fxp.read_text()) if fxp.is_file() else {}
     except ValueError as e: raise SystemExit(f"fx/fx.json: {e}")
+    if not isinstance(fxj, dict): raise SystemExit("fx/fx.json: нужен объект {…}")
     cin = bool(fxj.get("cine"))
     if cin and card: print("⚠ cine работает только с маской: --card собирается как раньше"); cin = False
     until = None
     if "--until" in a:
         try: until = round(float(a[a.index("--until") + 1]) * F)
         except (IndexError, ValueError): raise SystemExit("--until: нужно время в секундах, например --until 20.66")
+        if until <= 0: raise SystemExit("--until: время должно быть больше нуля")
     masks = {} if card else {int(m.stem): m for m in (P / "fx" / "masks").glob("*.png") if m.stem.isdigit()}
     if not card and not masks: raise SystemExit("нет fx/masks/*.png: запусти --prep или выбери --card")
     accent, win = accents(P, F)

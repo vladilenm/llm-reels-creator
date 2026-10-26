@@ -1049,3 +1049,28 @@ test("night_base cine: a non-mid shot in a night accent window stops the run and
   assert.notEqual(r.status, 0);
   assert.match(r.stderr, /окне акцента 0\.04–0\.20.*at 0/);
 });
+
+test("night_base cine punch: an active punch-in eases out with the move instead of snapping; mid entered after a move starts unpunched", { timeout: 60000 }, () => {
+  const r = py(`import sys, json; sys.path.insert(0, "scripts/ru/wide")
+import night_base as nb
+a = {"fps": 25, "shots": [(2.0, "side-right", 0.6)], "toggles": [25, 150]}
+b = {"fps": 25, "shots": [(1.0, "side-left", 0.0), (2.0, "mid", 0.6)], "toggles": [75, 200]}
+print(json.dumps({"a": [nb.punch_cine(f, a) for f in (49, 50, 51, 55, 65)], "b": [nb.punch_cine(f, b) for f in (60, 70, 80)]}))`);
+  assert.equal(r.status, 0, r.stderr);
+  const o = JSON.parse(r.stdout.trim().split("\n").pop());
+  near(o.a[0], 1.05); near(o.a[1], 1.05, 1e-6);
+  assert.ok(o.a[2] < 1.05 && o.a[2] > 1.0, `eases, not snaps: ${o.a[2]}`);
+  assert.ok(o.a[3] < 1.006, `nearly gone a third into the move: ${o.a[3]}`);
+  near(o.a[4], 1.0);
+  near(o.b[0], 1.0, 1e-9); near(o.b[1], 1.0, 1e-9); near(o.b[2], 1.05);
+});
+
+test("night_base cine: punch-in toggles stay in mid and 0.3 s away from a move; without cine every join counts as before", { timeout: 120000 }, () => {
+  const P = cineProject("cine4-", { fx: { look: "night", cine: true }, shots: [{ at: 1.0, shot: "side-right", dur: 0.6 }], dur: 2.0 });
+  writeFileSync(join(P, "EDL.json"), JSON.stringify({ keep_ranges: [0, 1, 2, 3, 4].map((k) => ({ start: k, end: k + 0.4 })) }));
+  let r = nb(P, "--until", "0.2"); assert.equal(r.status, 0, r.stderr + r.stdout);
+  assert.match(r.stdout, /наезды \[10\]/);
+  writeFileSync(join(P, "fx/fx.json"), JSON.stringify({ look: "night" }));
+  r = nb(P, "--until", "0.2"); assert.equal(r.status, 0, r.stderr + r.stdout);
+  assert.match(r.stdout, /наезды \[10, 40\]/);     // joins at frames 10/20/30/40, the old rule keeps ≥ 1 s between toggles
+});
