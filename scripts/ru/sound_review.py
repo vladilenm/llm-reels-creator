@@ -2,7 +2,8 @@
 # The customer's listening page for the brand sound library (design 2026-10-26). Claude cannot hear:
 # the customer marks «беру / нет» once, and the marks become the library.
 #   python3 scripts/ru/sound_review.py build [--out .cache/sound-review] [--voice-reel <reel>] [--voice-start 5] [--swap-t 43.29]
-#                                            [--level -17] [--duck -9]   (music against the voice, as fx.json sound.music)
+#                                            [--level -13] [--duck -5]   (music against the voice, as fx.json sound.music)
+#                                            [--sections sfx]            (a second round: only these sections)
 #   python3 scripts/ru/sound_review.py serve [--out .cache/sound-review] [--port 8765]   → http://127.0.0.1:8765
 #   python3 scripts/ru/sound_review.py apply [--out .cache/sound-review] [--no-index]
 #   common: [--music-dir brand/music] [--lib brand/sfx/library]
@@ -96,7 +97,7 @@ def build_music(out, mdir, voice, speech):
     cands = json.load(open(os.path.join(cdir, "candidates.json")))
     os.makedirs(os.path.join(out, "music"), exist_ok=True)
     items = []
-    for i in sorted((i for i, m in scr.items() if m.get("status") == "pass"), key=lambda i: -scr[i].get("score", 0)):
+    for i in sorted((i for i, m in scr.items() if m.get("status") == "pass" and i in cands), key=lambda i: -scr[i].get("score", 0)):
         c, m = cands[i], scr[i]
         src = c["file"] if os.path.isabs(c["file"]) else os.path.join(ROOT, c["file"])
         x = fades(S.fit(S.decode(src, ss=m.get("excerpt_start") or None), len(voice)))
@@ -244,10 +245,15 @@ fetch("/verdicts").then((r) => r.json()).then((m) => { marks = m; render(); }).c
 """
 
 
-def build(out, mdir, lib, reel, voice_start, swap_t):
+def build(out, mdir, lib, reel, voice_start, swap_t, sections=("music", "sfx", "signature")):
+    """sections: a second round can show only "sfx" (reserve brought back to the library and re-screened)."""
     os.makedirs(out, exist_ok=True)
-    voice, speech = voice_stretch(reel, voice_start, EXCERPT_S)
-    items = build_music(out, mdir, voice, speech) + build_sfx(out, lib) + build_signature(out, lib, reel, swap_t)
+    items = []
+    if "music" in sections:
+        voice, speech = voice_stretch(reel, voice_start, EXCERPT_S)
+        items += build_music(out, mdir, voice, speech)
+    if "sfx" in sections: items += build_sfx(out, lib)
+    if "signature" in sections: items += build_signature(out, lib, reel, swap_t)
     data = json.dumps(items, ensure_ascii=False, indent=1).replace("</", "<\\/")
     open(os.path.join(out, "index.html"), "w").write(PAGE.replace("__ITEMS__", data))
     n = {s: sum(i["section"] == s for i in items) for s in ("music", "sfx", "signature")}
@@ -400,7 +406,8 @@ def main():
         global LEVEL_DB, DUCK_DB
         LEVEL_DB, DUCK_DB = float(opt("--level", LEVEL_DB)), float(opt("--duck", DUCK_DB))
         print(f"music {LEVEL_DB:g} dB against the voice between phrases, {LEVEL_DB + DUCK_DB:g} dB under speech")
-        build(out, mdir, lib, os.path.abspath(opt("--voice-reel", DEFAULT_REEL)), float(opt("--voice-start", 5)), float(opt("--swap-t", 43.29)))
+        build(out, mdir, lib, os.path.abspath(opt("--voice-reel", DEFAULT_REEL)), float(opt("--voice-start", 5)), float(opt("--swap-t", 43.29)),
+              tuple(opt("--sections", "music,sfx,signature").split(",")))
     elif a[0] == "serve":
         serve(out, mdir, lib, int(opt("--port", 8765)))
     else:
