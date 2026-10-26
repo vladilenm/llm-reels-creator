@@ -25,7 +25,8 @@
      words:[{text, font:'display'|'serif'|'sans'|'mono', size, y, x:540, t, color}],   accent words: a wipe
      line:{y, t, w:520},                                              the glowing line under the words
      counter:{t, to, label, y, dur:1.2},
-     terminal:{x, y, w, h, title, tin:-1, lines:[{t, text, kind:'cmd'|'out'|'ok', dur:0.55}]},   «живой интерфейс»
+     terminal:{x, y, w, h, title, tin:-1, fs:26, lines:[{t, text, kind:'cmd'|'out'|'ok', dur:0.55}]},   «живой интерфейс»
+                                                fs: code px (line 1.54·fs, title 0.9·fs, caret to match); no fs — 26/40
    })
    OK.gridCells(parent, rect, {t, dur, step:84, ox:52, oy:52, drift:0, color, id:'ok-cells'}) → {el, draw(t)}: the grid's
    cells whose centre lies inside rect (at least the one under its centre) light in a sweep from the centre and fade
@@ -338,12 +339,14 @@ OK.run = (cfg) => {
     Object.assign(box.style, {left: c.x + 'px', top: c.y + 'px', width: c.w + 'px', height: c.h + 'px', color: TH.ink,
       background: theme === 'night' ? 'rgba(24,18,38,.94)' : '#FFFFFF',
       boxShadow: `0 0 0 3px rgba(${TH.glow},.45),0 0 40px 2px rgba(124,58,237,.22)`});
-    const head = el('', box); head.textContent = c.title || ''; Object.assign(head.style, {color: TH.dim, fontSize: '30px', marginBottom: '8px'});
+    if (c.fs) Object.assign(box.style, {fontSize: c.fs + 'px', lineHeight: Math.round(c.fs * 1.54) + 'px'});   // big code: the cine slice
+    const head = el('', box); head.textContent = c.title || ''; Object.assign(head.style, {color: TH.dim, fontSize: (c.fs ? Math.round(c.fs * 0.9) : 30) + 'px', marginBottom: '8px'});
     const rows = c.lines.map((l, i) => {
       const r = el('', box, 'div', 'ok-row-' + i); r.style.color = l.kind === 'ok' ? TH.on : TH.ink;
       if (l.kind !== 'cmd') { r.textContent = l.text; return {l, r}; }
       const pr = el('', r, 'span'); pr.textContent = '$ '; pr.style.color = TH.on;
       const tx = el('okx', r, 'span'); const car = el('okcar', r, 'span'); car.style.background = TH.on;
+      if (c.fs) Object.assign(car.style, {width: Math.round(c.fs * 0.54) + 'px', height: Math.round(c.fs * 1.15) + 'px', verticalAlign: -Math.round(c.fs * 0.19) + 'px'});
       return {l, r, tx, car};
     });
     term = {c, box, rows};

@@ -412,6 +412,24 @@ test("object scene terminal: the command types, output lines arrive on their wor
   } finally { await c.browser.close(); }
 });
 
+test("object scene terminal: fs sets the code size, line height, title and caret; without fs the old 26/40", { timeout: 60000 }, async () => {
+  const term = (fs) => scene({ T: 2, mode: "panel", theme: "night", terminal: { x: 40, y: 340, w: 1000, h: 560, title: "агент",
+    ...(fs ? { fs } : {}), tin: -0.2, lines: [{ t: 0.2, text: "curl x", kind: "cmd", dur: 0.3 }] } });
+  const st = () => {
+    const b = getComputedStyle(document.getElementById("ok-term")), car = getComputedStyle(document.querySelector("#ok-row-0 .okcar"));
+    return [b.fontSize, b.lineHeight, getComputedStyle(document.querySelector("#ok-term > div:first-child")).fontSize, car.width, car.height];
+  };
+  const big = await openClip(term(34));
+  try {
+    assert.deepEqual(await big.at(1.0, st), ["34px", "52px", "31px", "18px", "39px"]);
+    assert.deepEqual(big.errors, []);
+  } finally { await big.browser.close(); }
+  const small = await openClip(term(0));
+  try {
+    assert.deepEqual(await small.at(1.0, st), ["26px", "40px", "30px", "14px", "30px"]);
+  } finally { await small.browser.close(); }
+});
+
 // ---------- screen kit night ----------
 
 test("screen kit night: no title plate, typed chapter index, the frame draws in, edge light on a shot change, lens runs", { timeout: 60000 }, async () => {
