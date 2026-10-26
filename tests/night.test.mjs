@@ -188,3 +188,46 @@ test("kinetic captions: theme_default sets the theme where no key says otherwise
   assert.match(html, /id="c0" class="kg dark clip"/);
   assert.match(html, /id="c1" class="kg light clip"/);
 });
+
+// ---------- night base ----------
+
+function pixel(video, n, x, y) {
+  const r = spawnSync("ffmpeg", ["-v", "error", "-i", video, "-vf", `select=eq(n\\,${n})`, "-frames:v", "1", "-f", "rawvideo", "-pix_fmt", "rgb24", "-"], { maxBuffer: 1 << 26 });
+  assert.equal(r.status, 0, String(r.stderr));
+  const i = (y * 1080 + x) * 3;
+  return [r.stdout[i], r.stdout[i + 1], r.stdout[i + 2]];
+}
+
+test("night_base: night background, the speaker by the mask with a halo, an accent replaces the background, --card", { timeout: 120000 }, () => {
+  const P = tmp("nb-");
+  for (const d of ["assets", "renders", "broll", "work", "fx/masks"]) mkdirSync(join(P, d), { recursive: true });
+  writeFileSync(join(P, "assets/raw.mp4"), "");
+  writeFileSync(join(P, "PROBE.json"), JSON.stringify({ summary: { fps: 25 } }));
+  writeFileSync(join(P, "EDL.json"), JSON.stringify({ keep_ranges: [{ start: 0, end: 0.2 }, { start: 1, end: 1.2 }] }));
+  ff("-f", "lavfi", "-i", "color=c=red:s=1080x1920:r=25:d=0.4", "-f", "lavfi", "-i", "sine=f=220:d=0.4:sample_rate=48000",
+    "-shortest", "-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "aac", join(P, "renders/clean.mp4"));
+  ff("-f", "lavfi", "-i", "color=c=green:s=1080x1920:r=25:d=0.16", "-c:v", "libx264", "-pix_fmt", "yuv420p", join(P, "broll/acc.mp4"));
+  writeFileSync(join(P, "work/accents.json"), JSON.stringify({ accents: [{ id: "a", in: 0.04, out: 0.2, kind: "night", file: "broll/acc.mp4" }] }));
+  const r0 = py(`from PIL import Image, ImageDraw
+import pathlib
+d = pathlib.Path(${JSON.stringify(join(P, "fx/masks"))})
+for i in range(10):
+    m = Image.new("L", (989, 822), 0); ImageDraw.Draw(m).rectangle((300, 200, 700, 600), fill=255); m.save(d / f"{i:05d}.png")`);
+  assert.equal(r0.status, 0, r0.stderr);
+  let r = spawnSync("python3", ["scripts/ru/wide/night_base.py", P], { cwd: ROOT, encoding: "utf8" });
+  assert.equal(r.status, 0, r.stderr + r.stdout);
+  const out = join(P, "renders/picture.base.mp4");
+  const [pr, pg] = pixel(out, 7, 547, 1456);
+  assert.ok(pr > 170 && pg < 70, `speaker ${pr},${pg}`);
+  const bg = pixel(out, 7, 100, 300);
+  assert.ok(bg[0] < 50 && bg[1] < 50 && bg[2] < 70, `night ${bg}`);
+  const acc = pixel(out, 2, 100, 300);
+  assert.ok(acc[1] > 100 && acc[0] < 80, `accent ${acc}`);
+  assert.ok(pixel(out, 2, 547, 1456)[0] > 170, "the speaker stays over the accent");
+  assert.ok(pixel(out, 7, 322, 1456)[2] > pixel(out, 7, 310, 1456)[2] + 8, "halo 5 px outside the silhouette, not 17 px out");
+  r = spawnSync("python3", ["scripts/ru/wide/night_base.py", P, "--card"], { cwd: ROOT, encoding: "utf8" });
+  assert.equal(r.status, 0, r.stderr + r.stdout);
+  assert.ok(pixel(out, 7, 540, 1500)[0] > 170, "card shows the camera");
+  const sum = (p) => p[0] + p[1] + p[2];
+  assert.ok(sum(pixel(out, 7, 47, 1300)) > sum(pixel(out, 7, 20, 1300)) + 60, "card frame line");
+});
