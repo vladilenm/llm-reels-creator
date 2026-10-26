@@ -8,6 +8,8 @@ import { fileURLToPath } from "node:url";
 
 import { searchUrl, creditLine, licenseName, download } from "../scripts/ru/lib/openverse.mjs";
 import { selectMusic, MOODS } from "../scripts/ru/music-fetch.mjs";
+import { PALETTE, selectSfx, folderFor } from "../scripts/ru/lib/sfx-palette.mjs";
+import { haveIds, migrateLegacy } from "../scripts/ru/sfx-fetch.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const tmp = (p = "snd-") => mkdtempSync(join(tmpdir(), p));
@@ -49,4 +51,35 @@ test("music-fetch keeps CC0 / CC BY instrumentals of 60 s – 8 min and skips se
   assert.equal(got[2].credit, null);
   assert.equal(got[2].license_name, "CC0");
   assert.ok(Object.keys(MOODS).length >= 6);
+});
+
+test("sfx palette: every folder is a Real SFX role, the kit's tick lives in click_tick", () => {
+  const expect = { whoosh: "whoosh", whoosh_big: "whoosh", whoosh_small: "whoosh", riser: "riser", hit: "hit",
+    subdrop: "sub_drop", click: "click", click_tick: "click", pop: "pop", paper: "paper", glass: "glass",
+    chime: "chime", keyboard: "typing", ambience: "ambience" };
+  assert.deepEqual(Object.keys(PALETTE).sort(), Object.keys(expect).sort());
+  const r = py(`import sys, json; sys.path.insert(0, ".claude/skills/real-sfx/scripts"); from common import tag_roles
+print(json.dumps({k: tag_roles(f"main / {k} / x.mp3") for k in ${JSON.stringify(Object.keys(expect))}}))`);
+  assert.equal(r.status, 0, r.stderr);
+  const roles = JSON.parse(r.stdout);
+  for (const [k, role] of Object.entries(expect)) assert.ok(roles[k].includes(role), `${k}: ${roles[k]}`);
+  assert.equal(folderFor("tick"), "click_tick");
+  assert.equal(folderFor("pop"), "pop");
+});
+
+test("sfx-fetch: CC0 Freesound files within the length limit, ids on disk skipped, legacy tick folder moved", () => {
+  const r = (o) => ({ id: "a", license: "cc0", source: "freesound", duration: 300, ...o });
+  const got = selectSfx([r({ id: "ok" }), r({ id: "by", license: "by" }), r({ id: "js", source: "jamendo" }),
+    r({ id: "long", duration: 900 }), r({ id: "have" })], { maxMs: 400, have: new Set(["have"]) });
+  assert.deepEqual(got.map((x) => x.id), ["ok"]);
+  const d = tmp();
+  mkdirSync(join(d, "library", "tick"), { recursive: true });
+  writeFileSync(join(d, "library", "tick", "id1.mp3"), "x");
+  mkdirSync(join(d, "rejected", "click_tick"), { recursive: true });
+  writeFileSync(join(d, "rejected", "click_tick", "id2.mp3"), "x");
+  const credits = migrateLegacy(join(d, "library"), { "brand/sfx/library/tick/id1.mp3": { kind: "tick" } });
+  assert.ok(existsSync(join(d, "library", "click_tick", "id1.mp3")));
+  assert.deepEqual(Object.keys(credits), ["brand/sfx/library/click_tick/id1.mp3"]);
+  assert.equal(credits["brand/sfx/library/click_tick/id1.mp3"].kind, "click_tick");
+  assert.deepEqual([...haveIds(d, "click_tick")].sort(), ["id1", "id2"]);
 });

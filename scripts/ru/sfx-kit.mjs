@@ -16,6 +16,7 @@ import { execFileSync } from "node:child_process";
 import { existsSync, readdirSync, writeFileSync, copyFileSync, readFileSync } from "node:fs";
 import { join, resolve, dirname, extname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { folderFor } from "./lib/sfx-palette.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const KIT = join(ROOT, "brand", "sfx");
@@ -59,7 +60,7 @@ for (const kind of kinds) {
     kit[kind] = { source: "earshot", id, knobs };
     console.log(`${kind}\t${id}\t${check}`);
   } else if (source === "openverse") {
-    const dir = join(KIT, "library", kind);
+    const dir = join(KIT, "library", folderFor(kind));
     const files = existsSync(dir) ? readdirSync(dir).filter((f) => /\.(wav|mp3|flac|ogg)$/.test(f)).sort() : [];
     if (!files.length) { console.error(`${kind}: no files in ${dir} — run sfx-fetch.mjs`); process.exit(1); }
     const src = join(dir, opt("--file", files[0]));
