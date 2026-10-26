@@ -217,6 +217,7 @@ Claude пишет `PRINCIPLES.md` в проект: по каждому прин�
 без ведущих нулей), бейдж «N/5» в шапке окна (`win.pager`), список-хук «топ N» с размытыми именами и
 звёздами (`list`), светлая полноэкранная карточка «Плагин номер N» (`mode: 'card'`). Собираются
 `python3 scripts/ru/broll/build.py`, записи экрана режутся `node scripts/ru/broll/screen-frames.mjs`.
+Ночная тема — `theme: 'night'`; сцены с предметами и акценты — `OK.run` (`scripts/ru/broll/object-scene.js`), предметы — `scripts/ru/broll/object-kit.js` (список из 32 в шапке).
 
 ## Где результат
 

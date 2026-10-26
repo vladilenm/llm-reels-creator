@@ -98,6 +98,14 @@ data (notes, names, messengers) get `blur` marks; captions `kinetic` for window-
 remakes. S6 self-review is mandatory (2–3 sheets), then `assemble.mjs <reel> --preview` and the
 fast copy `renders/preview.x<F>.mp4` at the speed F from `vladilen-reels` S7 (by words per second).
 
+**Night look (default since 2026-10-26, customer: «ок» on claude-sfx in the night look).** OBS-template takes get
+`fx/fx.json` `"look": "night"` (the old light look only when he asks: «как раньше, светлый»):
+- the first frame decides the base: a plain wall, nothing at the shoulder → the mask; a chair or clutter at the
+  shoulder → `night_base.py --card`. Name the choice in the preview report;
+- vladilen-reels S3 writes the motion storyboard `PLAN.json` `motion` and runs `motion-check.mjs` → `MOTION.md`;
+  S4 builds night clips (screen-kit `theme: 'night'`, `OK.run` scenes and accents); S4b's base is `night_base.py`;
+- the preview report adds the `MOTION.md` table (time · word · verb · what is in the frame).
+
 **Preview — stop.** Show `renders/preview.x<F>.mp4` and `renders/preview.mp4` to the customer (SendUserFile,
 plus the paths), what differs from `SCRIPT.md`, the automatic decisions, one line from `REVIEW.md`,
 the sound line. One question: «Ок или правки?» Corrections → apply, re-render what changed,

@@ -172,6 +172,13 @@ said. Write `$P/PRINCIPLES.md`; cuts and reorders stay proposals like the hook r
 table and numbered edits), recommend one hook, then stop and wait. Record the answer with `status.mjs --decision` and count requested changes
 for `gate_b_changes`.
 
+**Motion storyboard (night look, `fx.json` `"look": "night"`).** `PLAN.json` `motion`: one entry per state change,
+`{at, word, verb, what}` — `at` is the start of `word` on the clean timeline, verbs from `scripts/ru/motion-check.mjs`
+(16: fly, pull, live, layers, lens, grid, materialize, rebuild, tree, physics, callouts, active, chapter, return, morph,
+prompt). No verb twice in a row, at least 5 different ones, one hero scene built by hand for the tool (usually the hook
+or the main claim), 1–2 light accents on the strongest moments, the rest of the background swaps are night ones.
+`node scripts/ru/motion-check.mjs $P` must PASS; it writes `MOTION.md` for the preview report.
+
 ### S4 Графика — no stop
 
 Build each approved event with **motion-broll** (read its `reference/engine-api.md`
@@ -186,6 +193,16 @@ Light clips are panels (`.mov`), dark ones are `full`. Then render with the engi
 If the head sits high in the raw (no room above it), put the window phrases into `fx.json`
 `relocate` windows (customer, 2026-10-19: speaker cut out and moved down over his own blurred, lifted
 room) and run `fx_picture.py $P --prep-relocate` first; close-ups stay the plain frame.
+
+**Night look** (`look: "night"`): windows `SK.run({theme: 'night', …})` — public pages screenshotted headless with
+Playwright `colorScheme: 'dark'`; glass list and night card; `pull`, `enter: 'grid'`, `layers`, `lens`. Object scenes
+and accents: `OK.run` (`scripts/ru/broll/object-scene.js`, schema in its header) with objects from
+`scripts/ru/broll/object-kit.js` (32 objects listed in its header). A missing object: draw it in the reel's generator
+from `OK.box/cyl/disc/face/plate/circ` in the same style; reusable → add it to `object-kit.js` with a `checkObjects`
+test. Accents are full `OK.run` layers listed in `work/accents.json` (`kind: night | light`), not in `broll/plan.json`;
+a light full insert carries `theme: "light"` in `broll/plan.json`. Joins: full clips and panels butt (out = the next
+in); a full clip that follows a frame with the speaker starts its entry 0.08–0.1 s before the cut. Lines ≥ 3 px,
+labels ≥ 30 px, entries expo-out 0.6–0.9 s, exits 0.3–0.4 s, no bouncing springs.
 
 - `full` → opaque clip, render to `.mp4`.
 - `panel` / `card` → `bg:null`, render to `.mov` (ProRes 4444 with alpha), placed
@@ -285,7 +302,13 @@ phrase), with person masks so the text sits behind the head, plus zoom-blur on e
 location change. Propose them in the S3 plan as `fx` events.
 **OBS-template takes** (1080×1920 from his OBS scene: placeholders on top, the camera as a rounded card
 from y 1098). The base is `python3 scripts/ru/wide/obs_base.py $P [--mix]` — brand canvas, the card as
-recorded, punch-ins 1.00 ↔ 1.07 on the joins — not `fx_picture.py`. Background swaps depend on the wall:
+recorded, punch-ins 1.00 ↔ 1.07 on the joins — not `fx_picture.py`.
+With `look: "night"` the base is `python3 scripts/ru/wide/night_base.py $P --prep` (Vision masks for the whole reel) →
+`--stills <t,…>` (check the mask edges, the halo, every accent) → `--mix`: the night background drawn in code, the
+speaker by the mask ×1.1 from the bottom with a halo (a soft shadow on light accents), punch-ins 1.00 ↔ 1.05 on the
+joins, accents from `work/accents.json` under him — the word is always behind the head. `obs_base.py` and `obs_swaps.py`
+stay for the light look.
+Background swaps depend on the wall:
 - **plain wall, nothing at the shoulder → swaps with the mask** (customer twice on 2026-10-25, claude-sfx and
   harness2: «с маской, чтоб фон вырезать»): render each swap as a full dark `.mp4` (background, glow behind
   the speaker, text; no hole for the card), list them in `work/swaps.json` and leave them out of
@@ -326,6 +349,7 @@ head): `PLAN.json` `captions.style: "kinetic"` → 1–3 words centred between t
 future words dimmed, one accent word per phrase in the brand serif italic, `font_serif.italic` (`captions.kinetic.accent_words`
 or `accent` times, `breaks`, `y_keys`, `theme_keys` light/dark — schema in the header of
 `kineticHtml`). Use it when the remake's SCRIPT.md asks for it; anchor rail stays the default.
+With `look: "night"` kinetic captions are dark and switch to the light theme over light accents and light full inserts by themselves (`nightCaptions`); explicit `theme_keys` win.
 
 ### S6 Самопроверка — no stop, max 3 iterations
 
