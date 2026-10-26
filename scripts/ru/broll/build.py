@@ -8,6 +8,7 @@ Adds to each fragment, then runs the motion-broll engine build:
   - Cyrillic brand fonts from brand.md as 'SK Sans' (font_body), 'SK Serif' (font_serif.italic)
     and 'SK Mono' (font_mono); the motion-broll stage and .mono switch to them too,
   - the kit itself,
+  - the object kit and object scenes (object-kit.js, object-scene.js; the night look of 2026-10-26),
   - SK.BASE, so media paths in the fragment stay relative to the fragment's folder.
 A fragment that does not call SK.run builds exactly like a plain motion-broll clip."""
 import base64, json, os, pathlib, re, sys, tempfile
@@ -61,10 +62,12 @@ def weighted_faces(family, files):
 
 def brand_faces(b):
     body = (b.get('font_body') or DEFAULT_FONTS['font_body'])['files']
-    serif = (b.get('font_serif') or DEFAULT_FONTS['font_serif'])['italic']
+    serif_all = b.get('font_serif') or DEFAULT_FONTS['font_serif']
+    serif, display = serif_all['italic'], serif_all.get('display')
     mono = (b.get('font_mono') or DEFAULT_FONTS['font_mono'])['files']
     return (weighted_faces('SK Sans', body) + font_face('SK Serif', serif, '400 900', 'italic')
             + weighted_faces('SK Mono', mono)
+            + (font_face('SK Display', display, 800) if display else '')
             + "#stage{font-family:'SK Sans','Geist',system-ui,sans-serif}.mono{font-family:'SK Mono','Geist Mono',ui-monospace,monospace}")
 
 
@@ -73,7 +76,8 @@ def kit_head(fragment_dir, out_dir):
     faces = brand_faces(b)
     base = os.path.relpath(fragment_dir, out_dir).replace(os.sep, '/') + '/'
     pre = f"window.SK={{BRAND:{json.dumps(brand_tokens(b))},BASE:{json.dumps(base)}}};\n"
-    return f'<style>{faces}</style>\n<script>{pre}{(HERE / "screen-kit.js").read_text(encoding="utf-8")}</script>\n'
+    kits = '\n'.join((HERE / f).read_text(encoding='utf-8') for f in ('screen-kit.js', 'object-kit.js', 'object-scene.js'))
+    return f'<style>{faces}</style>\n<script>{pre}{kits}</script>\n'
 
 
 def build(src, out_dir):
