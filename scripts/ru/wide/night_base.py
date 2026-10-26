@@ -384,7 +384,7 @@ def main():
     try: fxj = json.loads(fxp.read_text()) if fxp.is_file() else {}
     except ValueError as e: raise SystemExit(f"fx/fx.json: {e}")
     if not isinstance(fxj, dict): raise SystemExit("fx/fx.json: нужен объект {…}")
-    cin = fxj.get("cine") is True                   # как readCine в assemble.mjs: финиш включает только true, не 1 и не "true"
+    cin = fxj.get("cine") is True and fxj.get("look") == "night"   # как readCine в assemble.mjs: нужны "cine": true и "look": "night" (не 1, не "true", без look — выкл)
     if cin and card: print("⚠ cine работает только с маской: --card собирается как раньше"); cin = False
     until = None
     if "--until" in a:

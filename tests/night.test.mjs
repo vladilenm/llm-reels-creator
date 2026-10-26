@@ -1112,11 +1112,11 @@ print(json.dumps({"shape": list(at0.shape), "dtype": str(at0.dtype), "diff": flo
   assert.ok(o.top < 5, `the top glow and the grid stay where they are: ${o.top}`);
 });
 
-test("night_base cine: only \"cine\": true turns the cine layer on, any other value reads as off (assemble.mjs does the same)", { timeout: 120000 }, () => {
-  for (const v of [1, "true"]) {
-    const P = cineProject("cine5-", { fx: { look: "night", cine: v } });
+test("night_base cine: only \"cine\": true with \"look\": \"night\" turns the cine layer on, any other value or no look reads as off (assemble.mjs does the same)", { timeout: 120000 }, () => {
+  for (const fx of [{ look: "night", cine: 1 }, { look: "night", cine: "true" }, { cine: true }]) {
+    const P = cineProject("cine5-", { fx });
     const r = nb(P); assert.equal(r.status, 0, r.stderr + r.stdout);
-    assert.match(r.stdout, /кино выкл/, `cine ${JSON.stringify(v)}`);
+    assert.match(r.stdout, /кино выкл/, `fx ${JSON.stringify(fx)}`);
   }
 });
 
