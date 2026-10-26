@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, writeFileSync, readFileSync, mkdirSync, symlinkSync, lstatSync, existsSync } from "node:fs";
+import { mkdtempSync, writeFileSync, readFileSync, mkdirSync, symlinkSync, lstatSync, existsSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -880,4 +880,73 @@ test("night_base --prep: stale frames and masks are cleared, a symlinked fx/mask
   assert.equal(r.status, 0, r.stderr + r.stdout);
   assert.ok(!existsSync(join(P, "fx/masks/00099.png")), "a stale mask of a previous run is gone");
   assert.ok(existsSync(join(P, "fx/masks/00000.png")));
+});
+
+// ---------- cine: планы спикера ----------
+
+const near = (a, b, e = 1e-3) => assert.ok(Math.abs(a - b) < e, `${a} ≈ ${b}`);
+const cinePy = (code) => {
+  const r = py(`import sys, json; sys.path.insert(0, "scripts/ru/wide")\nimport cine\n${code}`);
+  assert.equal(r.status, 0, r.stderr);
+  return JSON.parse(r.stdout.trim().split("\n").pop());
+};
+
+test("cine shots: mid before the first key, an expo-out move, a cut with dur 0, motion only while moving", () => {
+  const o = cinePy(`
+sh = [(1.0, "side-right", 0.6), (3.0, "close", 0.0)]
+print(json.dumps({"before": cine.state(sh, 0.5), "start": cine.state(sh, 1.0), "half": cine.state(sh, 1.06),
+  "end": cine.state(sh, 1.7), "cut": cine.state(sh, 3.0), "mv": [cine.moving(sh, t) for t in (0.99, 1.0, 1.59, 1.6, 3.0)],
+  "pad": [cine.moving(sh, 0.8, 0.3), cine.moving(sh, 0.6, 0.3)], "shutter": cine.shutter(25)}))`);
+  assert.deepEqual(o.before, [1, 0, 0]);
+  assert.deepEqual(o.start, [1, 0, 0]);
+  near(o.half[0], 0.93); near(o.half[1], 120); near(o.half[2], -0.5);
+  near(o.end[0], 0.86); near(o.end[1], 240); near(o.end[2], -1);
+  near(o.cut[0], 1.38); near(o.cut[1], 0); near(o.cut[2], 0);
+  assert.deepEqual(o.mv, [false, true, true, false, false]);
+  assert.deepEqual(o.pad, [true, false]);
+  o.shutter.forEach((v, i) => near(v, [-0.0075, -0.0025, 0.0025, 0.0075][i], 1e-9));
+});
+
+test("cine load_shots: no file is no shots; unknown shot, unsorted at, negative dur and a non-mid accent window stop the run", () => {
+  const d = tmp("shots-"), p = join(d, "shots.json");
+  const load = (shots, acc = "[]") => {
+    if (shots) writeFileSync(p, JSON.stringify({ shots }));
+    return py(`import sys, json, pathlib; sys.path.insert(0, "scripts/ru/wide")\nimport cine\nprint(json.dumps(cine.load_shots(pathlib.Path(${JSON.stringify(p)}), ${acc})))`);
+  };
+  let r = load(null);
+  assert.equal(r.status, 0, r.stderr); assert.equal(r.stdout.trim(), "[]");
+  r = load([{ at: 0, shot: "close", dur: 0 }, { at: 2, shot: "mid" }], "[(3.0, 4.0)]");
+  assert.equal(r.status, 0, r.stderr); assert.deepEqual(JSON.parse(r.stdout), [[0, "close", 0], [2, "mid", 0.6]]);
+  r = load([{ at: 0, shot: "wide" }]);
+  assert.notEqual(r.status, 0); assert.match(r.stderr, /план 'wide'/);
+  r = load([{ at: 2, shot: "mid" }, { at: 1, shot: "close" }]);
+  assert.notEqual(r.status, 0); assert.match(r.stderr, /не по возрастанию/);
+  r = load([{ at: 1, shot: "close", dur: -1 }]);
+  assert.notEqual(r.status, 0); assert.match(r.stderr, /dur < 0/);
+  r = load([{ at: 0, shot: "side-left", dur: 0 }], "[(3.0, 4.0)]");
+  assert.notEqual(r.status, 0); assert.match(r.stderr, /окне акцента 3\.00–4\.00.*at 0/);
+  r = load([{ at: 0, shot: "mid", dur: 0 }, { at: 3.5, shot: "close" }], "[(3.0, 4.0)]");
+  assert.notEqual(r.status, 0); assert.match(r.stderr, /at 3\.5/);
+  r = load([{ at: 2.8, shot: "mid" }], "[(3.0, 4.0)]");
+  assert.notEqual(r.status, 0, "a move into mid that is still running at the window start"); assert.match(r.stderr, /at 2\.8/);
+});
+
+test("cine affine and feather: the shot scales from the frame bottom after the punch-in; only a card edge inside the frame fades", () => {
+  const o = cinePy(`
+import numpy as np
+A = cine.affine(0.86, 240.0)
+fwd = lambda x, y: ((x - A[2]) / A[0], (y - A[5]) / A[4])
+m = np.ones((4, 1080), np.float32)
+mid = cine.feather(m, *cine.card_edges(1.0, 0.0, -3, 1088))
+side = cine.feather(m, *cine.card_edges(0.86, 240.0, -3, 1088))
+P = cine.affine(1.0, 0.0, 1.05)
+print(json.dumps({"bottom": fwd(540, 1920), "top": fwd(540, 1030), "edges": cine.card_edges(0.86, 240.0, -3, 1088),
+  "mid_same": bool((mid == m).all()), "side": [float(side[0, x]) for x in (300, 400, 500, 1000)],
+  "punch": [P[0], P[2], P[4], P[5]]}))`);
+  near(o.bottom[0], 780); near(o.bottom[1], 1920);
+  near(o.top[1], 1154.6, 0.1);
+  near(o.edges[0], 313.02, 0.01); near(o.edges[1], 1248.7, 0.01);
+  assert.equal(o.mid_same, true, "mid: both card edges are off the frame, the mask is untouched");
+  near(o.side[0], 0); near(o.side[1], 0.5436, 1e-3); near(o.side[2], 1); near(o.side[3], 1);
+  near(o.punch[0], 1 / 1.05); near(o.punch[1], 540 - 540 / 1.05); near(o.punch[3], 1330 - 1330 / 1.05);
 });
