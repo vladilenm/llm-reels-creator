@@ -159,9 +159,15 @@ def rel(P, path):
 
 
 def frame_count(path, fps_):
-    r = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", str(path)],
-                       capture_output=True, text=True, check=True)
-    return round(float(r.stdout.strip()) * fps_)
+    """число кадров видеопотока: nb_frames, если это число, иначе длительность потока × fps; ffprobe не прочёл — SystemExit"""
+    r = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=nb_frames,duration", "-of", "json",
+                        str(path)], capture_output=True, text=True)
+    if r.returncode != 0: raise SystemExit(f"ffprobe не прочитал {path} (код {r.returncode}):\n{r.stderr.strip()}")
+    try: st = json.loads(r.stdout)["streams"][0]
+    except (ValueError, KeyError, IndexError): raise SystemExit(f"в {path} нет видеопотока")
+    if str(st.get("nb_frames", "")).isdigit(): return int(st["nb_frames"])
+    try: return round(float(st["duration"]) * fps_)
+    except (KeyError, ValueError): raise SystemExit(f"ffprobe не назвал ни число кадров, ни длительность видеопотока {path}")
 
 
 def frames(path, fps_):
@@ -240,6 +246,8 @@ def main():
     if not a or a[0].startswith("--"): print(__doc__); sys.exit(1)
     P = project(a[0]); F = fps(P)
     if "--prep" in a: prep(P, F); return
+    clean = P / "renders" / "clean.mp4"
+    if not clean.is_file(): raise SystemExit(f"нет {rel(P, clean)}: сначала чистый ролик (S2)")
     card = "--card" in a
     masks = {} if card else {int(m.stem): m for m in (P / "fx" / "masks").glob("*.png") if m.stem.isdigit()}
     if not card and not masks: raise SystemExit("нет fx/masks/*.png: запусти --prep или выбери --card")
@@ -250,7 +258,6 @@ def main():
         if any(f0 / F - 0.3 <= j <= f1 / F + 0.3 for f0, f1, _, _ in win): continue
         if not toggles or fj - toggles[-1] >= F: toggles.append(fj)
     ctx = {"fps": F, "card": card, "masks": masks, "cuts": {round(j * F) for j in joins(P)}, "toggles": toggles, "accent": accent}
-    clean = P / "renders" / "clean.mp4"
     cuts = ctx["cuts"]
     if not card:
         total = frame_count(clean, F)
@@ -294,7 +301,7 @@ def main():
     except BaseException:
         enc.kill(); raise
     rc = enc.wait()
-    if rc != 0: raise SystemExit(f"ffmpeg (кодировщик) завершился с кодом {rc}, {base} не готов:\n{tail(err)}")
+    if rc != 0: raise SystemExit(f"ffmpeg (кодировщик) завершился с кодом {rc}, {rel(P, base)} не готов:\n{tail(err)}")
     if missing:
         empty = [f for f in missing if mask_src(masks, f, cuts) is None]
         print(f"⚠ кадров без своей маски: {len(missing)} (первые: {', '.join(map(str, missing[:5]))}) · взяты у соседей: "

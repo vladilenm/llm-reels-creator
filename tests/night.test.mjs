@@ -545,7 +545,7 @@ for i in range(10):
   assert.ok(near[0] < far[0] - 10, `a shadow next to the silhouette ${near}`);
   assert.ok(near[0] < far[0] - 20, `the shadow is the 35 % ink one, not the faint purple halo ${near}`);
   assert.ok(Math.abs(near[0] - near[2]) < 12, `neutral, not a purple halo ${near}`);
-  assert.ok(pixel(out, 2, 547, 1456)[0] > 170, "the speaker stays over the light accent");
+  assert.ok(pixel(out, 2, 547, 1456)[1] < 100, "the speaker (red) stays over the white light accent");
   assert.equal(masks([3, 4, 5, 6, 7, 8]).status, 0);
   r = spawnSync("python3", ["scripts/ru/wide/night_base.py", P], { cwd: ROOT, encoding: "utf8" });
   assert.notEqual(r.status, 0, "6 of 10 frames without a mask: stale masks, stop");
@@ -556,6 +556,26 @@ for i in range(10):
   r = spawnSync("python3", ["scripts/ru/wide/night_base.py", P], { cwd: ROOT, encoding: "utf8" });
   assert.notEqual(r.status, 0, "an unknown accent kind stops the run");
   assert.match(r.stderr, /kind/);
+});
+
+test("night_base mask_src: a frame without a mask borrows the nearest neighbour within 3 frames, never across a cut", { timeout: 60000 }, () => {
+  const r = py(`import sys, json
+sys.path.insert(0, "scripts/ru/wide")
+from night_base import mask_src
+M = lambda *ks: {k: "x" for k in ks}
+print(json.dumps({
+  "own": mask_src(M(3, 2), 3, set()),
+  "reach3": mask_src(M(0), 3, set()), "reach4": mask_src(M(0), 4, set()), "reach3_fwd": mask_src(M(6), 3, set()), "reach4_fwd": mask_src(M(7), 3, set()),
+  "earlier_first": mask_src(M(2, 4), 3, set()),
+  "cut_far_falls_to_near": mask_src(M(4, 6), 5, {5}), "cut_only_far": mask_src(M(4), 5, {5}),
+  "cut_ahead": mask_src(M(5), 4, {5}),
+  "same_side_of_a_cut": mask_src(M(6), 5, {5}),
+}))`);
+  assert.equal(r.status, 0, r.stderr);
+  assert.deepEqual(JSON.parse(r.stdout.trim().split("\n").pop()), {
+    own: 3, reach3: 0, reach4: null, reach3_fwd: 6, reach4_fwd: null, earlier_first: 2,
+    cut_far_falls_to_near: 6, cut_only_far: null, cut_ahead: null, same_side_of_a_cut: 6,
+  });
 });
 
 test("night_base --prep: stale frames and masks are cleared, a symlinked fx/masks is unlinked and its target is never touched", { timeout: 120000 }, () => {
