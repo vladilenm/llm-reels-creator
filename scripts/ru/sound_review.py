@@ -107,6 +107,8 @@ def build_music(out, mdir, voice, speech):
 
 def build_sfx(out, lib):
     scr = json.load(open(os.path.join(lib, "screen.json")))
+    cp = os.path.join(lib, "credits.json")
+    credits = json.load(open(cp)) if os.path.exists(cp) else {}
     os.makedirs(os.path.join(out, "sfx"), exist_ok=True)
     items = []
     for k in sorted(k for k, m in scr.items() if m["status"] == "shortlist"):
@@ -114,7 +116,9 @@ def build_sfx(out, lib):
         subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", os.path.join(lib, k), "-lavfi",
                         "showspectrumpic=s=360x90:legend=0:color=intensity", png], check=True)
         m = scr[k]
-        items.append({"section": "sfx", "group": k.split("/")[0], "id": k, "title": k.split("/")[1],
+        cr = credits.get(next((c for c in credits if c.endswith("/library/" + k)), ""), {})   # files are named by Openverse id
+        title = f"{cr['title']} — {cr.get('creator', '')}" if cr.get("title") else k.split("/")[1]
+        items.append({"section": "sfx", "group": k.split("/")[0], "id": k, "title": title,
                       "meta": f"{m['dur']} с · атака {m['attack_ms']:.0f} мс · {m['centroid']} Гц",
                       "audio": [["", "lib/" + urllib.parse.quote(k)]], "img": f"a/sfx/{os.path.basename(png)}"})
     return items
