@@ -167,6 +167,9 @@ test("screen kit night: no title plate, typed chapter index, the frame draws in,
     const edge = () => [+document.querySelector(".sk-edge").style.opacity, parseFloat(document.querySelector(".sk-edge").style.left)];
     const [o1, l1] = await c.at(1.7, edge), [o2, l2] = await c.at(2.0, edge);
     assert.ok(o2 > 0.2 && l2 > l1, `edge ${o1} ${l1} → ${o2} ${l2}`);
+    const [clip, shadow] = await c.at(1.0, () => { const s = getComputedStyle(document.querySelector(".sk-win")); return [s.clipPath, s.boxShadow]; });
+    assert.ok(clip.includes("-120px"), `the clip leaves room for the shadow: ${clip}`);
+    assert.ok(shadow.includes("3px"), `3 px ring: ${shadow}`);
     await c.at(2.2, () => 0);
     assert.deepEqual(c.errors, []);
   } finally { await c.browser.close(); }

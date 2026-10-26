@@ -147,8 +147,8 @@ SK.run = (cfg)=>{
   const urlEl = el('sk-url', barEl);
   let drawSvg = null, drawRect = null, edge = null;
   if(night){
-    win.style.background = '#18122A';
-    win.style.boxShadow = `0 0 0 2px ${rgba(B.accent_light,.45)},0 0 44px 4px ${rgba(B.accent,.28)},0 30px 80px -20px rgba(0,0,0,.7)`;
+    win.style.background = '#1A1428';
+    win.style.boxShadow = `0 0 0 3px ${rgba(B.accent_light,.45)},0 0 44px 4px ${rgba(B.accent,.28)},0 30px 80px -20px rgba(0,0,0,.7)`;
     Object.assign(barEl.style, {background:'rgba(255,255,255,.04)', borderBottom:`1px solid ${rgba(B.accent_light,.18)}`});
     Object.assign(urlEl.style, {background:'rgba(255,255,255,.06)', color:'rgba(245,243,250,.68)', fontFamily:"'SK Mono',monospace"});
     if(wc.enter !== 'fly'){
@@ -322,7 +322,7 @@ SK.run = (cfg)=>{
     }
     if(c.suffix){ const s = el('', num, 'span'); s.textContent = c.suffix; }
     if(night){
-      Object.assign(box.style, {background:'#18122A', boxShadow:`0 0 0 2px ${rgba(B.accent_light,.9)},0 0 46px 4px ${rgba(B.accent,.35)}`});
+      Object.assign(box.style, {background:'#1A1428', boxShadow:`0 0 0 3px ${rgba(B.accent_light,.9)},0 0 46px 4px ${rgba(B.accent,.35)}`});
       Object.assign(num.style, {color:B.ink, fontFamily:"'SK Mono',monospace", fontWeight:500}); lbl.style.color = 'rgba(245,243,250,.7)';
     }
     counter = {c, box, cols, digits};
@@ -396,7 +396,12 @@ SK.run = (cfg)=>{
       const wa = t - (wc.tin ?? tin), wo = wc.tout === undefined ? tout : wc.tout;
       const o = (wa < 0 ? 0 : 1) * (wo==null ? 1 : 1-clamp((t-wo)/0.3));
       if(wc.enter === 'fly'){ const u = ex(wa/0.6); wv = {o:o*clamp(wa/0.25), blur:(1-u)*6, s:0.35+0.65*u}; }
-      else { wv = {o, blur:0, s:1}; win.style.clipPath = `inset(0 ${(100-100*ex((wa-0.15)/0.6)).toFixed(2)}% 0 0 round 26px)`; }
+      else {
+        // the content wipes left → right; the clip leaves 120 px around so the ring, glow and drop shadow stay visible
+        // (empty at u=0, shadow room on every side at u=1; same trick as the terminal in object-scene.js)
+        wv = {o, blur:0, s:1}; const u = ex((wa-0.15)/0.6);
+        win.style.clipPath = `inset(-120px calc(${(100-100*u).toFixed(2)}% + ${(120-240*u).toFixed(1)}px) -120px -120px round 26px)`;
+      }
       nightFrame(t, x, y, w, h, wa, o);
     }
     if(M.apply(win, wv)){
