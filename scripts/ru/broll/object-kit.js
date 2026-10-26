@@ -10,6 +10,23 @@
      P     {part name: element} for every data-p in the markup
      s     {t, active, open, spin, struck, play, on, fill}: numbers, 0..1 except t (clip seconds) — pose is a pure function of s
      T     the theme (OK.THEMES.night | light)
+   Objects (kind — what it stands for · states):
+     database — a library, storage · open, active      agent — an AI agent · active
+     turntable — sound on the timeline · spin, active  speaker — sound made in code · play
+     key — an API key · struck                         folder — a project, files · open, active
+     document — a file, a page · open, fill, active    laptop — a computer · open, on
+     terminal — a command line · fill, active          browser — a site, a web app · fill, active
+     phone — a mobile app · on, fill                   chat — a conversation · fill, play
+     code — code </> · play, active                    graph — a graph, a pipeline · fill, active
+     server — a backend, hosting · play, active        cloud — a service, deploy · play, active
+     lock — security, a login · open, active           gear — settings, automation · spin, play
+     magnifier — search, a detail · play, active       star — GitHub stars, a rating · play, active
+     plugin — a plugin, an integration · open, active  camera — filming, the take · play, active
+     mic — a voice, a recording · play, active         montage — editing, cuts · open, struck, play
+     fan — colours, options · open, active             chart — growth, metrics · fill, active
+     clock — time, a deadline · spin, play, active     money — revenue, a price · fill, active
+     checklist — steps, done · fill, active            mail — email, a message · open, active
+     rocket — a launch, speed · open, play, active     ear — listening, earshot · play, active
    A new object: compose it from OK.box / OK.cyl / OK.disc / OK.poly / OK.face / OK.plate / OK.circ, give moving parts a
    data-p, write its pose; its vb must hold every pose (tests/night.test.mjs checkObjects). */
 (function(){
@@ -469,6 +486,148 @@ OK.O.montage = {
     }
     P.h0.setAttribute('transform', `translate(${f1(-d * 0.866)} ${f1(-d * 0.5)})`);
     P.h1.setAttribute('transform', `translate(${f1(d * 0.866)} ${f1(d * 0.5)})`);
+  },
+};
+
+// ---------- meaning, money, sound ----------
+
+// fan (colours, a palette, options): five swatches on one pin, facing the camera (upright, like code and gear);
+// open spreads them, active lights the top one
+const swatch = (a) => {
+  const dx = Math.sin(a), dz = Math.cos(a), nx = dz * 13, nz = -dx * 13;
+  return upright([[nx, 12 + nz], [nx + 100 * dx, 12 + nz + 100 * dz], [-nx + 100 * dx, 12 - nz + 100 * dz], [-nx, 12 - nz]]);
+};
+OK.O.fan = {
+  vb: [-76, -120, 152, 124],
+  svg: () => ['fl', 'fr', 'ft', 'fr', 'fa'].map((c, i) => face(swatch(0), 0, c, 's' + i)).join('') + face(upright(circ(0, 12, 6, 12)), 0, 'fi'),
+  pose: (P, s, T) => {
+    for (let i = 0; i < 5; i++) P['s' + i].setAttribute('points', pts(swatch((i - 2) * 0.32 * s.open).map(([x, z]) => [x, 0, z])));
+    P.s4.style.fill = s.active > 0.5 ? T.on : '';
+  },
+};
+
+// chart (growth, metrics, results): bars on a plate and a trend line; fill grows the bars and draws the line,
+// active lights the last bar
+const BARS = [36, 58, 74, 104];
+const bar = (i, h) => OK.box(-60 + i * 32, -14, 6, 22, 28, Math.max(2, h), i === 3 ? {t: 'fa'} : {});
+OK.O.chart = {
+  vb: [-94, -110, 188, 168],
+  svg: () => OK.box(-70, -30, 0, 140, 60, 6) + BARS.map((h, i) => `<g data-p="b${i}">${bar(i, h)}</g>`).join('')
+    + `<polyline class="ln" data-p="tr" points="${BARS.map((h, i) => at(-49 + i * 32, 0, 6 + h + 14).join(',')).join(' ')}" pathLength="1" style="vector-effect:none;stroke-width:5;stroke-dasharray:1;stroke-dashoffset:1"/>`,
+  pose: (P, s, T) => {
+    const k = 0.15 + 0.85 * s.fill;
+    BARS.forEach((h, i) => { P['b' + i].innerHTML = bar(i, h * k); });
+    P.b3.querySelectorAll('polygon')[2].style.fill = s.active > 0.5 ? T.on : '';
+    P.tr.style.strokeDashoffset = (1 - c01((s.fill - 0.5) * 2)).toFixed(4);
+  },
+};
+
+// clock (time, a deadline, hours saved): a face with ticks and hands, facing the camera (upright); spin turns the
+// minute hand (spin 1 = an hour), play runs the accent second hand, active lights the centre
+const onFace = (u, v) => { const [x, z] = upright([[u, v]])[0]; return at(x, 0, z); };   // a point of the upright face
+const hand = (a, r) => [onFace(0, 60), onFace(r * Math.sin(a), 60 + r * Math.cos(a))];
+OK.O.clock = {
+  vb: [-56, -122, 122, 118],
+  svg: () => plate(upright(circ(0, 60, 50, 36)), 10) + face(upright(circ(0, 60, 42, 36)), 0, 'ft')
+    + Array.from({length: 12}, (_, k) => { const a = k * Math.PI / 6, r0 = k % 3 ? 36 : 32;
+      const p = onFace(r0 * Math.sin(a), 60 + r0 * Math.cos(a)), q = onFace(40 * Math.sin(a), 60 + 40 * Math.cos(a));
+      return `<line class="ln" x1="${p[0]}" y1="${p[1]}" x2="${q[0]}" y2="${q[1]}"/>`; }).join('')
+    + ['hh', 'mh', 'sh'].map((id) => `<line class="ln" data-p="${id}"/>`).join('') + face(upright(circ(0, 60, 5, 12)), 0, 'fa', 'c'),
+  pose: (P, s, T) => {
+    const set = (e, a, r) => { const [p, q] = hand(a, r);
+      e.setAttribute('x1', p[0]); e.setAttribute('y1', p[1]); e.setAttribute('x2', q[0]); e.setAttribute('y2', q[1]); };
+    set(P.mh, s.spin * Math.PI * 2, 34); set(P.hh, (0.25 + s.spin / 12) * Math.PI * 2, 22); set(P.sh, s.t * Math.PI / 3, 38);
+    P.sh.style.opacity = s.play > 0.01 ? '1' : '0'; P.sh.style.stroke = T.accent;
+    P.c.style.fill = s.active > 0.5 ? T.on : '';
+  },
+};
+
+// money (revenue, a price, savings): a banknote and a coin stack; fill grows the stack (1 → 5 coins),
+// active lights the top coin
+OK.O.money = {
+  vb: [-108, -58, 162, 102],
+  svg: () => OK.box(-84, -12, 0, 72, 46, 4) + OK.poly([[-74, -2, 4], [-22, -2, 4], [-22, 24, 4], [-74, 24, 4]], 'fd')
+    + [0, 1, 2, 3, 4].map((i) => OK.cyl(30, 10, i * 9, 26, 8, {id: 'c' + i})).join(''),
+  pose: (P, s, T) => {
+    const n = 1 + Math.round(s.fill * 4);
+    for (let i = 0; i < 5; i++) {
+      P['c' + i].style.display = i < n ? '' : 'none';
+      P['c' + i].lastChild.style.fill = i === n - 1 && s.active > 0.5 ? T.accent : '';
+    }
+  },
+};
+
+// checklist (steps, a plan, done): a clipboard with three rows; fill ticks them one by one, active lights the done rows
+const ROW_Z = [104, 72, 40];
+OK.O.checklist = {
+  vb: [-56, -178, 116, 212],
+  svg: () => OK.box(-55, -6, 0, 110, 6, 140) + OK.box(-20, -10, 132, 40, 10, 14)
+    + ROW_Z.map((z, i) => face([[-40, z], [-22, z], [-22, z + 18], [-40, z + 18]], 0, 'ft')
+      + face([[-12, z + 6], [40, z + 6], [40, z + 12], [-12, z + 12]], 0, 'fd', 'r' + i)
+      + `<polyline class="ln" data-p="k${i}" points="${[[-37, z + 9], [-32, z + 4], [-24, z + 16]].map(([x, zz]) => at(x, 0, zz).join(',')).join(' ')}" pathLength="1" style="vector-effect:none;stroke-width:6;stroke-dasharray:1;stroke-dashoffset:1"/>`).join(''),
+  pose: (P, s, T) => {
+    for (let i = 0; i < 3; i++) {
+      const k = c01(s.fill * 3 - i);
+      P['k' + i].style.strokeDashoffset = (1 - k).toFixed(4); P['k' + i].style.stroke = T.on;
+      P['r' + i].style.fill = s.active > 0.5 && k >= 1 ? T.on : '';
+    }
+  },
+};
+
+// mail (email, a newsletter, a message sent): an envelope; open lifts the flap behind the letter and slides the letter
+// up, active lights the seal
+const ENV = [[-60, 0], [60, 0], [60, 76], [-60, 76]];
+const flap = (o) => [[-60, 76], [60, 76], [0, 34 + 84 * o]];
+OK.O.mail = {
+  vb: [-62, -158, 124, 196],
+  svg: () => face(ENV, -6, 'fr') + OK.poly([[60, -6, 0], [60, 0, 0], [60, 0, 76], [60, -6, 76]], 'fr') + face(flap(1), -5, 'fr', 'fb')
+    + `<g data-p="lt">${face([[-48, 10], [48, 10], [48, 72], [-48, 72]], -3, 'ft')}${face([[-36, 56], [30, 56], [30, 61], [-36, 61]], -3, 'fd')}${face([[-36, 44], [12, 44], [12, 49], [-36, 49]], -3, 'fd')}</g>`
+    + face(ENV, 0, 'fl') + face(flap(0), 0, 'ft', 'ff') + face(circ(0, 40, 6, 12), 0, 'fa', 'seal'),
+  pose: (P, s, T) => {
+    P.fb.setAttribute('points', pts(flap(s.open).map(([x, z]) => [x, -5, z])));
+    P.ff.setAttribute('points', pts(flap(s.open).map(([x, z]) => [x, 0, z])));
+    P.fb.style.display = s.open >= 0.5 ? '' : 'none'; P.ff.style.display = s.open < 0.5 ? '' : 'none';
+    P.seal.style.display = s.open < 0.5 ? '' : 'none'; P.seal.style.fill = s.active > 0.5 ? T.on : '';
+    P.lt.setAttribute('transform', `translate(0 ${f1(-50 * s.open)})`);
+  },
+};
+
+// rocket (a launch, growth, speed): a body, a nose, fins and a flame; open launches it up, play flickers the flame,
+// active lights the window
+OK.O.rocket = {
+  vb: [-50, -220, 100, 250],
+  svg: () => {
+    const [rx, ry] = OK.ellipse(24), [X, Yt] = OK.iso(0, 0, 120);
+    return `<g data-p="rk"><polygon class="fa" data-p="fire" points="${[[-12, 0, 22], [12, 0, 22], [0, 0, -14]].map((p) => at(...p).join(',')).join(' ')}"/>`
+      + face([[-24, 26], [-50, 0], [-24, 56]], 0, 'fr') + face([[24, 26], [50, 0], [24, 56]], 0, 'fr')
+      + OK.cyl(0, 0, 20, 24, 100)
+      + `<path class="ft" d="M${f1(X - rx)},${f1(Yt)} A${f1(rx)},${f1(ry)} 0 0 0 ${f1(X + rx)},${f1(Yt)} L${f1(X)},${f1(Yt - 56)} Z"/>`
+      + OK.disc(8, 8, 86, 10, 'y', 'fd', 'win') + '</g>';
+  },
+  pose: (P, s, T) => {
+    P.rk.setAttribute('transform', `translate(0 ${f1(-36 * s.open)})`);
+    const k = 0.7 + 0.3 * s.play * (0.5 + 0.5 * Math.sin(s.t * 23)), [fx, fy] = OK.iso(0, 0, 22);
+    P.fire.setAttribute('transform', `translate(${f1(fx)} ${f1(fy)}) scale(1 ${k.toFixed(3)}) translate(${f1(-fx)} ${f1(-fy)})`);
+    P.fire.style.opacity = (0.4 + 0.6 * Math.max(s.play, s.open)).toFixed(3);
+    P.win.style.fill = s.active > 0.5 ? T.on : '';
+  },
+};
+
+// ear (listening, hearing the result, earshot): an ear facing the camera (upright) with sound waves coming in from
+// the left; play pulses the waves toward it, active lights the inner curve
+const EAR = upright([[12, 24], [30, 40], [40, 70], [36, 104], [16, 128], [-12, 134], [-36, 120], [-46, 94], [-40, 70], [-26, 58], [-18, 40], [-6, 22]]);
+const EAR_IN = upright([[-24, 92], [-20, 110], [0, 118], [20, 104], [22, 80], [8, 64], [-2, 50]]);
+OK.O.ear = {
+  vb: [-100, -146, 152, 132],
+  svg: () => {
+    const [cx, cy] = [-40, -84];                     // the waves' centre on screen, left of the ear
+    const waves = [0, 1, 2].map((i) => { const R = 22 + 16 * i;
+      return `<path class="ln" data-p="w${i}" d="M${f1(cx - R * 0.5)},${f1(cy - R * 0.866)} A${R},${R} 0 0 0 ${f1(cx - R * 0.5)},${f1(cy + R * 0.866)}" style="opacity:0"/>`; }).join('');
+    return plate(EAR, 6) + `<polyline class="ln" data-p="in" points="${EAR_IN.map(([x, z]) => at(x, 0, z).join(',')).join(' ')}"/>` + waves;
+  },
+  pose: (P, s, T) => {
+    for (let i = 0; i < 3; i++) P['w' + i].style.opacity = (s.play * Math.pow(0.5 + 0.5 * Math.sin(s.t * 6 + i * 1.2), 2)).toFixed(3);
+    P.in.style.stroke = s.active > 0.5 ? T.accent : '';
   },
 };
 })();

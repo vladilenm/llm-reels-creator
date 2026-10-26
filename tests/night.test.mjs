@@ -114,6 +114,18 @@ test("object kit, part 2: tools — nine objects in both themes, every pose insi
   await checkObjects(["cloud", "lock", "gear", "magnifier", "star", "plugin", "camera", "mic", "montage"]);
 });
 
+test("object kit, part 3: meaning, money, sound — eight objects, 32 in all, each listed in the header", { timeout: 120000 }, async () => {
+  const src = readFileSync(join(ROOT, "scripts/ru/broll/object-kit.js"), "utf8");
+  const ctx = { window: {} };
+  vm.createContext(ctx);
+  vm.runInContext(src, ctx);
+  const kinds = Object.keys(ctx.window.OK.O);
+  assert.equal(kinds.length, 32, kinds.join(" "));
+  const head = src.slice(0, src.indexOf("(function(){"));
+  for (const k of kinds) assert.match(head, new RegExp(`\\b${k}\\b`), `${k} is listed in the header`);
+  await checkObjects(["fan", "chart", "clock", "money", "checklist", "mail", "rocket", "ear"]);
+});
+
 // ---------- object scene ----------
 
 const scene = (cfg) => `<title>x</title><script>OK.run(${JSON.stringify(cfg)});</script>`;
