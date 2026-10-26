@@ -26,6 +26,7 @@ export const MOODS = {
 const SOURCES = "jamendo,freesound,ccmixter";
 const NOT_MUSIC = /\b(vocals?|song|feat\.?|singer|voice|rap|lyrics|speech|interview|podcast|lecture|field recording|traffic|birds?|rain)\b/i;
 const HEAD_BYTES = 4 * 1024 * 1024;
+const PARALLEL = 4;
 
 export function selectMusic(results, { mood, minMs = 60000, maxMs = 480000, seen = new Set() } = {}) {
   const text = (r) => `${r.title} ${(r.tags || []).map((t) => t.name).join(" ")}`;
@@ -58,17 +59,25 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
       if (!first) await sleep(PAUSE_MS);
       first = false;
       const picks = selectMusic(await search(q, { license: "cc0,by", source: SOURCES, page }), { mood, seen });
-      for (const c of picks) {
-        if (got >= max) break outer;
-        seen.add(c.id);
-        if (dry) { console.log(`${mood}\t${c.license}\t${Math.round(c.duration_ms / 1000)} s\t${c.title} — ${c.creator}`); got++; continue; }
-        const ext = /^mp3/.test(c.filetype || "mp3") ? "mp3" : c.filetype;
-        const file = join(DIR, `${c.id}.${ext}`);
-        try { await download(c.url, file, { maxBytes: HEAD_BYTES }); } catch (e) { console.warn(`skip ${c.title}: ${e.message}`); continue; }
-        cands[c.id] = { ...c, file: file.slice(ROOT.length + 1), fetched: new Date().toISOString().slice(0, 10) };
-        writeFileSync(join(DIR, "candidates.json"), JSON.stringify(cands, null, 1));   // an interrupted run keeps what it got
-        got++;
+      const take = picks.slice(0, max - got);
+      for (const c of take) seen.add(c.id);
+      if (dry) {
+        for (const c of take) console.log(`${mood}\t${c.license}\t${Math.round(c.duration_ms / 1000)} s\t${c.title} — ${c.creator}`);
+        got += take.length;
+      } else {
+        // Jamendo gives one connection ~100 KB/s: PARALLEL heads at a time
+        for (let i = 0; i < take.length; i += PARALLEL) {
+          await Promise.all(take.slice(i, i + PARALLEL).map(async (c) => {
+            const ext = /^mp3/.test(c.filetype || "mp3") ? "mp3" : c.filetype;
+            const file = join(DIR, `${c.id}.${ext}`);
+            try { await download(c.url, file, { maxBytes: HEAD_BYTES }); } catch (e) { console.warn(`skip ${c.title}: ${e.message}`); return; }
+            cands[c.id] = { ...c, file: file.slice(ROOT.length + 1), fetched: new Date().toISOString().slice(0, 10) };
+            writeFileSync(join(DIR, "candidates.json"), JSON.stringify(cands, null, 1));   // an interrupted run keeps what it got
+            got++;
+          }));
+        }
       }
+      if (got >= max) break outer;
     }
   }
   if (!dry) writeFileSync(join(DIR, "candidates.json"), JSON.stringify(cands, null, 1));
