@@ -27,9 +27,10 @@ PRIORITY = {"whoosh_big": 6, "hit": 5, "whoosh": 4, "riser": 4, "chime": 3, "cli
 BASE_GAIN = {"whoosh": 0.09, "whoosh_small": 0.08, "whoosh_big": 0.12, "pop": 0.05, "click": 0.045, "tick": 0.03,
              "chime": 0.08, "hit": 0.22, "riser": 0.1}
 RUNS = ("tick", "pop")
-# our kind → Real SFX typed kind and default length (s)
+# our kind → Real SFX typed kind and default length (s). The hero hit plays as a «drop» (soft low sub_drop first,
+# then a dark long hit): the customer approved low drops and no punchy hits (2026-10-26), and the signature is one too.
 TYPES = {"whoosh": ("whoosh", 0.5), "whoosh_small": ("whoosh", 0.3), "whoosh_big": ("whoosh", 0.8), "pop": ("pop", None),
-         "click": ("click", None), "tick": ("tick", None), "chime": ("chime", None), "hit": ("hit", None),
+         "click": ("click", None), "tick": ("tick", None), "chime": ("chime", None), "hit": ("drop", None),
          "thump": ("thump", None), "riser": ("riser", 1.5)}
 
 
