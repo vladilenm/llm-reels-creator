@@ -28,3 +28,11 @@
 Тишину в начале файла скрипт обрезает сам, поэтому удар попадает точно в событие.
 Сэмплы должны быть с лицензией на коммерческое использование (CC0 из Openverse — да).
 Другую папку можно указать в `fx/fx.json` → `"sfx_kit"`.
+
+## Палитра «чисто и дорого» (с 2026-10-26)
+
+`node scripts/ru/sfx-fetch.mjs` качает CC0-записи по палитре `scripts/ru/lib/sfx-palette.mjs` в папки-роли
+Real SFX (`whoosh`, `riser`, `hit`, `subdrop`, `click`, `click_tick`, `pop`, `paper`, `glass`, `chime`, `keyboard`,
+`ambience`). `python3 scripts/ru/sfx_screen.py` отсеивает по замерам: брак — в `rejected/`, лишнее — в `reserve/`.
+Отбор на слух и фирменный звук — `scripts/ru/sound_review.py` (`signature.json` рядом с этой папкой).
+В remake-fast звуки ставит `scripts/ru/fx/sfx_real.py`, набор `<вид>.wav` выше — для старого `sfx.py`.

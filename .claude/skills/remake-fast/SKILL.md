@@ -107,6 +107,15 @@ fast copy `renders/preview.x<F>.mp4` at the speed F from `vladilen-reels` S7 (by
   run `motion-check.mjs` again after S4/S4b, once `work/accents.json` and `broll/plan.json` exist, before the preview;
 - the preview report adds that run's `MOTION.md` table (time · word · verb · what is in the frame).
 
+Sound (since 2026-10-26, «чисто и дорого»): set `fx.json` `"sfx_engine": "real"` before S4b, pick the track with
+`node scripts/ru/music-pick.mjs <reel> --mood <mood from the brief: спокойный | технологичный | тёплый | lo-fi |
+кинематографичный | бодрый>`, then `python3 scripts/ru/fx/sfx_real.py <reel>` instead of `sfx.py`, then `sound.py`.
+`sfx_real.py` thins the events by the brand rules, plays the brand signature on every `whoosh_big` and puts the SFX
+9 dB under the voice; `music-pick.mjs` sets the music to −13 / −5 (−18 dB under speech: the old −17 / −9 was
+inaudible with live tracks, 2026-10-27). S6 writes one line into `REVIEW.md` from `fx/sfx.real.json`: events kept / dropped, trim, silent
+moments, the three critique lines. The preview's sound line: the track (title, author, licence) and that line. A moment
+with no fitting recording stays quiet and is named — never synthesized.
+
 **Preview — stop.** Show `renders/preview.x<F>.mp4` and `renders/preview.mp4` to the customer (SendUserFile,
 plus the paths), what differs from `SCRIPT.md`, the automatic decisions, one line from `REVIEW.md`,
 the `MOTION.md` table and the base choice (mask or card), the sound line. One question: «Ок или правки?» Corrections → apply, re-render what changed,
@@ -124,6 +133,8 @@ Write `<reel>/CAPTION.md` and give it in chat: line 1 — the CTA keyword («Н�
 (`brand.md` → «Словами»), the last one ending with an open question the viewer wants to
 answer. Only true facts. Then `vladilen-reels` S8 (lessons, `log-run.mjs`); its proposals go
 into the final report and do not hold the final.
+
+CC BY music: `node scripts/ru/music-pick.mjs <reel> --credit` appends the author line to `CAPTION.md` (CC0 adds nothing).
 
 ## Report lines
 

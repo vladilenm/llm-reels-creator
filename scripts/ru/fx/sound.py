@@ -2,6 +2,10 @@
 # S4c «Звуковой слой»: voice polish + click-free joins + music bed with ducking + SFX → one mix.
 #   python3 scripts/ru/fx/sound.py <project> [--music file] [--variant B] [--no-music] [--stems]
 #   →  <project>/fx/mix[.<variant>].wav (48 kHz stereo, clean length) + fx/sound[.<variant>].json
+#   python3 scripts/ru/fx/sound.py <project> --plan [--music f] [--bpm n] [--variant B]
+#   →  work/sound/music[.B].wav only: the music aligned to the clean timeline (ducked, stops) — for sfx_real.py
+#   --sfx fx/sfx.B.wav   mix this SFX track (an sfx_real.py variant) instead of "sound.sfx"
+#   --level -13 --duck -5   override sound.music level_db / duck_db for this run
 #
 # numpy + ffmpeg only (system python3). Settings live in <project>/fx/fx.json under "sound":
 #   voice:     {chain: "default" | "off" | "<ffmpeg -af string>", denoise: "auto" | true | false}
@@ -312,6 +316,8 @@ def main():
     mc = dict(cfg.get("music", {}))
     if opt("--music"): mc["src"] = opt("--music")
     if opt("--bpm"): mc["bpm"] = float(opt("--bpm"))
+    if opt("--level"): mc["level_db"] = float(opt("--level"))
+    if opt("--duck"): mc["duck_db"] = float(opt("--duck"))
     if "--no-music" in a: mc = {}
     var = opt("--variant"); suf = f".{var}" if var else ""
     tr = json.load(open(os.path.join(P, "transcript.clean.json")))
@@ -328,9 +334,19 @@ def main():
             print(f"bpm {bpm:6.1f}  score {sc:.2f}  off-beat ms {offs}")
         return
 
+    if "--plan" in a:
+        if not mc.get("src"):
+            print("no music in fx.json sound.music and no --music: nothing to plan"); return
+        v, speech, vrms = voice_layer(P, cfg, words, n, rep)
+        m = music_layer(P, fx, mc, words, n, speech, vrms, scratch, rep)
+        stem = os.path.join(scratch, f"music{suf}.wav"); write_wav(stem, m)
+        json.dump(rep, open(os.path.join(P, "fx", f"sound{suf}.json"), "w"), ensure_ascii=False, indent=1)
+        print(f"→ {os.path.relpath(stem, ROOT)} (music on the clean timeline, no mix)")
+        return
+
     v, speech, vrms = voice_layer(P, cfg, words, n, rep)
     mix = v.copy()
-    sfx_path = os.path.join(P, cfg.get("sfx", "fx/sfx.wav"))
+    sfx_path = os.path.join(P, opt("--sfx") or cfg.get("sfx", "fx/sfx.wav"))
     if os.path.exists(sfx_path):
         s = fit(decode(sfx_path), n); mix += s
         rep["sfx"] = {"src": os.path.relpath(sfx_path, P), "peak_dbfs": round(db(np.abs(s).max()), 1)}
