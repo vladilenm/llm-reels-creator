@@ -33,9 +33,11 @@
 
 | Где | Что |
 |---|---|
-| `brand/music/` + `tracks.json` | твои треки с лицензией; без записи в `tracks.json` трек не используется |
+| `brand/music/` + `tracks.json` | фирменные треки CC0 / CC BY, отобранные на слух: настроение, темп, лицензия, строка автора (`credit`), когда звучал (`last_used`); трек под рилс выбирает `node scripts/ru/music-pick.mjs <рилс> --mood <настроение>` |
 | `brand/sfx/<вид>.wav` | эффекты вместо синтезированных (собирает `node scripts/ru/sfx-kit.mjs` из банка earshot; выбор — `brand/sfx/kit.json`): `whoosh`, `whoosh_big`, `pop`, `click`, `tick`, `chime`, `hit` |
 | `brand/sfx/library/` | настоящие записи CC0 с Freesound через Openverse (`node scripts/ru/sfx-fetch.mjs`, без ключа), авторы в `credits.json`; библиотека скилла Real SFX |
+| `brand/sfx/signature.json` | фирменный звук на смене фона и CTA (слои и уровни), выбран на странице отбора |
+| страница отбора звука | `python3 scripts/ru/sound_review.py build`, затем `serve` → `http://127.0.0.1:8765`, отметки «беру / нет» → `apply`; пополнение: `music-fetch.mjs` + `music_screen.py`, `sfx-fetch.mjs` + `sfx_screen.py` |
 | `.claude/skills/real-sfx/` | скилл Real SFX: ставит настоящие записи из библиотеки точно в кадр; по просьбе «озвучь настоящими звуками» |
 | `tools/earshot/` | earshot (локально, не в git): рендер набора и проверка «звук против склеек» в S6 |
 
@@ -194,11 +196,13 @@ Claude пишет `PRINCIPLES.md` в проект: по каждому прин�
 |---|---|---|
 | `sfx` | эффекты на событиях: слово, вид, громкость | на каждом визуальном событии, тихо |
 | `sfx_kit` | папка своих эффектов | `brand/sfx` |
+| `sfx_engine` | `"real"` — звуки из фирменной библиотеки через Real SFX (`sfx_real.py`), без синтеза | в remake-fast `"real"`, в остальных — набор `brand/sfx/<вид>.wav` |
+| `sfx_real` | плотность и уровень звуков: `budget_s` (один акцент на столько секунд), `merge_s`, `run_max`, `peak_below_voice_db` | 2 · 0,4 · 3 · 9 |
 | `sound.voice.chain` | обработка голоса; `"off"` — выкл | вкл |
 | `sound.join_fade_ms` | сглаживание щелчков на склейках | 6 |
 | `sound.music.src` | трек | нет |
-| `sound.music.level_db` | громкость музыки в паузах: −12 громче, −18 тише | −15 |
-| `sound.music.duck_db` | насколько тише музыка под голосом | −8 |
+| `sound.music.level_db` | громкость музыки в паузах: −12 громче, −18 тише | −15; с живым треком из библиотеки −13 (ставит `music-pick.mjs`) |
+| `sound.music.duck_db` | насколько тише музыка под голосом | −8; с живым треком −5 (под речью −18 дБ к голосу) |
 | `sound.music.stops` | стоп музыки перед фразой и возврат на слове | — |
 | `audio.mix` | какой готовый звук идёт в видео | `fx/mix.wav` |
 

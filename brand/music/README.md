@@ -4,6 +4,18 @@
 или сгенерированные. Аудиофайлы в git не попадают (`*.mp3`, `*.wav` в `.gitignore`), в
 репозитории остаются только этот файл и `tracks.json`.
 
+## Фирменная библиотека (с 2026-10-26)
+
+Треки собираются автоматически и отбираются на слух:
+
+1. `node scripts/ru/music-fetch.mjs` — кандидаты из Openverse (Jamendo, Freesound, ccMixter), только CC0 и CC BY.
+2. `python3 scripts/ru/music_screen.py` — отсев по замерам (темп, вступление, ровность, полоса голоса).
+3. `python3 scripts/ru/sound_review.py build` и `serve` — страница: каждый трек отдельно и под твоим голосом.
+4. `python3 scripts/ru/sound_review.py apply` — отмеченные «беру» скачиваются целиком и попадают в `tracks.json`
+   со строкой автора; «нет» больше не появятся (`rejected.json`).
+
+Трек под рилс выбирает `node scripts/ru/music-pick.mjs <рилс> --mood <настроение>`.
+
 ## Как добавить трек
 
 1. Положи файл сюда: `brand/music/<имя>.mp3`.

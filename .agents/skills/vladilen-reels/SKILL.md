@@ -334,6 +334,12 @@ When the customer asks for real recorded sounds on a finished render («озву
 звуками»), use the `real-sfx` skill on `renders/final.mp4` with `--voice-safe`; its library is
 `brand/sfx/library`. Never both on one reel: Real SFX takes the baked-in layer out, not doubles it.
 
+**Brand library engine (since 2026-10-26, default in remake-fast).** With `fx.json` `"sfx_engine": "real"` the
+SFX come from the customer-approved library through Real SFX: `python3 scripts/ru/fx/sfx_real.py $P` (the same
+`sfx` list as `sfx.py`; `sfx.py` refuses this engine) → `fx/sfx.wav` + `fx/sfx.real.json`; music from
+`node scripts/ru/music-pick.mjs $P --mood …`; then `sound.py` as usual. Rules and the library upkeep:
+`references/sound-rules.md` → «Чисто и дорого». `/reel` and `/reel-wide` switch to it by the same setting.
+
 ### S5 Субтитры — no stop
 
 ```bash
