@@ -89,12 +89,14 @@ def hero(events):
 
 
 def signature_cue(e, signature):
-    """brand/sfx/signature.json layers → one Real SFX cue with layers (files by absolute path); the hero gets +2 dB."""
+    """brand/sfx/signature.json layers → one Real SFX cue with layers (files by absolute path); the hero gets +2 dB.
+    Every layer is placed by its arrival: a low drop placed by its peak lands its body ~0.24 s before the swap."""
     L = [dict(l, file=os.path.join(ROOT, l["file"])) for l in signature["layers"]]
     boost = 2.0 if e.get("hero") else 0.0
     return {"t": e["t"], "label": f"signature · {e['name']}", "file": L[0]["file"], "role": L[0]["role"],
-            "gain_db": L[0].get("gain_db", 0.0) + boost,
-            "layers": [{"dt": l.get("dt", 0.0), "file": l["file"], "role": l["role"], "gain_db": l.get("gain_db", 0.0) + boost}
+            "gain_db": L[0].get("gain_db", 0.0) + boost, "anchor": "arrive",
+            "layers": [{"dt": l.get("dt", 0.0), "file": l["file"], "role": l["role"], "gain_db": l.get("gain_db", 0.0) + boost,
+                        "anchor": "arrive"}
                        for l in L[1:]]}
 
 
@@ -119,9 +121,10 @@ def fit_to_voice(sfx, voice, below_db):
     return sfx * 10 ** (trim / 20), round(trim, 1)
 
 
-def run(cmd, what):
+def run(cmd, what, fatal=True):
+    """fatal=False for critique.py: it exits 1 whenever it has advice, which goes into the report."""
     r = subprocess.run(cmd, cwd=SKILL, capture_output=True, text=True)
-    if r.returncode != 0: raise SystemExit(f"{what} failed:\n{r.stdout[-1500:]}\n{r.stderr[-1500:]}")
+    if r.returncode != 0 and fatal: raise SystemExit(f"{what} failed:\n{r.stdout[-1500:]}\n{r.stderr[-1500:]}")
     return r.stdout
 
 
@@ -184,7 +187,7 @@ def main():
     sfx, trim = fit_to_voice(sfx, S.fit(S.decode(clean), n), cfg["peak_below_voice_db"])
     out = os.path.join(P, "fx", f"sfx{suf}.wav"); S.write_wav(out, sfx)
     ver = run([sys.executable, "scripts/verify.py", resolved_path, track_dry], "verify.py")
-    crit = run([sys.executable, "scripts/critique.py", resolved_path, track_dry, "--out", os.path.join(work, "critique.md")], "critique.py")
+    crit = run([sys.executable, "scripts/critique.py", resolved_path, track_dry, "--out", os.path.join(work, "critique.md")], "critique.py", fatal=False)
     placed = sum(1 for c in resolved["cues"] if not c.get("_layer"))
     rep.update({"trim_db": trim, "peak_below_voice_db": cfg["peak_below_voice_db"], "music_ref": bool(ref),
                 "placed": placed, "silent": max(0, len(lst) + len(sig) - placed),

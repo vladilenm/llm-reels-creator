@@ -329,6 +329,7 @@ lst, cues = R.typed([{"name": "смена", "kind": "whoosh_big", "t": 3.0, "gai
 assert lst == [{"t": 4.0, "type": "tick", "g": 1.5}], lst
 assert cues[0]["file"].startswith("/") and cues[0]["file"].endswith("brand/sfx/library/whoosh/w.mp3")
 assert cues[0]["gain_db"] == 2.0 and cues[0]["layers"][0]["gain_db"] == -1.0 and cues[0]["layers"][0]["role"] == "sub_drop"
+assert cues[0]["anchor"] == "arrive" and cues[0]["layers"][0]["anchor"] == "arrive"
 lst2, cues2 = R.typed([{"name": "смена", "kind": "whoosh_big", "t": 3.0, "gain": 0.12, "hero": False}], None)
 assert lst2 == [{"t": 3.0, "type": "whoosh", "g": 1.0, "len": 0.8}] and cues2 == [], lst2
 voice = np.zeros((48000, 2)); voice[100] = 0.5
