@@ -881,3 +881,42 @@ test("night_base --prep: stale frames and masks are cleared, a symlinked fx/mask
   assert.ok(!existsSync(join(P, "fx/masks/00099.png")), "a stale mask of a previous run is gone");
   assert.ok(existsSync(join(P, "fx/masks/00000.png")));
 });
+
+test("open_zoom: the whole frame flies in from 0.82 to full size in half a second, its own blurred edges around it (no black frame); \"open\": false leaves it", { timeout: 120000 }, () => {
+  const r = py(`import sys, json
+sys.path.insert(0, "scripts/ru/fx")
+import opening as O
+c = O.cfg_from({})
+bad = None
+try: O.cfg_from({"open": {"from": 1.2}})
+except SystemExit as e: bad = str(e)
+print(json.dumps({"c": c, "off": O.cfg_from({"open": False}), "s0": O.scale(0, c), "s_quarter": O.scale(0.25, c), "s_end": O.scale(0.5, c), "bad": bad}))`);
+  assert.equal(r.status, 0, r.stderr);
+  const o = JSON.parse(r.stdout);
+  assert.deepEqual(o.c, { from: 0.82, dur: 0.5, anchor: [0.5, 0.65] });
+  assert.equal(o.off, null);
+  assert.equal(o.s0, 0.82); assert.equal(o.s_end, 1.0);
+  assert.ok(o.s_quarter > 0.97 && o.s_quarter < 0.98, `ease-out cubic: 87.5 % of the way at 0.25 s, ${o.s_quarter}`);
+  assert.match(o.bad, /from 1\.2/);
+
+  const P = tmp("oz-");
+  mkdirSync(join(P, "fx"), { recursive: true });
+  const src = join(P, "in.mp4"), out = join(P, "out.mp4");
+  ff("-f", "lavfi", "-i", "color=c=red:s=1080x1920:r=25:d=1", "-f", "lavfi", "-i", "sine=f=220:d=1:sample_rate=48000",
+    "-vf", "drawbox=x=300:y=600:w=480:h=700:color=white:t=fill", "-shortest", "-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "aac", src);
+  let z = spawnSync("python3", ["scripts/ru/fx/open_zoom.py", P, src, "--out", out], { cwd: ROOT, encoding: "utf8" });
+  assert.equal(z.status, 0, z.stderr + z.stdout);
+  assert.match(z.stdout, /весь кадр ×0\.82 → 1 за 0\.5 с/);
+  // the white box's left edge is at x 300; at 0.82 toward (540, 1248) it is at x ≈ 343: x 320 is red on frame 0, white later
+  const p0 = pixel(out, 0, 320, 900), p15 = pixel(out, 15, 320, 900);
+  assert.ok(p0[1] < 120 && p0[0] > 200, `frame 0: the whole frame is smaller ${p0}`);
+  assert.ok(p15[1] > 220, `after 0.6 s the frame is full again ${p15}`);
+  const corner = pixel(out, 0, 20, 20);
+  assert.ok(corner[0] > 200, `frame 0: no black frame around the small card — its own edges, blurred ${corner}`);
+  const probe = spawnSync("ffprobe", ["-v", "error", "-show_entries", "stream=codec_type", "-of", "csv=p=0", out], { encoding: "utf8" }).stdout;
+  assert.match(probe, /audio/, "the sound is copied");
+  writeFileSync(join(P, "fx/fx.json"), JSON.stringify({ open: false }));
+  z = spawnSync("python3", ["scripts/ru/fx/open_zoom.py", P, src, "--out", out], { cwd: ROOT, encoding: "utf8" });
+  assert.equal(z.status, 0, z.stderr);
+  assert.ok(pixel(out, 0, 20, 20)[0] > 220, "off: frame 0 is untouched");
+});

@@ -150,6 +150,8 @@ Apply only the edits the customer picks; never invent a number to make a line sp
 - Priority when rules conflict: the customer's words in the current message →
   `lessons.md` → `brand/brand.md` → `vladilen-reels` → chassis skills → other skills.
 - Educational speech: let phrases breathe; never turn it into a sizzle cut.
+- Every reel opens with the whole frame flying in for half a second under the one brand «вжух» (`brand/sfx/open.json`):
+  `vladilen-reels` S4b, `fx.json` `open`, on by default; switch it off only when the customer says so.
 - Never invent facts, numbers, results or testimonials.
 - Sources are read-only. Every derivative goes to `video-projects/<YYYY-MM-DD-slug>/`.
 - Publish or send nothing.

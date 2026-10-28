@@ -75,6 +75,9 @@ KINDS = {
 
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import opening as O                            # fx.json "open": the opening zoom of the whole frame and its one brand sound
+
 BASE_F = {"pop": 660, "chime": 880}          # a kit sample is pitched by e["f"] / BASE_F
 _kit_cache = {}
 
@@ -139,6 +142,11 @@ def main():
             print(f"WARN {e['name']}: {t:.2f} is inside the word «{inside[0]}»")
         ev.append(dict(name=e["name"], t=t, x=make(e["kind"], e, kit), gain=e["gain"], pan=e.get("pan", 0.0)))
 
+    oc, f = O.cfg_from(cfg), O.brand_sound()      # the opening: the brand «вжух» of brand/sfx/open.json, its peak on the end of the zoom
+    if oc and f:
+        r = subprocess.run(["ffmpeg", "-v", "error", "-i", f, "-ac", "1", "-ar", str(SR), "-f", "f32le", "-"], capture_output=True, check=True)
+        t0, x = O.place(np.frombuffer(r.stdout, np.float32).astype(np.float64), SR, oc["dur"])
+        ev.append(dict(name="открытие · вжух", t=t0, x=x, gain=0.16, pan=0.0))
     out = np.zeros((int(dur * SR) + SR, 2)); log = []
     for e in ev:
         x = e["x"] / (np.max(np.abs(e["x"])) + 1e-9) * e["gain"]

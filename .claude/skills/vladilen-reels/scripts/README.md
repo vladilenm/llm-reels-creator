@@ -9,9 +9,9 @@ The orchestrator's scripts live in the repo at `scripts/ru/` (one copy, tested b
 | S1 | `scripts/ru/transcribe.mjs`, `scripts/ru/normalize-transcript.mjs` |
 | S2 | `.claude/skills/cut-silences/scripts/cut-silences.mjs`, `.claude/skills/cut-mistakes/scripts/find-cut-candidates.mjs`, `scripts/ru/build-edl.mjs` |
 | S4 | `.claude/skills/motion-broll/engine/*`, `scripts/ru/check-glyphs.mjs` |
-| S4b | `scripts/ru/fx/fx_picture.py`, `scripts/ru/fx/sfx.py`, `scripts/ru/fx/person-mask.swift` |
+| S4b | `scripts/ru/fx/fx_picture.py`, `scripts/ru/fx/sfx.py` / `sfx_real.py` (event `open`: the brand «вжух» of `brand/sfx/open.json`), `scripts/ru/fx/person-mask.swift` |
 | S5 | `scripts/ru/make-captions.mjs`, `scripts/ru/words-to-srt.mjs` |
-| S6 | `scripts/ru/assemble.mjs --preview`, `scripts/ru/contact-sheet.mjs` |
+| S6 | `scripts/ru/assemble.mjs --preview` (calls `scripts/ru/fx/open_zoom.py`: the opening zoom of the whole frame, settings in `scripts/ru/fx/opening.py`), `scripts/ru/contact-sheet.mjs` |
 | S7 | `scripts/ru/assemble.mjs --kit` / `--final`, `scripts/ru/export-reel.mjs`, `scripts/ru/check-reel.mjs` |
 | S8 | `scripts/ru/log-run.mjs` |
 | tests | `scripts/ru/make-ru-fixture.sh` (synthetic Russian reel) |

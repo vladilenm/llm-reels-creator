@@ -310,6 +310,23 @@ With `look: "night"` the base is `python3 scripts/ru/wide/night_base.py $P --pre
 speaker by the mask ×1.1 from the bottom with a halo (a soft shadow on light accents), punch-ins 1.00 ↔ 1.05 on the
 joins, accents from `work/accents.json` under him — the word is always behind the head. `obs_base.py` and `obs_swaps.py`
 stay for the light look.
+
+**Opening zoom of the whole frame (default since 2026-10-28, approved on agency-agents).** Customer: «каждый следующий рилс
+начинать с небольшого зума… приближение ко мне буквально полсекунды… и звук, который это увеличение сопровождает». Rejected
+first: a speaker-only push 1.00 → 1.08 («нет приближения… я имею в виду всего кадра… визуально никак не видно»), a different
+library whoosh + thump («звук должен быть один… не рандомный, а вжух именно, такой зум приближает»), a dark frame around the
+shrunk picture («черные рамки… чтобы черный экран не видно было»). Approved: «первый вариант… самый топовый… давай так сделаем».
+So: the finished frame — speaker, windows, titles, captions — flies in for the first 0.5 s from 0.82 to full size toward his
+face (`anchor` 0.5, 0.65), ease-out cubic with a zoom blur (8 sub-frames); around it the frame's own edges, stretched and
+heavily blurred — never a black or dark frame. `assemble.mjs` applies it to the composite (`scripts/ru/fx/open_zoom.py`,
+settings in `scripts/ru/fx/opening.py`), so preview, final and the ×F variant all have it; nothing to plan or build, and it is
+not a decision to list in a report. Sound: the `open` event of `sfx_real.py` (and `sfx.py`) plays the ONE brand sound of
+`brand/sfx/open.json` — A, a backwards whoosh, chosen by ear; B–D stay there as heard candidates (`sfx_real.py --open B
+--variant openB` renders another for comparison). Its peak lands on the end of the zoom, 4 dB under the voice peak (the other
+SFX sit 9 dB under), not ducked by the voice (he speaks from frame 0), outside the density budget; no file → a silent opening,
+never a stand-in. `fx.json` `"open": false` switches it off, `{"from": 0.85, "dur": 0.6, "anchor": [0.5, 0.6]}` tunes it —
+only on his word. In S6 look at `--times 0,0.1,0.25,0.5`. A new base next to an approved reel: `night_base.py --mix --tag v2` +
+`sfx_real.py --variant v2` + `sound.py --variant v2 --sfx fx/sfx.v2.wav`, then `assemble.mjs --final --tag v2`.
 In the light look, background swaps depend on the wall:
 - **plain wall, nothing at the shoulder → swaps with the mask** (customer twice on 2026-10-25, claude-sfx and
   harness2: «с маской, чтоб фон вырезать»): render each swap as a full dark `.mp4` (background, glow behind
@@ -364,7 +381,12 @@ With `look: "night"` kinetic captions are dark and switch to the light theme ove
 ```bash
 node scripts/ru/assemble.mjs $P --preview
 node scripts/ru/contact-sheet.mjs $P/renders/preview.mp4 --plan $P/PLAN.json --every 2 --out $P/review/sheet-1.png
+node scripts/ru/contact-sheet.mjs $P/renders/preview.mp4 --times 0,0.1,0.25,0.5 --out $P/review/open.png   # the opening zoom
 ```
+
+`assemble.mjs` puts the opening zoom on every preview and final (S4b «Opening zoom of the whole frame»): frame 0 is the
+whole frame at 0.82 inside its own blurred edges — never a black or dark frame —, by 0.5 s it is full; the brand «вжух»
+plays under the first word. A missing `brand/sfx/open.json` file means a silent opening: say so in the report.
 
 Then let earshot listen for you (since 2026-10-25; ~20 s, models cached in `tools/earshot/.cache`):
 
@@ -385,7 +407,7 @@ what remains. Never claim a fix that was not re-rendered and looked at.
 
 ### S7 Сборка — ГЕЙТ C, always stop
 
-`renders/preview.mp4` (540×960) is the review copy. **Speed:** he asks for a faster cut on almost
+`renders/preview.mp4` (540×960) is the review copy; it, the final and the ×F variant all open with the whole-frame zoom. **Speed:** he asks for a faster cut on almost
 every reel; show the preview at normal speed and at **F = clamp(3.45 ÷ words per second of the clean
 timeline, 1.05, 1.12)**, rounded to 0.01 (words of `transcript.clean.json` ÷ `EDL.json` clean_duration).
 Calibrated on 18 approved reels (2026-10-19…25): dense takes land at ≈ 3.45 words/s after the speed-up —

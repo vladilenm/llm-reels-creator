@@ -65,6 +65,9 @@ Shared constants live in `scripts/ru/wide/common.py`.
 - **Background swaps 2–3 per reel**, around the card (dark #0E0B14 + purple glow, big text above the
   card): a number or time jump («Спустя / 40 / минут» with a counter and the reel's one `hit`), the main
   claim («для научных работ»), the CTA. Each ≥ 1.2 s, the key word on screen ≥ 0.6 s; captions hidden.
+- **Opening zoom** (since 2026-10-28): the first 0.5 s the whole finished frame flies in from 0.82 to full size with a zoom
+  blur, its own blurred edges around it (no black frame), under the one brand «вжух» (`brand/sfx/open.json`); `assemble.mjs` does it (`scripts/ru/fx/open_zoom.py`), `fx.json`
+  `"open": false` switches it off.
 - **Card punch-ins** 1.00 ↔ 1.07 on joins, not more often than once a second, none in the final swap.
 - **Sound**: quiet SFX on every visual event — whoosh on window changes (0.08–0.10), whoosh_big on swaps
   (0.12–0.14), pop on titles and appearances (0.04–0.06), tick on highlights (0.03–0.04), click on rings

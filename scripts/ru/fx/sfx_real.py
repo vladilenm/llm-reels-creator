@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # S4b «Звуковые акценты» from real recordings (Real SFX + the brand library) — fx.json "sfx_engine": "real".
-#   python3 scripts/ru/fx/sfx_real.py <project> [--variant v2] [--music file] [--bpm n] [--dry]
+#   python3 scripts/ru/fx/sfx_real.py <project> [--variant v2] [--music file] [--bpm n] [--dry] [--open B]
+#   --open B: the opening with another candidate of brand/sfx/open.json (to compare by ear) instead of the chosen one
 #   →  <project>/fx/sfx[.<variant>].wav       SFX only, ducked under the voice, the loudest peak 9 dB under the voice's
 #      <project>/fx/sfx.real[.<variant>].json  kept and dropped events with the reason, picks, checks
 #   --dry: the events and the typed list only (work/sfx-real[.<variant>]/events.json), no Real SFX run.
@@ -12,6 +13,11 @@
 # signature does not count); events closer than merge_s are one sound; runs of ticks / pops stop after run_max;
 # one hit per reel (the rest become soft thumps); whoosh_big (a background swap, the CTA) plays the brand
 # signature from brand/sfx/signature.json; Real SFX varies the files of repeats; no synthesis (--ui library).
+# The opening zoom of the whole frame (scripts/ru/fx/opening.py; fx.json "open", on by default, "open": false switches it off)
+# adds the "open" event: one brand sound «вжух-приближение» from brand/sfx/open.json, its peak on the end of the zoom, outside
+# the budget and the density rules. The voice speaks from frame 0, so it is not ducked by the voice (that would take it away):
+# its peak sits sfx_real.open_below_voice_db (4) under the voice's — louder than the other SFX (9): at 7 dB it added only 1–2 dB
+# over the first word (agency-agents, 2026-10-28).
 import json, os, subprocess, sys
 import numpy as np
 
@@ -20,11 +26,12 @@ ROOT = os.path.abspath(os.path.join(HERE, "..", "..", ".."))
 SKILL = os.path.join(ROOT, ".claude", "skills", "real-sfx")
 sys.path.insert(0, HERE)
 import sound as S                                    # decode, fit, db, write_wav, Words, SR
+import opening as O                                  # fx.json "open": the opening zoom of the whole frame (customer, 2026-10-28)
 
-DEFAULTS = {"peak_below_voice_db": 9.0, "budget_s": 2.0, "merge_s": 0.4, "run_max": 3}
-PRIORITY = {"whoosh_big": 6, "hit": 5, "whoosh": 4, "riser": 4, "chime": 3, "click": 2, "pop": 2, "whoosh_small": 2, "tick": 1}
+DEFAULTS = {"peak_below_voice_db": 9.0, "budget_s": 2.0, "merge_s": 0.4, "run_max": 3, "open_below_voice_db": 4.0}
+PRIORITY = {"open": 7, "whoosh_big": 6, "hit": 5, "whoosh": 4, "riser": 4, "chime": 3, "click": 2, "pop": 2, "whoosh_small": 2, "tick": 1}
 # sfx.py gains that mean «nominal» (Real SFX g = 1.0)
-BASE_GAIN = {"whoosh": 0.09, "whoosh_small": 0.08, "whoosh_big": 0.12, "pop": 0.05, "click": 0.045, "tick": 0.03,
+BASE_GAIN = {"open": 0.1, "whoosh": 0.09, "whoosh_small": 0.08, "whoosh_big": 0.12, "pop": 0.05, "click": 0.045, "tick": 0.03,
              "chime": 0.08, "hit": 0.22, "riser": 0.1}
 RUNS = ("tick", "pop")
 # our kind → Real SFX typed kind and default length (s). The hero hit plays as a «drop» (soft low sub_drop first,
@@ -46,11 +53,16 @@ def resolve_events(fx, words):
              "gain": e.get("gain", BASE_GAIN.get(e["kind"], 0.08))}
         if e.get("len"): x["len"] = e["len"]
         ev.append(x)
+    oc = O.cfg_from(fx)
+    if oc: ev.append({"name": "открытие · вжух", "kind": "open", "t": oc["dur"], "gain": BASE_GAIN["open"]})
     return sorted(ev, key=lambda e: e["t"])
 
 
 def thin(events, dur, cfg):
-    """Brand density rules → (kept, dropped with "why": run | merged | budget)."""
+    """Brand density rules → (kept, dropped with "why": run | merged | budget). The opening ("open") is outside them: it
+    always plays, and does not count in the budget."""
+    opening = [e for e in events if e["kind"] == "open"]
+    events = [e for e in events if e["kind"] != "open"]
     kept, dropped = [], []
     drop = lambda e, why: dropped.append(dict(e, why=why))
     # 1. a run of ticks or pops (each within 1.5 s of the previous one of its kind) stops after run_max
@@ -78,7 +90,7 @@ def thin(events, dur, cfg):
     over = max(0, len(acc) - int(np.ceil(dur / cfg["budget_s"])))
     for e in sorted(acc, key=lambda e: (PRIORITY.get(e["kind"], 0), e["gain"], -e["t"]))[:over]:
         out.remove(e); drop(e, "budget")
-    return out, sorted(dropped, key=lambda e: e["t"])
+    return sorted(out + opening, key=lambda e: e["t"]), sorted(dropped, key=lambda e: e["t"])
 
 
 def hero(events):
@@ -106,6 +118,7 @@ def typed(events, signature):
     for e in events:
         if e["kind"] == "whoosh_big" and signature:
             sig.append(signature_cue(e, signature)); continue
+        if e["kind"] == "open": continue          # built apart by open_sound(): one brand file, not ducked by the voice
         typ, ln = TYPES.get(e["kind"], (e["kind"], None))
         g = 0.6 if e["kind"] == "thump" else float(np.clip(e["gain"] / BASE_GAIN.get(e["kind"], 0.08), 0.5, 1.5))
         if e["kind"] == "whoosh_small": g *= 0.7
@@ -113,6 +126,18 @@ def typed(events, signature):
         if e.get("len") or ln: item["len"] = e.get("len") or ln
         lst.append(item)
     return lst, sig
+
+
+def open_sound(dur, n, key=None):
+    """The opening zoom's sound → ((n, 2) track, picks): the one brand sound of brand/sfx/open.json (the customer picks it by
+    ear), its peak on the end of the zoom. No file → silence and no picks: never a stand-in."""
+    f = O.brand_sound(key)
+    track = np.zeros((n, 2))
+    if not f: return track, []
+    start, x = O.place(S.decode(f), S.SR, dur)
+    i = int(round(start * S.SR)); x = x[: max(0, n - i)]
+    track[i:i + len(x)] += x
+    return track, [{"t": round(start, 3), "label": "open · вжух", "role": "open", "file": os.path.relpath(f, ROOT)}]
 
 
 def fit_to_voice(sfx, voice, below_db):
@@ -151,7 +176,8 @@ def main():
     kept = hero(kept)
     sig_path = os.path.join(ROOT, "brand", "sfx", "signature.json")
     signature = json.load(open(sig_path)) if os.path.exists(sig_path) else None
-    lst, sig = typed(kept, signature)
+    opening_ev = [e for e in kept if e["kind"] == "open"]
+    lst, sig = typed([e for e in kept if e["kind"] != "open"], signature)
     work = os.path.join(P, "work", f"sfx-real{suf}"); os.makedirs(work, exist_ok=True)
     json.dump(lst, open(os.path.join(work, "events.json"), "w"), ensure_ascii=False, indent=1)
     rep = {"variant": var, "events": len(events),
@@ -184,7 +210,15 @@ def main():
     resolved = json.load(open(resolved_path))
     n = int(round(dur * S.SR))
     sfx = S.fit(S.decode(resolved.get("sfx_ducked") or track_dry), n)
-    sfx, trim = fit_to_voice(sfx, S.fit(S.decode(clean), n), cfg["peak_below_voice_db"])
+    voice = S.fit(S.decode(clean), n)
+    sfx, trim = fit_to_voice(sfx, voice, cfg["peak_below_voice_db"])
+    open_picks = []
+    if opening_ev:                                   # the opening: apart from the voice ducking, laid over the trimmed SFX
+        op, open_picks = open_sound(opening_ev[0]["t"], n, opt("--open"))
+        if open_picks:
+            op = op * 10 ** (((S.db(np.abs(voice).max()) - cfg["open_below_voice_db"]) - S.db(np.abs(op).max())) / 20)
+            sfx = sfx + op
+        else: print("  открытие: нет brand/sfx/open.json или его файла — звук открытия молчит")
     out = os.path.join(P, "fx", f"sfx{suf}.wav"); S.write_wav(out, sfx)
     ver = run([sys.executable, "scripts/verify.py", resolved_path, track_dry], "verify.py")
     crit = run([sys.executable, "scripts/critique.py", resolved_path, track_dry, "--out", os.path.join(work, "critique.md")], "critique.py", fatal=False)
@@ -192,7 +226,7 @@ def main():
     rep.update({"trim_db": trim, "peak_below_voice_db": cfg["peak_below_voice_db"], "music_ref": bool(ref),
                 "placed": placed, "silent": max(0, len(lst) + len(sig) - placed),
                 "picks": [{"t": c["t"], "label": c["label"], "role": c["role"], "file": os.path.relpath(c["file"], ROOT)}
-                          for c in resolved["cues"]],
+                          for c in resolved["cues"]] + open_picks,
                 "verify": ver.strip().splitlines()[-3:], "critique_top": top3(crit)})
     json.dump(rep, open(rep_path, "w"), ensure_ascii=False, indent=1)
     print(f"{len(events)} events → {len(kept)} kept, {len(dropped)} dropped; {placed} placed, {rep['silent']} silent; "

@@ -307,9 +307,24 @@ test("sfx_real: events, brand density rules, one hero hit, signature cue, the tr
 import sys, numpy as np
 sys.path.insert(0, "scripts/ru/fx"); import sfx_real as R
 words = [{"text": "Привет,", "start": 0.2, "end": 0.9}, {"text": "мир.", "start": 1.05, "end": 1.5}]
-ev = R.resolve_events({"location_joins": [1.55], "sfx": [{"name": "клик", "kind": "click", "word": "мир", "offset": 0.1, "gain": 0.045}]}, words)
+ev = R.resolve_events({"open": False, "location_joins": [1.55], "sfx": [{"name": "клик", "kind": "click", "word": "мир", "offset": 0.1, "gain": 0.045}]}, words)
 assert [e["kind"] for e in ev] == ["click", "whoosh"], ev
-assert abs(ev[0]["t"] - 1.15) < 1e-6 and abs(ev[1]["t"] - 1.53) < 1e-6, ev
+op = R.resolve_events({"sfx": []}, words)               # the opening zoom is on by default: its sound is an event at the end of the zoom
+assert [(e["kind"], e["t"]) for e in op] == [("open", 0.5)], op
+assert R.resolve_events({"open": {"dur": 0.4}}, words)[0]["t"] == 0.4 and R.resolve_events({"open": False}, words) == []
+kept_o, dropped_o = R.thin([{"name": "o", "kind": "open", "t": 0.5, "gain": 0.1}, {"name": "w", "kind": "whoosh", "t": 0.7, "gain": 0.09}], 2, dict(R.DEFAULTS))
+assert [e["name"] for e in kept_o] == ["o", "w"] and not dropped_o, (kept_o, dropped_o)     # outside the budget and the merging
+lo, co = R.typed([{"name": "o", "kind": "open", "t": 0.5, "gain": 0.1}], None)
+assert lo == [] and co == [], lo                                 # not a Real SFX cue: one brand file, built by open_sound()
+import opening as O
+sr = 1000; x = np.zeros((800, 2)); x[300:330] = 0.8           # a sound peaking at 0.31 s
+t0, y = O.place(x, sr, 0.5)
+assert abs(t0 - 0.19) < 0.011 and len(y) == 800, t0           # its peak lands on the end of the zoom
+t0, y = O.place(x, sr, 0.2)
+assert t0 == 0.0 and len(y) < 800 and abs(y[0]).max() == 0, (t0, len(y))   # longer than the zoom: the head is cut with an attack
+O.SOUND = "/nonexistent/open.json"
+track, picks = R.open_sound(0.5, 4800)
+assert picks == [] and not track.any(), "no brand sound → silence, never a stand-in"
 cfg = dict(R.DEFAULTS)
 ticks = [{"name": f"t{i}", "kind": "tick", "t": 10 + 0.5 * i, "gain": 0.03} for i in range(6)]
 kept, dropped = R.thin(ticks, 60, cfg)
@@ -347,7 +362,7 @@ test("sfx_real --dry writes the kept and dropped events without running Real SFX
   const P = tmp("sfxr-");
   mkdirSync(join(P, "fx"));
   writeFileSync(join(P, "transcript.clean.json"), JSON.stringify({ audio_duration_secs: 4, words: [{ text: "раз", start: 0.2, end: 0.9 }] }));
-  writeFileSync(join(P, "fx/fx.json"), JSON.stringify({ sfx_engine: "real", sfx: [
+  writeFileSync(join(P, "fx/fx.json"), JSON.stringify({ sfx_engine: "real", open: false, sfx: [
     { name: "a", kind: "tick", t: 1.0, gain: 0.03 }, { name: "b", kind: "pop", t: 1.1, gain: 0.05 }, { name: "c", kind: "hit", t: 2.5, gain: 0.22 }] }));
   let r = spawnSync("python3", ["scripts/ru/fx/sfx_real.py", P, "--dry"], { cwd: ROOT, encoding: "utf8" });
   assert.equal(r.status, 0, r.stderr);

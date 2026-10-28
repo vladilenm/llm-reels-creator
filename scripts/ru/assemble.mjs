@@ -4,6 +4,7 @@
 //   node scripts/ru/assemble.mjs <project> --preview       renders/preview.mp4 (540×960, ГЕЙТ C)
 //   node scripts/ru/assemble.mjs <project> --final         renders/final.mp4 (mode full) + check-reel
 //   node scripts/ru/assemble.mjs <project> --kit           renders/kit/* (mode kit)
+//   The opening zoom of the whole frame (fx.json "open", on by default) is applied to the composite: scripts/ru/fx/open_zoom.py.
 //   --tag v2   base picture renders/picture.v2.mp4 → work/composite-*.v2.mov, renders/preview|final.v2.mp4
 //              (a new look next to the approved one; the approved files stay untouched)
 //
@@ -76,6 +77,14 @@ export function composite(project, out, { scale = 1, video } = {}) {
   return { out, clips: plan.clips.length, captions: existsSync(captions) };
 }
 
+// The opening (scripts/ru/fx/opening.py, customer 2026-10-28): the whole finished frame flies in for the first half second.
+// fx.json "open": false leaves the composite as it is.
+export function openZoom(project, file) {
+  const r = spawnSync("python3", [join(ROOT, "scripts/ru/fx/open_zoom.py"), project, file], { encoding: "utf8" });
+  if (r.status !== 0) throw new Error(`open_zoom failed: ${(r.stderr || r.stdout).slice(-800)}`);
+  if (r.stdout.trim()) console.log(r.stdout.trim());
+}
+
 export function buildKit(project) {
   const kit = join(project, "renders/kit");
   mkdirSync(join(kit, "broll"), { recursive: true });
@@ -132,11 +141,13 @@ function main() {
   const video = tag ? join(project, `renders/picture${sfx}.mp4`) : undefined;
   if (a.includes("--preview")) {
     const c = composite(project, join(work, `composite-half${sfx}.mov`), { scale: 0.5, video });
+    openZoom(project, c.out);
     const r = exportReel(c.out, join(project, `renders/preview${sfx}.mp4`), { preview: true, fps });
     console.log(`preview → ${relative(ROOT, r.output)} (${c.clips} clips${c.captions ? " + captions" : ""})`);
   }
   if (a.includes("--final")) {
     const c = composite(project, join(work, `composite-full${sfx}.mov`), { video });
+    openZoom(project, c.out);
     const r = exportReel(c.out, join(project, `renders/final${sfx}.mp4`), { fps });
     for (const x of r.check.results) console.log(`${x.status.padEnd(4)}  ${x.item}${x.detail !== undefined ? ` — ${x.detail}` : ""}`);
     console.log(r.check.ok ? "RESULT: PASS" : "RESULT: FAIL");

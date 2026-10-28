@@ -9,6 +9,7 @@
   python3 scripts/ru/wide/night_base.py <project> --stills 0.5,6.2  → review/night-<t>.png
   python3 scripts/ru/wide/night_base.py <project> [--card] [--mix]  → renders/picture.base.mp4 [+ renders/picture.mp4 со звуком fx/mix.wav]
   --card: без маски — карточка камеры на ночном фоне с тонкой светлой рамкой (кресло или мебель у плеча)
+  --tag v2: вариант рядом с утверждённым — renders/picture.base.v2.mp4, picture.v2.mp4 (звук fx/mix.v2.wav)
   --allow-missing: не останавливаться, если больше 5 % кадров без своей маски (по умолчанию это стоп: маски от другой версии ролика)
 
 work/accents.json: {"accents": [{"id", "in", "out", "kind": "night" | "light", "file"}]} — время чистого таймлайна,
@@ -286,7 +287,8 @@ def main():
             Image.fromarray(im).save(out / f"night-{t:05.2f}.png"); print("→", f"review/night-{t:05.2f}.png")
         return
 
-    base = P / "renders" / "picture.base.mp4"
+    tag = f".{a[a.index('--tag') + 1]}" if "--tag" in a else ""
+    base = P / "renders" / f"picture.base{tag}.mp4"
     err = tempfile.TemporaryFile()
     enc = subprocess.Popen(["ffmpeg", "-v", "error", "-y", "-f", "rawvideo", "-pix_fmt", "rgb24", "-s", f"{W}x{H}", "-r", f"{F:g}", "-i", "-",
                             "-i", str(clean), "-map", "0:v", "-map", "1:a?", "-c:v", "libx264", "-crf", "14", "-preset", "medium",
@@ -311,10 +313,10 @@ def main():
               f"{len(missing) - len(empty)} · пустых: {len(empty)}" + (" — на пустых спикера нет, проверь fx/masks" if empty else ""))
     print(f"→ {base.relative_to(P.parents[1])} · кадров {n} · {'карточка' if card else 'маска'} · наезды {'—' if card else toggles} · акцентов {len(win)}")
     if "--mix" in a:
-        pic = P / "renders" / "picture.mp4"
-        subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", str(base), "-i", str(P / "fx" / "mix.wav"), "-map", "0:v", "-map", "1:a",
+        pic = P / "renders" / f"picture{tag}.mp4"
+        subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", str(base), "-i", str(P / "fx" / f"mix{tag}.wav"), "-map", "0:v", "-map", "1:a",
                         "-c:v", "copy", "-c:a", "aac", "-b:a", "256k", "-shortest", str(pic)], check=True)
-        print("→", pic.relative_to(P.parents[1]), "(звук fx/mix.wav)")
+        print("→", pic.relative_to(P.parents[1]), f"(звук fx/mix{tag}.wav)")
 
 
 if __name__ == "__main__":

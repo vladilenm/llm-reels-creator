@@ -105,7 +105,11 @@ fast copy `renders/preview.x<F>.mp4` at the speed F from `vladilen-reels` S7 (by
 - vladilen-reels S3 writes the motion storyboard `PLAN.json` `motion` and runs `motion-check.mjs` → `MOTION.md`;
   S4 builds night clips (screen-kit `theme: 'night'`, `OK.run` scenes and accents); S4b's base is `night_base.py`;
   run `motion-check.mjs` again after S4/S4b, once `work/accents.json` and `broll/plan.json` exist, before the preview;
-- the preview report adds that run's `MOTION.md` table (time · word · verb · what is in the frame).
+- the preview report adds that run's `MOTION.md` table (time · word · verb · what is in the frame);
+- every reel opens with the whole frame flying in for half a second (0.82 → 1, zoom blur, its own blurred edges around it —
+  no black frame) under the one brand «вжух» of
+  `brand/sfx/open.json` (vladilen-reels S4b, `fx.json` `open`, on by default since 2026-10-28): `assemble.mjs` does it, check
+  the first frames in S6; `"open": false` only when he asks.
 
 Sound (since 2026-10-26, «чисто и дорого»): set `fx.json` `"sfx_engine": "real"` before S4b, pick the track with
 `node scripts/ru/music-pick.mjs <reel> --mood <mood from the brief: спокойный | технологичный | тёплый | lo-fi |
