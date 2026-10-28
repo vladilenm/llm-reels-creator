@@ -1,0 +1,40 @@
+{
+  "_comment": "Cues for scripts/long/face-plan.mjs. An entry ending in * is a prefix (подпис* matches подпишись). Matching ignores case and ё/е. transition, section, conclusion and procedural are tested against the first words of a sentence, rhetorical against the last words of a question. Edit freely: the planner reads this file on every run.",
+  "weights": {
+    "question": 3,
+    "section": 2,
+    "transition": 1,
+    "firstPerson": 2,
+    "emotion": 2,
+    "conclusion": 2,
+    "rhetorical": 1.5,
+    "punch": 1.5,
+    "short": 0.5,
+    "compact": 0.5,
+    "contrast": 0.5
+  },
+  "ru": {
+    "firstPerson": ["я", "мне", "мой", "моя", "мое", "мои", "мою", "мной", "меня", "сам", "сама", "мы с"],
+    "emotion": ["честно", "признаюсь", "жаль", "к сожалению", "блин", "не вру", "не шучу", "поверь", "серьезно", "шок*", "безумн*", "сумасшедш*", "хотел бы", "хотелось бы"],
+    "section": ["а теперь", "теперь о", "перейдем", "переходим", "давай про", "следующий шаг", "следующая тема"],
+    "transition": ["итак", "теперь", "дальше", "далее", "во-первых", "во-вторых", "в-третьих", "первое", "второе", "третье", "наконец", "кстати", "смотри", "минус", "плюс", "шаг", "давай", "и вот"],
+    "contrast": ["но", "однако", "зато"],
+    "conclusion": ["в итоге", "короче", "в общем", "суть в том", "по факту", "вывод", "главное", "в конечном итоге", "в конце концов"],
+    "procedural": ["как", "что такое", "зачем", "какой", "какая", "какие", "где"],
+    "rhetorical": ["да", "верно", "правда", "согласись", "ведь"],
+    "outro": ["подпис*", "лайк*", "комментар*", "до встречи", "увидимся", "в следующем", "спасибо, что", "спасибо за просмотр", "надеюсь, вам", "надеюсь, было", "надеюсь, понравилось"],
+    "offer": ["в описании", "по ссылке", "ссылк*", "записывайся", "программ*", "курс*", "клуб*", "гарантир*", "школ*", "присоединяйся"]
+  },
+  "en": {
+    "firstPerson": ["i", "i'm", "i've", "i'd", "i'll", "my", "me", "myself", "mine"],
+    "emotion": ["wish", "honestly", "frankly", "unfortunately", "bullshit*", "exaggerat*", "making this up", "not kidding", "seriously", "crazy", "insane", "shocking*"],
+    "section": ["speaking of", "now we get to", "let's talk about", "moving on", "next up", "let's move on"],
+    "transition": ["so", "now", "first", "second", "third", "finally", "next", "once", "here's", "and then", "okay"],
+    "contrast": ["but", "however", "yet", "except"],
+    "conclusion": ["realistically", "bottom line", "in short", "the point is", "long story short", "so basically", "in the end", "at the end of the day"],
+    "procedural": ["how do you", "how do i", "how to", "how can", "what is", "what are", "what's", "how does"],
+    "rhetorical": ["right", "okay", "yeah", "huh"],
+    "outro": ["subscribe", "hopefully you", "next one", "catch you", "catch all", "thanks for watching", "like and", "leave a comment", "see you"],
+    "offer": ["check out", "in the description", "guarantee", "program", "course", "school", "join", "sign up", "link"]
+  }
+}

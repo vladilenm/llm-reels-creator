@@ -1,0 +1,87 @@
+<!doctype html>
+<!--
+  STAGE · steps · шаги по порядку, каждый появляется на своём слове
+  Слоты: kicker, tag, headline, items (до 4 шагов; у каждого поля label и note). Номера ставит CSS-счётчик.
+  Акцент всегда на одном шаге: активный шаг светится, прошедшие уходят в обычный цвет текста.
+  data-at у каждого .step: секунда от начала карточки, когда шаг входит.
+-->
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="../../tokens.css" />
+    <link rel="stylesheet" href="stage.css" />
+    <style>
+      #stage-steps .steps { width: 1280px; gap: var(--space-4); }
+      #stage-steps .list { list-style: none; margin: 0; padding: 0; counter-reset: step; }
+      #stage-steps .step {
+        counter-increment: step; position: relative; display: grid; grid-template-columns: 72px 88px 1fr;
+        align-items: start; padding: var(--space-2) 0;
+      }
+      #stage-steps .dot {
+        position: absolute; left: 22px; top: 28px; width: 28px; height: 28px; box-sizing: border-box;
+        border-radius: var(--radius-full); border: var(--stroke-diagram) solid var(--line-strong); background: var(--surface);
+      }
+      #stage-steps .link { position: absolute; left: 34px; top: 56px; width: var(--stroke-diagram); height: calc(100% - 28px); background: var(--line-strong); transform-origin: top center; }
+      #stage-steps .step:last-child .link { display: none; }
+      #stage-steps .n { grid-column: 2; padding-top: 6px; font-family: var(--font-mono); font-weight: var(--wt-label); font-size: var(--size-key); line-height: var(--lh-key); color: var(--ink-subtle); }
+      #stage-steps .n::before { content: counter(step, decimal-leading-zero); }
+      #stage-steps .txt { grid-column: 3; display: flex; flex-direction: column; gap: 4px; }
+      #stage-steps .label { font-size: var(--size-key); font-weight: var(--wt-title); line-height: var(--lh-key); color: var(--ink); }
+      #stage-steps .sub { font-size: var(--size-body); line-height: var(--lh-body); color: var(--ink-muted); }
+    </style>
+  </head>
+  <body>
+    <div id="stage-steps" class="stage" data-composition-id="stage-steps" data-start="0" data-width="1920" data-height="1080" data-duration="10">
+      <div class="glow"></div>
+      <div class="grid"></div>
+      <div class="dock" data-role="face-dock">лицо</div>
+      <div class="scene-content">
+        <section class="card steps">
+          <div class="row">
+            <div class="kicker" data-slot="kicker">06 / ШАГИ</div>
+            <div class="tag" data-slot="tag"></div>
+          </div>
+          <h2 class="headline" data-slot="headline">Четыре шага к понятной задаче</h2>
+          <ol class="list" data-slot="items">
+            <li class="step" data-at="1.4"><i class="link"></i><i class="dot"></i><span class="n"></span><div class="txt"><div class="label" data-field="label">Цель</div><div class="sub" data-field="note">Что должно получиться на выходе</div></div></li>
+            <li class="step" data-at="3.4"><i class="link"></i><i class="dot"></i><span class="n"></span><div class="txt"><div class="label" data-field="label">Контекст</div><div class="sub" data-field="note">Зачем это нужно и для кого</div></div></li>
+            <li class="step" data-at="5.4"><i class="link"></i><i class="dot"></i><span class="n"></span><div class="txt"><div class="label" data-field="label">Пример</div><div class="sub" data-field="note">Образец хорошего результата</div></div></li>
+            <li class="step" data-at="7.4"><i class="link"></i><i class="dot"></i><span class="n"></span><div class="txt"><div class="label" data-field="label">Проверка</div><div class="sub" data-field="note">По чему видно, что готово</div></div></li>
+          </ol>
+        </section>
+      </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <script>
+      window.__timelines = window.__timelines || {};
+      const root = document.getElementById("stage-steps");
+      const D = parseFloat(root.dataset.duration) || 10;
+      const col = (name) => getComputedStyle(root).getPropertyValue(name).trim();
+      const at = (el, d) => (el.dataset.at !== undefined ? parseFloat(el.dataset.at) : d);
+      const card = root.querySelector(".card");
+      const steps = [...root.querySelectorAll(".step")];
+      const times = steps.map((s, i) => at(s, 1.4 + i * 1.8));
+      const tl = gsap.timeline({ paused: true });
+      tl.fromTo(card, { opacity: 0, y: 40, filter: "blur(12px)" }, { opacity: 1, y: 0, filter: "blur(0px)", duration: 0.6, ease: "power4.out" }, 0.1)
+        .fromTo(root.querySelector(".kicker"), { opacity: 0, y: 24 }, { opacity: 1, y: 0, duration: 0.5, ease: "expo.out" }, 0.3)
+        .fromTo(root.querySelector(".headline"), { opacity: 0, y: 24 }, { opacity: 1, y: 0, duration: 0.5, ease: "expo.out" }, 0.42);
+      steps.forEach((s, i) => {
+        const t = times[i];
+        const dot = s.querySelector(".dot"), n = s.querySelector(".n"), prev = steps[i - 1];
+        tl.fromTo(s, { opacity: 0, x: -24 }, { opacity: 1, x: 0, duration: 0.5, ease: "power3.out" }, t);
+        // активный шаг: акцент на точке и номере
+        tl.fromTo(dot, { backgroundColor: col("--surface"), borderColor: col("--line-strong") }, { backgroundColor: col("--accent"), borderColor: col("--accent"), duration: 0.4, ease: "sine.inOut" }, t);
+        tl.fromTo(n, { color: col("--ink-subtle") }, { color: col("--accent-text"), duration: 0.4, ease: "sine.inOut" }, t);
+        if (prev) {
+          // линия дорисовывается от прошлого шага, прошлый шаг уходит в обычный цвет
+          tl.fromTo(prev.querySelector(".link"), { scaleY: 0 }, { scaleY: 1, duration: 0.4, ease: "power2.inOut" }, t - 0.1);
+          tl.to(prev.querySelector(".dot"), { backgroundColor: col("--ink"), borderColor: col("--ink"), duration: 0.4, ease: "sine.inOut" }, t);
+          tl.to(prev.querySelector(".n"), { color: col("--ink-muted"), duration: 0.4, ease: "sine.inOut" }, t);
+        }
+      });
+      tl.to(card, { opacity: 0, y: -160, filter: "blur(24px)", duration: 0.3, ease: "power2.in" }, D - 0.299);
+      window.__timelines["stage-steps"] = tl;
+    </script>
+  </body>
+</html>

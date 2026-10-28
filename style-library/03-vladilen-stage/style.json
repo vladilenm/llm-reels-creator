@@ -1,0 +1,250 @@
+{
+  "$schema": "../registry.schema.json",
+  "id": "vladilen-stage",
+  "name": "Vladilen Stage",
+  "number": "03",
+  "status": "draft",
+  "inspiration": "Long-form YouTube explainer: one persistent dark stage with a single idea card at a time, the speaker's face as a state machine (full frame on personal beats, a narrow dock on the right edge otherwise). Mechanics studied from a reference breakdown (local, not shipped); the look is the Vladilen brand in its dark theme, not the reference's monochrome.",
+  "summary": "16:9 YouTube stage for talking-head explainers in the Vladilen brand: night base with a soft violet glow, quiet cards that build word by word, hard cuts between face and stage, voice only by default.",
+  "palette": {
+    "bg": "#0E0B14",
+    "fg": "#F5F3FA",
+    "accent": "#A78BFA",
+    "surface": "#17131F",
+    "line": "#2B2537",
+    "paper": "#EFEDF4",
+    "notes": "Dark theme of the design system. One accent per frame (accent-dark #A78BFA, text #B79CFF); #7C3AED only as the glow core. Light paper (canvas) for real documents. Mirrored in tokens.css."
+  },
+  "fonts": {
+    "display": "Spectral",
+    "body": "Golos Text",
+    "mono": "IBM Plex Mono",
+    "notes": "All with Cyrillic, from brand/fonts. Spectral 300-500 only. Plex Mono for section labels (NN / РАЗДЕЛ), the ИЛЛЮСТРАЦИЯ tag and numbers."
+  },
+  "motion": "Quiet and exact. Enter 0.6s power4.out with a 12px blur resolving to sharp; exit 0.3s power2.in with motion blur up; elements build one by one on their words (data-at). No springs, no bounce.",
+  "transitions": "Face to stage and back: a one-frame hard cut on a sentence boundary. Card to card: motion-blur exit and fade-up entrance, the compositor overlaps the clips by 0.1-0.2s. Never a dissolve, zoom punch, flash or glitch.",
+  "sound": "Voice only by default (no music, no SFX). Music and Real SFX are a project flag.",
+  "layout": {
+    "frame": { "w": 1920, "h": 1080 },
+    "scale": "design-system token x 2 at 1080p",
+    "dock": { "side": "right", "x": 1712, "y": 406, "w": 208, "h": 312, "aspect": "2:3", "radiusLeft": 32, "stroke": 2 },
+    "content": { "x": 96, "y": 96, "w": 1568, "h": 888 },
+    "minText": { "key": 40, "label": 24, "diagramStroke": 3 }
+  },
+  "faceStates": {
+    "full": {
+      "frame": "1920x1080, untreated",
+      "use": "hook, questions, personal lines, conclusions, section borders, closing",
+      "seconds": [1.5,6],
+      "closingMax": 12
+    },
+    "dock": { "frame": "crop of the same take at the right edge", "use": "default" },
+    "none": { "use": "manual stretches of voice and large illustration only", "maxSeconds": 75 }
+  },
+  "cardContract": {
+    "duration": "taken from data-duration on the root; the exit tween ends 0.001s after it",
+    "wordSync": "an element with data-at=\"<seconds from card start>\" appears on that word; the compositor rewrites it from the transcript",
+    "slots": "data-slot names; a list slot has children (li, .step, .node) whose fields carry data-field; an empty slot disappears",
+    "dock": "the .dock placeholder is hidden in a render by --dock-display: none on the parent"
+  },
+  "cards": [
+    {
+      "id": "vladilen-stage.stage.base",
+      "tier": "custom",
+      "purpose": "stage",
+      "file": "cards/stage/stage-base.html",
+      "slots": [
+        { "name": "kicker", "type": "text", "maxChars": 28 },
+        { "name": "headline", "type": "text", "maxChars": 60, "minPx": 40, "required": true },
+        { "name": "note", "type": "text", "maxChars": 120 },
+        { "name": "tag", "type": "text", "maxChars": 16 }
+      ],
+      "duration": { "min": 4, "max": 12 },
+      "preview": { "mp4": "preview/vladilen-stage.stage.base.mp4", "poster": "preview/vladilen-stage.stage.base.png" },
+      "reveals": "none (all at once)"
+    },
+    {
+      "id": "vladilen-stage.stage.quote",
+      "tier": "custom",
+      "purpose": "quote",
+      "file": "cards/stage/stage-quote.html",
+      "slots": [
+        { "name": "kicker", "type": "text", "maxChars": 28 },
+        { "name": "quote", "type": "text", "maxChars": 140, "minPx": 40, "required": true },
+        { "name": "source", "type": "text", "maxChars": 60 }
+      ],
+      "duration": { "min": 5, "max": 10 },
+      "preview": { "mp4": "preview/vladilen-stage.stage.quote.mp4", "poster": "preview/vladilen-stage.stage.quote.png" },
+      "reveals": "each <em> word"
+    },
+    {
+      "id": "vladilen-stage.stage.term",
+      "tier": "custom",
+      "purpose": "term",
+      "file": "cards/stage/stage-term.html",
+      "slots": [
+        { "name": "kicker", "type": "text", "maxChars": 28 },
+        { "name": "tag", "type": "text", "maxChars": 16 },
+        { "name": "term", "type": "text", "maxChars": 28, "minPx": 40, "required": true },
+        { "name": "meta", "type": "text", "maxChars": 40 },
+        { "name": "definition", "type": "text", "maxChars": 140, "minPx": 40, "required": true },
+        { "name": "example", "type": "text", "maxChars": 100 }
+      ],
+      "duration": { "min": 6, "max": 12 },
+      "preview": { "mp4": "preview/vladilen-stage.stage.term.mp4", "poster": "preview/vladilen-stage.stage.term.png" },
+      "reveals": "rule, definition, example"
+    },
+    {
+      "id": "vladilen-stage.stage.doc",
+      "tier": "custom",
+      "purpose": "doc",
+      "file": "cards/stage/stage-doc.html",
+      "slots": [
+        { "name": "kicker", "type": "text", "maxChars": 28 },
+        { "name": "source", "type": "text", "maxChars": 48, "required": true },
+        { "name": "title", "type": "text", "maxChars": 80, "minPx": 40, "required": true },
+        { "name": "body", "type": "text", "maxChars": 260, "minPx": 40, "required": true }
+      ],
+      "duration": { "min": 6, "max": 12 },
+      "preview": { "mp4": "preview/vladilen-stage.stage.doc.mp4", "poster": "preview/vladilen-stage.stage.doc.png" },
+      "reveals": "each <mark> phrase"
+    },
+    {
+      "id": "vladilen-stage.stage.steps",
+      "tier": "custom",
+      "purpose": "steps",
+      "file": "cards/stage/stage-steps.html",
+      "slots": [
+        { "name": "kicker", "type": "text", "maxChars": 28 },
+        { "name": "tag", "type": "text", "maxChars": 16 },
+        { "name": "headline", "type": "text", "maxChars": 60, "minPx": 40, "required": true },
+        { "name": "items", "type": "list", "maxItems": 4, "fields": { "label": 28, "note": 56 }, "fieldMin": { "label": 40 }, "required": true, "template": ".step", "reveal": true }
+      ],
+      "duration": { "min": 8, "max": 20 },
+      "preview": { "mp4": "preview/vladilen-stage.stage.steps.mp4", "poster": "preview/vladilen-stage.stage.steps.png" },
+      "reveals": "each step"
+    },
+    {
+      "id": "vladilen-stage.stage.compare",
+      "tier": "custom",
+      "purpose": "compare",
+      "file": "cards/stage/stage-compare.html",
+      "slots": [
+        { "name": "kicker", "type": "text", "maxChars": 28 },
+        { "name": "tag", "type": "text", "maxChars": 16 },
+        { "name": "left_icon", "type": "text", "maxChars": 1000, "icon": true },
+        { "name": "left_title", "type": "text", "maxChars": 24, "minPx": 40, "required": true },
+        { "name": "left_items", "type": "list", "maxItems": 3, "maxChars": 28, "minPx": 40, "required": true, "template": "li", "reveal": true },
+        { "name": "right_icon", "type": "text", "maxChars": 1000, "icon": true },
+        { "name": "right_title", "type": "text", "maxChars": 24, "minPx": 40, "required": true },
+        { "name": "right_items", "type": "list", "maxItems": 3, "maxChars": 28, "minPx": 40, "required": true, "template": "li", "reveal": true },
+        { "name": "note", "type": "text", "maxChars": 70 },
+        { "name": "source", "type": "text", "maxChars": 60 }
+      ],
+      "duration": { "min": 8, "max": 16 },
+      "preview": { "mp4": "preview/vladilen-stage.stage.compare.mp4", "poster": "preview/vladilen-stage.stage.compare.png" },
+      "reveals": "left lines, vs, right lines, note"
+    },
+    {
+      "id": "vladilen-stage.stage.metric",
+      "tier": "custom",
+      "purpose": "metric",
+      "file": "cards/stage/stage-metric.html",
+      "slots": [
+        { "name": "kicker", "type": "text", "maxChars": 28 },
+        { "name": "tag", "type": "text", "maxChars": 16 },
+        { "name": "value", "type": "text", "maxChars": 8, "stress": "88888888", "minPx": 96, "required": true },
+        { "name": "label", "type": "text", "maxChars": 60, "minPx": 40, "required": true },
+        { "name": "note", "type": "text", "maxChars": 80 },
+        { "name": "source", "type": "text", "maxChars": 60 }
+      ],
+      "duration": { "min": 5, "max": 10 },
+      "preview": { "mp4": "preview/vladilen-stage.stage.metric.mp4", "poster": "preview/vladilen-stage.stage.metric.png" },
+      "reveals": "value, label, note"
+    },
+    {
+      "id": "vladilen-stage.stage.flow",
+      "tier": "custom",
+      "purpose": "diagram",
+      "file": "cards/stage/stage-flow.html",
+      "slots": [
+        { "name": "kicker", "type": "text", "maxChars": 28 },
+        { "name": "tag", "type": "text", "maxChars": 16 },
+        { "name": "headline", "type": "text", "maxChars": 60, "minPx": 40, "required": true },
+        { "name": "nodes", "type": "list", "maxItems": 4, "fields": { "icon": 1000, "label": 20 }, "fieldMin": { "label": 40 }, "required": true, "template": ".node", "joiner": ".edge", "reveal": true, "icons": ["icon"] },
+        { "name": "note", "type": "text", "maxChars": 100 }
+      ],
+      "duration": { "min": 8, "max": 16 },
+      "preview": { "mp4": "preview/vladilen-stage.stage.flow.mp4", "poster": "preview/vladilen-stage.stage.flow.png" },
+      "reveals": "each node"
+    },
+    {
+      "id": "vladilen-stage.stage.chat",
+      "tier": "custom",
+      "purpose": "ui",
+      "file": "cards/stage/stage-chat.html",
+      "slots": [
+        { "name": "kicker", "type": "text", "maxChars": 28 },
+        { "name": "tag", "type": "text", "maxChars": 16 },
+        { "name": "app", "type": "text", "maxChars": 28 },
+        { "name": "msg_user", "type": "text", "maxChars": 80, "minPx": 40, "required": true },
+        { "name": "msg_ai", "type": "text", "maxChars": 130, "minPx": 40, "required": true }
+      ],
+      "duration": { "min": 8, "max": 16 },
+      "preview": { "mp4": "preview/vladilen-stage.stage.chat.mp4", "poster": "preview/vladilen-stage.stage.chat.png" },
+      "reveals": "user message, assistant message"
+    },
+    {
+      "id": "vladilen-stage.stage.icons",
+      "tier": "custom",
+      "purpose": "icons",
+      "file": "cards/stage/stage-icons.html",
+      "slots": [
+        { "name": "kicker", "type": "text", "maxChars": 28 },
+        { "name": "tag", "type": "text", "maxChars": 16 },
+        { "name": "headline", "type": "text", "maxChars": 50, "minPx": 40, "required": true },
+        { "name": "tiles", "type": "list", "maxItems": 4, "fields": { "icon": 1000, "label": 12, "note": 40, "meta": 16 }, "fieldMin": { "label": 40 }, "icons": ["icon"], "required": true, "template": ".tile", "reveal": true },
+        { "name": "source", "type": "text", "maxChars": 70 }
+      ],
+      "duration": { "min": 6, "max": 20 },
+      "preview": { "mp4": "preview/vladilen-stage.stage.icons.mp4", "poster": "preview/vladilen-stage.stage.icons.png" },
+      "reveals": "each tile"
+    },
+    {
+      "id": "vladilen-stage.stage.scene",
+      "tier": "custom",
+      "purpose": "scene",
+      "file": "cards/stage/stage-scene.html",
+      "slots": [
+        { "name": "kicker", "type": "text", "maxChars": 28 },
+        { "name": "tag", "type": "text", "maxChars": 16 },
+        { "name": "icon", "type": "text", "maxChars": 1000, "icon": true, "required": true },
+        { "name": "icon2", "type": "text", "maxChars": 1000, "icon": true },
+        { "name": "headline", "type": "text", "maxChars": 34, "minPx": 40, "required": true },
+        { "name": "note", "type": "text", "maxChars": 90 },
+        { "name": "source", "type": "text", "maxChars": 50 }
+      ],
+      "duration": { "min": 5, "max": 14 },
+      "preview": { "mp4": "preview/vladilen-stage.stage.scene.mp4", "poster": "preview/vladilen-stage.stage.scene.png" },
+      "reveals": "icon, icon2 (if set), note"
+    },
+    {
+      "id": "vladilen-stage.stage.figure",
+      "tier": "custom",
+      "purpose": "figure",
+      "file": "cards/stage/stage-figure.html",
+      "slots": [
+        { "name": "kicker", "type": "text", "maxChars": 28 },
+        { "name": "headline", "type": "text", "maxChars": 40, "minPx": 40, "required": true },
+        { "name": "label", "type": "text", "maxChars": 48 },
+        { "name": "svg", "type": "text", "maxChars": 400000, "raw": true, "stress": "" },
+        { "name": "image", "type": "text", "maxChars": 2000, "stress": "" },
+        { "name": "host", "type": "text", "maxChars": 48 },
+        { "name": "mark", "type": "text", "maxChars": 60, "stress": "" }
+      ],
+      "duration": { "min": 4, "max": 16 },
+      "preview": { "mp4": "preview/vladilen-stage.stage.figure.mp4", "poster": "preview/vladilen-stage.stage.figure.png" },
+      "reveals": "mark (a screenshot) or svg (an illustration)"
+    }
+  ]
+}

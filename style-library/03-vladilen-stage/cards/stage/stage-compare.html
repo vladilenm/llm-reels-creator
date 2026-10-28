@@ -1,0 +1,102 @@
+<!doctype html>
+<!--
+  STAGE · compare · А против Б, два столбца по три строки
+  Слоты: kicker, tag, left_title, left_items (до 3 строк), right_title, right_items (до 3 строк), note.
+  Акцент один: правый столбец (то, к чему ведут). Левый остаётся в приглушённых тонах.
+  data-at у каждой строки и у .vs: секунды от начала карточки; сначала левый столбец, потом правый.
+-->
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="../../tokens.css" />
+    <link rel="stylesheet" href="stage.css" />
+    <style>
+      #stage-compare .compare { width: 1400px; gap: var(--space-2); }
+      #stage-compare .cols { display: grid; grid-template-columns: 1fr 96px 1fr; align-items: start; }
+      #stage-compare .col { display: flex; flex-direction: column; gap: var(--space-3); padding-top: var(--space-3); border-top: 4px solid var(--line-strong); }
+      #stage-compare .col.right { border-top-color: var(--accent); }
+      #stage-compare h3 {
+        margin: 0; font-family: var(--font-display); font-weight: var(--wt-headline);
+        font-size: var(--size-headline-md); line-height: var(--lh-headline-md); letter-spacing: var(--ls-headline-md); color: var(--ink-muted);
+      }
+      #stage-compare .col.right h3 { color: var(--accent-text); }
+      #stage-compare ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-2); }
+      #stage-compare li { position: relative; padding-left: var(--space-5); font-size: var(--size-key); line-height: var(--lh-key); color: var(--ink); }
+      #stage-compare li::before { content: ""; position: absolute; left: 0; top: 0.78em; width: var(--space-3); height: var(--stroke-diagram); background: var(--line-strong); }
+      #stage-compare .col.right li::before { background: var(--accent); }
+      #stage-compare .cmp-ic { width: 72px; height: 72px; color: var(--ink-muted); }
+      #stage-compare .col.right .cmp-ic { color: var(--accent); }
+      #stage-compare .source { margin-top: calc(-1 * var(--space-2)); font-family: var(--font-mono); font-weight: var(--wt-label); font-size: var(--size-label); letter-spacing: var(--ls-label); text-transform: uppercase; color: var(--ink-subtle); }
+      #stage-compare .vs {
+        padding-top: var(--space-5); text-align: center; font-family: var(--font-mono); font-weight: var(--wt-label);
+        font-size: var(--size-label); letter-spacing: var(--ls-label); text-transform: uppercase; color: var(--ink-subtle);
+      }
+    </style>
+  </head>
+  <body>
+    <div id="stage-compare" class="stage" data-composition-id="stage-compare" data-start="0" data-width="1920" data-height="1080" data-duration="10">
+      <div class="glow"></div>
+      <div class="grid"></div>
+      <div class="dock" data-role="face-dock">лицо</div>
+      <div class="scene-content">
+        <section class="card compare">
+          <div class="row">
+            <div class="kicker" data-slot="kicker">07 / СРАВНЕНИЕ</div>
+            <div class="tag" data-slot="tag"></div>
+          </div>
+          <div class="cols">
+            <div class="col left">
+              <div class="ic cmp-ic" data-slot="left_icon">prompt</div>
+              <h3 data-slot="left_title">Было</h3>
+              <ul data-slot="left_items">
+                <li data-at="1.2">Просьба без критерия</li>
+                <li data-at="2.2">Нет примера результата</li>
+                <li data-at="3.2">Проверка на глаз</li>
+              </ul>
+            </div>
+            <div class="vs" data-at="4.0">vs</div>
+            <div class="col right">
+              <div class="ic cmp-ic" data-slot="right_icon">check</div>
+              <h3 data-slot="right_title">Стало</h3>
+              <ul data-slot="right_items">
+                <li data-at="4.4">Цель с критерием</li>
+                <li data-at="5.4">Образец рядом</li>
+                <li data-at="6.4">Проверка по списку</li>
+              </ul>
+            </div>
+          </div>
+          <p class="note" data-slot="note" data-at="7.4">Разница в одном: у второго варианта есть критерий проверки.</p>
+          <div class="source" data-slot="source">Источник: подпись</div>
+        </section>
+      </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <script src="../../icons/icons.js"></script>
+    <script>
+      window.__timelines = window.__timelines || {};
+      const root = document.getElementById("stage-compare");
+      const D = parseFloat(root.dataset.duration) || 10;
+      const at = (el, d) => (el.dataset.at !== undefined ? parseFloat(el.dataset.at) : d);
+      const card = root.querySelector(".card");
+      const drawOn = window.stageIconsInit(root, 1.3);
+      const left = root.querySelector(".col.left"), right = root.querySelector(".col.right"), vs = root.querySelector(".vs");
+      const tl = gsap.timeline({ paused: true });
+      tl.fromTo(card, { opacity: 0, y: 40, filter: "blur(12px)" }, { opacity: 1, y: 0, filter: "blur(0px)", duration: 0.6, ease: "power4.out" }, 0.1)
+        .fromTo(root.querySelector(".kicker"), { opacity: 0, y: 24 }, { opacity: 1, y: 0, duration: 0.5, ease: "expo.out" }, 0.3)
+        .fromTo(left.querySelector("h3"), { opacity: 0, y: 24 }, { opacity: 1, y: 0, duration: 0.5, ease: "expo.out" }, 0.5)
+        .fromTo(vs, { opacity: 0 }, { opacity: 1, duration: 0.5, ease: "sine.inOut" }, at(vs, 4.0))
+        .fromTo(right.querySelector("h3"), { opacity: 0, y: 24 }, { opacity: 1, y: 0, duration: 0.5, ease: "expo.out" }, at(vs, 4.0) + 0.1);
+      // иконки столбцов рисуются вместе с заголовками
+      drawOn(tl, left.querySelector(".cmp-ic"), 0.5, 0.8);
+      drawOn(tl, right.querySelector(".cmp-ic"), at(vs, 4.0) + 0.1, 0.8);
+      tl.fromTo(root.querySelector(".source"), { opacity: 0 }, { opacity: 1, duration: 0.5, ease: "sine.inOut" }, 0.9);
+      // строки входят на свои слова: слева сдвиг справа, справа слева, чтобы глаз ходил между столбцами
+      left.querySelectorAll("li").forEach((li) => tl.fromTo(li, { opacity: 0, x: 24 }, { opacity: 1, x: 0, duration: 0.5, ease: "power3.out" }, at(li, 1.2)));
+      right.querySelectorAll("li").forEach((li) => tl.fromTo(li, { opacity: 0, x: -24 }, { opacity: 1, x: 0, duration: 0.5, ease: "power3.out" }, at(li, 4.4)));
+      tl.fromTo(root.querySelector(".note"), { opacity: 0, y: 16 }, { opacity: 1, y: 0, duration: 0.5, ease: "sine.inOut" }, at(root.querySelector(".note"), 7.4))
+        .to(card, { opacity: 0, y: -160, filter: "blur(24px)", duration: 0.3, ease: "power2.in" }, D - 0.299);
+      window.__timelines["stage-compare"] = tl;
+    </script>
+  </body>
+</html>

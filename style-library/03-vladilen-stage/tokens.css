@@ -1,0 +1,112 @@
+/* ============================================================================
+   VLADILEN STAGE — токены стиля «сцена» для YouTube 16:9 (1920×1080)
+   Источник значений: дизайн-система Владилена (~/Documents/dev/vladilen-design-system,
+   DESIGN.md), тёмная тема. Цвета, шрифты, радиусы, тени и кривые перенесены оттуда,
+   здесь ничего не придумано заново.
+   Правило масштаба для видео: размер = токен дизайн-системы × 2 (сетка 4 px → 8 px
+   при 1080p). В дизайн-системе нет раздела «Видео 16:9», это известный пробел:
+   когда он появится в tokens.mjs, значения ниже сверяются с ним.
+   Карточки берут отсюда всё и ничего не прописывают сами. См. DESIGN.md.
+   ============================================================================ */
+
+/* Шрифты локально (кириллица, OFL). Путь относительный: style-library/03-…/ → brand/fonts/.
+   При копировании карточки в проект шрифты копируются вместе с ней. */
+@font-face { font-family: "Spectral"; font-weight: 300; font-style: normal; src: url("../../brand/fonts/Spectral-Light.ttf") format("truetype"); }
+@font-face { font-family: "Spectral"; font-weight: 300; font-style: italic; src: url("../../brand/fonts/Spectral-LightItalic.ttf") format("truetype"); }
+@font-face { font-family: "Spectral"; font-weight: 400; font-style: normal; src: url("../../brand/fonts/Spectral-Regular.ttf") format("truetype"); }
+@font-face { font-family: "Spectral"; font-weight: 500; font-style: normal; src: url("../../brand/fonts/Spectral-Medium.ttf") format("truetype"); }
+@font-face { font-family: "Golos Text"; font-weight: 400 800; font-style: normal; src: url("../../brand/fonts/GolosText-Variable.ttf") format("truetype"); }
+@font-face { font-family: "IBM Plex Mono"; font-weight: 400; font-style: normal; src: url("../../brand/fonts/IBMPlexMono-Regular.ttf") format("truetype"); }
+@font-face { font-family: "IBM Plex Mono"; font-weight: 500; font-style: normal; src: url("../../brand/fonts/IBMPlexMono-Medium.ttf") format("truetype"); }
+
+:root {
+  /* --- палитра: тёмная тема дизайн-системы (роль → значение `<роль>-dark`) --- */
+  --bg:            #0E0B14;   /* bg-dark: сцена */
+  --surface:       #17131F;   /* surface-dark: карточки */
+  --surface-sunken:#120F19;   /* surface-sunken-dark: подложки кода, треки, зебра */
+  --line:          #2B2537;   /* line-dark: границы карточек, разделители */
+  --line-strong:   #6A617E;   /* line-strong-dark: рамки полей, оси графиков */
+  --ink:           #F5F3FA;   /* ink-dark: заголовки и основной текст */
+  --ink-muted:     #B6AFC4;   /* ink-muted-dark: подписи, метаданные */
+  --ink-subtle:    #8F889D;   /* ink-subtle-dark: метки, подсказки (не для длинного текста) */
+  --accent:        #A78BFA;   /* accent-dark: ОДНА ключевая деталь на кадр (#7C3AED на тёмном не используется) */
+  --accent-text:   #B79CFF;   /* accent-text-dark: акцентный текст на фоне и мягком акценте */
+  --accent-soft:   #261C3D;   /* accent-soft-dark: плашка под словом, мягкая заливка */
+  --on-accent:     #160E2B;   /* on-accent-dark: текст на заливке акцентом */
+  --glow:          #1E1630;   /* фирменное свечение за сценой (единственный градиент бренда вне логотипа) */
+  --accent-brand:  #7C3AED;   /* ядро свечения, только в радиальном пятне, не как цвет текста или линии */
+  --accent-brand-rgb: 124, 58, 237;   /* то же в rgb: для мягкой заливки на светлой бумаге */
+
+  /* состояния, только для смысла «хорошо / внимание / плохо», не как второй акцент */
+  --success:       #5CC98F;  --success-soft: #13291E;
+  --warning:       #E5AE45;  --warning-soft: #2D2312;
+  --danger:        #F27D78;  --danger-soft:  #33171A;
+
+  /* светлая «бумага» для настоящих документов, статей и схем: canvas бренда */
+  --paper:         #EFEDF4;   /* canvas */
+  --paper-ink:     #16121E;   /* ink светлой темы */
+  --paper-muted:   #565062;   /* ink-muted светлой темы */
+  --paper-line:    #E2DFEA;   /* line светлой темы */
+  --paper-accent:  #6A2BD8;   /* accent-text светлой темы: акцент на бумаге */
+  --paper-mark:    rgba(var(--accent-brand-rgb), 0.16);   /* подсветка фразы на бумаге: accent-soft, но видимый на canvas */
+
+  /* --- шрифты ------------------------------------------------------------- */
+  --font-display:  "Spectral", "Iowan Old Style", Georgia, serif;                         /* заголовки: 300–500, жирнее нельзя */
+  --font-body:     "Golos Text", "Segoe UI", system-ui, sans-serif;                       /* текст и интерфейс */
+  --font-mono:     "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;            /* метки, цифры, код */
+
+  /* типографика: токен дизайн-системы × 2 */
+  --size-display:      128px;  --lh-display:      1.05;  --wt-display:  300;  --ls-display:  -0.02em;   /* display 64 */
+  --size-headline-lg:   80px;  --lh-headline-lg:  1.15;  --wt-headline: 400;  --ls-headline-lg: -0.01em;  /* headline-lg 40 */
+  --size-headline-md:   56px;  --lh-headline-md:  1.25;                       --ls-headline-md: -0.005em; /* headline-md 28 */
+  --size-title:         40px;  --lh-title:        1.35;  --wt-title:    600;                              /* title 20 */
+  --size-body-lg:       36px;  --lh-body-lg:      1.6;                                                    /* body-lg 18 */
+  --size-body:          32px;  --lh-body:         1.55;                                                   /* body 16 */
+  --size-label:         24px;  --lh-label:        1.4;   --wt-label:    500;  --ls-label:   0.06em;       /* label 12, капс */
+  --size-key:           40px;  --lh-key:           1.5;                                                    /* ключевой текст карточки (= title × 2, вес 400) */
+  --size-key-min:       40px;  /* ключевой текст, который надо прочитать, не мельче */
+  --size-label-min:     24px;  /* метки и декор не мельче; текст внутри UI-макетов, который читать не нужно, не нормируется */
+
+  /* --- сетка и фигуры (× 2) ------------------------------------------------ */
+  --space-1:   8px;   --space-2:  16px;   --space-3:  24px;   --space-4:  32px;
+  --space-5:  48px;   --space-6:  64px;   --space-7:  96px;   --space-8: 128px;   --space-9: 192px;
+  --radius-sm:  8px;  --radius-md: 12px;  --radius-lg: 20px;  --radius-xl: 32px;  --radius-full: 9999px;
+  --stroke:     2px;  /* линия 1 px дизайн-системы × 2 */
+  --stroke-diagram: 3px;  /* линии схем и графиков; не тоньше (правило ночного стиля бренда) */
+
+  /* тени: elevation дизайн-системы, тёмная тема, × 2 */
+  --shadow-1: 0 2px 4px rgba(0, 0, 0, 0.40);
+  --shadow-2: 0 8px 32px rgba(0, 0, 0, 0.45);
+  --shadow-3: 0 32px 80px rgba(0, 0, 0, 0.55);
+
+  /* --- геометрия кадра 1920×1080 ------------------------------------------- */
+  --frame-w: 1920px;  --frame-h: 1080px;
+  /* плашка лица у правого края, 2:3, по центру чуть ниже середины */
+  --dock-w: 208px;    --dock-h: 312px;    --dock-x: 1712px;   --dock-y: 406px;
+  /* рабочая область карточек: не заходит под плашку; от плашки 48 px */
+  --content-x:  96px; --content-y:  96px; --content-w: 1568px; --content-h: 888px;
+  /* лицо во весь кадр: без обработки, 1920×1080 */
+
+  /* --- движение ------------------------------------------------------------ */
+  /* кривые дизайн-системы (CSS) */
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --ease-enter:    cubic-bezier(0.05, 0.7, 0.1, 1);
+  --ease-exit:     cubic-bezier(0.3, 0, 0.8, 0.15);
+  /* то же для GSAP (без пружин и отскоков, правило бренда) */
+  --gsap-enter: power4.out;
+  --gsap-exit:  power2.in;
+  /* длительности: ночной стиль бренда: вход 0,6–0,9 с, выход 0,3–0,4 с */
+  --dur-enter:   0.6s;
+  --dur-exit:    0.3s;
+  --dur-stagger: 0.12s;       /* шаг между элементами внутри карточки */
+  --move-enter:  40px;        /* вход: подъём снизу */
+  --move-exit:   160px;       /* выход: уход вверх с размытием в движении */
+  --blur-enter:  12px;        /* размытие в первый кадр входа */
+  --blur-exit:   24px;        /* размытие в движении на выходе */
+
+  /* --- фон сцены: база + фирменное свечение + тонкая сетка ------------------ */
+  --stage-glow: radial-gradient(60% 55% at 46% 18%, rgba(124, 58, 237, 0.22) 0%, var(--glow) 38%, transparent 72%);
+  --stage-grid: linear-gradient(rgba(245, 243, 250, 0.035) 2px, transparent 2px),
+                linear-gradient(90deg, rgba(245, 243, 250, 0.035) 2px, transparent 2px);
+  --stage-grid-size: 96px 96px;   /* space-7 */
+}

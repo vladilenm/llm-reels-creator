@@ -124,6 +124,24 @@ validators. Structural checks supplement rendered video and audio review.
 a 150–900 MB SAM 2 model, installed on first use only. Never run it in a reel
 unless the user asks for it. Vendored versions and local patches: `vendor/SOURCES.md`.
 
+## YouTube long-form (a separate flow; Reels Studio is unchanged)
+
+Long YouTube videos (16:9) use their own style pack and skills. Nothing here changes `/reel`.
+
+| Need | Skill |
+| --- | --- |
+| Stage layout, face states, `FACE.json` (where the face goes full-frame), rules for long-form cards | `longform-stage` |
+| A YouTube video from a raw recording: facts checked, an image on every idea, preview → «ок» → final (`/youtube`) | `vladilen-youtube` |
+| Idea cards for the stage: pick by the beat, fill slots, word-synced reveals, QA (quote, term, doc, steps, compare, metric, flow, chat, scene, icons, figure: a full-stage illustration or a source screenshot) | `stage-cards` |
+
+Style pack: `style-library/03-vladilen-stage/` (brand palette, one accent per frame, quiet
+transitions, hard cut between face and stage). Sound is voice only unless the project asks
+for music or SFX. Face plan: `node scripts/long/face-plan.mjs <transcript.words.json>`; cards check:
+`node scripts/long/check-stage-cards.mjs`; assembly:
+`node scripts/long/stage-assemble.mjs <project> --check|--preview|--final` (take + `FACE.json` + `CARDS.json`).
+The main scenario is `/youtube <file> [— brief]` (`vladilen-youtube`); it checks the facts of the speech against
+sources (`FACTS.md`) before any card shows them. The customer's how-to is `docs/YOUTUBE.md`.
+
 ## Reels Studio
 
 The main scenario is `/reel <file> [— brief] [--mode kit|full] [--review-cuts] [--density …] [--principles]`.

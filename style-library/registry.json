@@ -1,7 +1,7 @@
 {
   "generated_by": "scripts/style-library/build-registry.mjs",
-  "styleCount": 2,
-  "cardCount": 406,
+  "styleCount": 3,
+  "cardCount": 418,
   "tiers": [
     "tier1",
     "tier2",
@@ -8592,6 +8592,302 @@
           "preview": {
             "mp4": "02-kallaway/preview/kallaway.t2.label.warning.mp4",
             "poster": "02-kallaway/preview/kallaway.t2.label.warning.png"
+          }
+        }
+      ]
+    },
+    {
+      "id": "vladilen-stage",
+      "number": "03",
+      "name": "Vladilen Stage",
+      "status": "draft",
+      "folder": "03-vladilen-stage",
+      "inspiration": "Long-form YouTube explainer: one persistent dark stage with a single idea card at a time, the speaker's face as a state machine (full frame on personal beats, a narrow dock on the right edge otherwise). Mechanics studied from a reference breakdown (local, not shipped); the look is the Vladilen brand in its dark theme, not the reference's monochrome.",
+      "palette": {
+        "bg": "#0E0B14",
+        "fg": "#F5F3FA",
+        "accent": "#A78BFA",
+        "surface": "#17131F",
+        "line": "#2B2537",
+        "paper": "#EFEDF4",
+        "notes": "Dark theme of the design system. One accent per frame (accent-dark #A78BFA, text #B79CFF); #7C3AED only as the glow core. Light paper (canvas) for real documents. Mirrored in tokens.css."
+      },
+      "fonts": {
+        "display": "Spectral",
+        "body": "Golos Text",
+        "mono": "IBM Plex Mono",
+        "notes": "All with Cyrillic, from brand/fonts. Spectral 300-500 only. Plex Mono for section labels (NN / РАЗДЕЛ), the ИЛЛЮСТРАЦИЯ tag and numbers."
+      },
+      "cardCount": 12,
+      "cards": [
+        {
+          "id": "vladilen-stage.stage.base",
+          "style": "vladilen-stage",
+          "tier": "custom",
+          "purpose": "stage",
+          "file": "03-vladilen-stage/cards/stage/stage-base.html",
+          "slots": [
+            "kicker",
+            "headline",
+            "note",
+            "tag"
+          ],
+          "duration": {
+            "min": 4,
+            "max": 12
+          },
+          "preview": {
+            "mp4": "03-vladilen-stage/preview/vladilen-stage.stage.base.mp4",
+            "poster": "03-vladilen-stage/preview/vladilen-stage.stage.base.png"
+          }
+        },
+        {
+          "id": "vladilen-stage.stage.quote",
+          "style": "vladilen-stage",
+          "tier": "custom",
+          "purpose": "quote",
+          "file": "03-vladilen-stage/cards/stage/stage-quote.html",
+          "slots": [
+            "kicker",
+            "quote",
+            "source"
+          ],
+          "duration": {
+            "min": 5,
+            "max": 10
+          },
+          "preview": {
+            "mp4": "03-vladilen-stage/preview/vladilen-stage.stage.quote.mp4",
+            "poster": "03-vladilen-stage/preview/vladilen-stage.stage.quote.png"
+          }
+        },
+        {
+          "id": "vladilen-stage.stage.term",
+          "style": "vladilen-stage",
+          "tier": "custom",
+          "purpose": "term",
+          "file": "03-vladilen-stage/cards/stage/stage-term.html",
+          "slots": [
+            "kicker",
+            "tag",
+            "term",
+            "meta",
+            "definition",
+            "example"
+          ],
+          "duration": {
+            "min": 6,
+            "max": 12
+          },
+          "preview": {
+            "mp4": "03-vladilen-stage/preview/vladilen-stage.stage.term.mp4",
+            "poster": "03-vladilen-stage/preview/vladilen-stage.stage.term.png"
+          }
+        },
+        {
+          "id": "vladilen-stage.stage.doc",
+          "style": "vladilen-stage",
+          "tier": "custom",
+          "purpose": "doc",
+          "file": "03-vladilen-stage/cards/stage/stage-doc.html",
+          "slots": [
+            "kicker",
+            "source",
+            "title",
+            "body"
+          ],
+          "duration": {
+            "min": 6,
+            "max": 12
+          },
+          "preview": {
+            "mp4": "03-vladilen-stage/preview/vladilen-stage.stage.doc.mp4",
+            "poster": "03-vladilen-stage/preview/vladilen-stage.stage.doc.png"
+          }
+        },
+        {
+          "id": "vladilen-stage.stage.steps",
+          "style": "vladilen-stage",
+          "tier": "custom",
+          "purpose": "steps",
+          "file": "03-vladilen-stage/cards/stage/stage-steps.html",
+          "slots": [
+            "kicker",
+            "tag",
+            "headline",
+            "items"
+          ],
+          "duration": {
+            "min": 8,
+            "max": 20
+          },
+          "preview": {
+            "mp4": "03-vladilen-stage/preview/vladilen-stage.stage.steps.mp4",
+            "poster": "03-vladilen-stage/preview/vladilen-stage.stage.steps.png"
+          }
+        },
+        {
+          "id": "vladilen-stage.stage.compare",
+          "style": "vladilen-stage",
+          "tier": "custom",
+          "purpose": "compare",
+          "file": "03-vladilen-stage/cards/stage/stage-compare.html",
+          "slots": [
+            "kicker",
+            "tag",
+            "left_icon",
+            "left_title",
+            "left_items",
+            "right_icon",
+            "right_title",
+            "right_items",
+            "note",
+            "source"
+          ],
+          "duration": {
+            "min": 8,
+            "max": 16
+          },
+          "preview": {
+            "mp4": "03-vladilen-stage/preview/vladilen-stage.stage.compare.mp4",
+            "poster": "03-vladilen-stage/preview/vladilen-stage.stage.compare.png"
+          }
+        },
+        {
+          "id": "vladilen-stage.stage.metric",
+          "style": "vladilen-stage",
+          "tier": "custom",
+          "purpose": "metric",
+          "file": "03-vladilen-stage/cards/stage/stage-metric.html",
+          "slots": [
+            "kicker",
+            "tag",
+            "value",
+            "label",
+            "note",
+            "source"
+          ],
+          "duration": {
+            "min": 5,
+            "max": 10
+          },
+          "preview": {
+            "mp4": "03-vladilen-stage/preview/vladilen-stage.stage.metric.mp4",
+            "poster": "03-vladilen-stage/preview/vladilen-stage.stage.metric.png"
+          }
+        },
+        {
+          "id": "vladilen-stage.stage.flow",
+          "style": "vladilen-stage",
+          "tier": "custom",
+          "purpose": "diagram",
+          "file": "03-vladilen-stage/cards/stage/stage-flow.html",
+          "slots": [
+            "kicker",
+            "tag",
+            "headline",
+            "nodes",
+            "note"
+          ],
+          "duration": {
+            "min": 8,
+            "max": 16
+          },
+          "preview": {
+            "mp4": "03-vladilen-stage/preview/vladilen-stage.stage.flow.mp4",
+            "poster": "03-vladilen-stage/preview/vladilen-stage.stage.flow.png"
+          }
+        },
+        {
+          "id": "vladilen-stage.stage.chat",
+          "style": "vladilen-stage",
+          "tier": "custom",
+          "purpose": "ui",
+          "file": "03-vladilen-stage/cards/stage/stage-chat.html",
+          "slots": [
+            "kicker",
+            "tag",
+            "app",
+            "msg_user",
+            "msg_ai"
+          ],
+          "duration": {
+            "min": 8,
+            "max": 16
+          },
+          "preview": {
+            "mp4": "03-vladilen-stage/preview/vladilen-stage.stage.chat.mp4",
+            "poster": "03-vladilen-stage/preview/vladilen-stage.stage.chat.png"
+          }
+        },
+        {
+          "id": "vladilen-stage.stage.icons",
+          "style": "vladilen-stage",
+          "tier": "custom",
+          "purpose": "icons",
+          "file": "03-vladilen-stage/cards/stage/stage-icons.html",
+          "slots": [
+            "kicker",
+            "tag",
+            "headline",
+            "tiles",
+            "source"
+          ],
+          "duration": {
+            "min": 6,
+            "max": 20
+          },
+          "preview": {
+            "mp4": "03-vladilen-stage/preview/vladilen-stage.stage.icons.mp4",
+            "poster": "03-vladilen-stage/preview/vladilen-stage.stage.icons.png"
+          }
+        },
+        {
+          "id": "vladilen-stage.stage.scene",
+          "style": "vladilen-stage",
+          "tier": "custom",
+          "purpose": "scene",
+          "file": "03-vladilen-stage/cards/stage/stage-scene.html",
+          "slots": [
+            "kicker",
+            "tag",
+            "icon",
+            "icon2",
+            "headline",
+            "note",
+            "source"
+          ],
+          "duration": {
+            "min": 5,
+            "max": 14
+          },
+          "preview": {
+            "mp4": "03-vladilen-stage/preview/vladilen-stage.stage.scene.mp4",
+            "poster": "03-vladilen-stage/preview/vladilen-stage.stage.scene.png"
+          }
+        },
+        {
+          "id": "vladilen-stage.stage.figure",
+          "style": "vladilen-stage",
+          "tier": "custom",
+          "purpose": "figure",
+          "file": "03-vladilen-stage/cards/stage/stage-figure.html",
+          "slots": [
+            "kicker",
+            "headline",
+            "label",
+            "svg",
+            "image",
+            "host",
+            "mark"
+          ],
+          "duration": {
+            "min": 4,
+            "max": 16
+          },
+          "preview": {
+            "mp4": "03-vladilen-stage/preview/vladilen-stage.stage.figure.mp4",
+            "poster": "03-vladilen-stage/preview/vladilen-stage.stage.figure.png"
           }
         }
       ]

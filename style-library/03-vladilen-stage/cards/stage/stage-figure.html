@@ -1,0 +1,115 @@
+<!doctype html>
+<!--
+  STAGE · figure · иллюстрация или скриншот источника на всю сцену, заголовок и метка в углу (как в референсе)
+  Слоты: kicker, headline (коротко), label (ИЛЛЮСТРАЦИЯ или ИСТОЧНИК · домен), а дальше одно из двух:
+    · image + host + mark — скриншот страницы в окне браузера; mark = "x,y,w,h" (доли кадра) — где фраза:
+      на data-at камера подъезжает к ней и ложится подсветка;
+    · svg — иллюстрация проекта (svg-разметка, линии рисуются, подписи проявляются на data-at).
+  Сборщик сам заполняет host и mark из файла <имя>.json рядом со скриншотом (scripts/long/web-shot.mjs).
+-->
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="../../tokens.css" />
+    <link rel="stylesheet" href="stage.css" />
+    <style>
+      #stage-figure .figure { width: 100%; height: 100%; display: flex; flex-direction: column; gap: var(--space-3); }
+      #stage-figure .head { display: flex; align-items: baseline; gap: var(--space-4); flex: none; padding-top: var(--space-2); }
+      #stage-figure .headline { font-size: var(--size-headline-md); }
+      #stage-figure .label {
+        font-family: var(--font-mono); font-weight: var(--wt-label); font-size: var(--size-label); line-height: var(--lh-label);
+        letter-spacing: var(--ls-label); text-transform: uppercase; color: var(--ink-subtle);
+      }
+      #stage-figure .media { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; }
+      #stage-figure .art { width: 100%; height: 100%; }
+      #stage-figure .art svg { display: block; width: 100%; height: 100%; }
+      #stage-figure .browser {
+        height: 100%; aspect-ratio: 1280 / 848; max-width: 100%; box-sizing: border-box; display: flex; flex-direction: column;
+        background: var(--surface); border: var(--stroke) solid var(--line); border-radius: var(--radius-lg); overflow: hidden; box-shadow: var(--shadow-3);
+      }
+      #stage-figure .bar { flex: none; display: flex; align-items: center; gap: var(--space-3); height: 48px; padding: 0 var(--space-3); background: var(--surface-sunken); border-bottom: var(--stroke) solid var(--line); }
+      #stage-figure .dots { display: flex; gap: var(--space-1); }
+      #stage-figure .dots i { width: 14px; height: 14px; box-sizing: border-box; border-radius: var(--radius-full); border: var(--stroke) solid var(--line-strong); }
+      #stage-figure .host { font-family: var(--font-mono); font-size: var(--size-label); color: var(--ink-muted); }
+      #stage-figure .page { position: relative; flex: 1; overflow: hidden; }
+      #stage-figure .zoom { position: absolute; inset: 0; transform-origin: 50% 40%; }
+      #stage-figure .zoom img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: top; }
+      #stage-figure .mark { display: block; position: absolute; color: transparent; background: rgba(var(--accent-brand-rgb), 0.22); border-bottom: 4px solid var(--accent); transform-origin: left center; }
+      #stage-figure .browser.off { display: none; }
+    </style>
+  </head>
+  <body>
+    <div id="stage-figure" class="stage" data-composition-id="stage-figure" data-start="0" data-width="1920" data-height="1080" data-duration="8">
+      <div class="glow"></div>
+      <div class="grid"></div>
+      <div class="dock" data-role="face-dock">лицо</div>
+      <div class="scene-content">
+        <section class="figure">
+          <div class="head">
+            <div class="kicker" data-slot="kicker">13 / ОБРАЗ</div>
+            <h2 class="headline" data-slot="headline">Агент как сотрудник</h2>
+            <div class="label" data-slot="label">ИЛЛЮСТРАЦИЯ</div>
+          </div>
+          <div class="media">
+            <div class="art" data-slot="svg" data-at="0.6"><svg viewBox="0 0 1568 720"><g fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><rect x="584" y="160" width="400" height="300" rx="24"/><circle cx="784" cy="290" r="60"/><path d="M684 420c30-50 170-50 200 0"/></g><text x="784" y="560" text-anchor="middle" font-size="40" fill="currentColor">образец</text></svg></div>
+            <div class="browser off">
+              <div class="bar"><span class="dots"><i></i><i></i><i></i></span><span class="host" data-slot="host"></span></div>
+              <div class="page"><div class="zoom"><img class="shot" data-slot="image" alt="" /><div class="mark" data-slot="mark" data-at="1.2"></div></div></div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <script>
+      window.__timelines = window.__timelines || {};
+      const root = document.getElementById("stage-figure");
+      const D = parseFloat(root.dataset.duration) || 8;
+      const at = (el, d) => (el.dataset.at !== undefined ? parseFloat(el.dataset.at) : d);
+      const fig = root.querySelector(".figure"), art = root.querySelector(".art"), browser = root.querySelector(".browser");
+      const img = root.querySelector('[data-slot="image"]'), mark = root.querySelector('[data-slot="mark"]');
+      // the image slot carries a file URL as text: it becomes the src of the screenshot
+      const src = img.textContent.trim();
+      img.textContent = "";
+      const shot = src !== "";
+      if (shot) { img.setAttribute("src", src); browser.classList.remove("off"); }
+      const tl = gsap.timeline({ paused: true });
+      tl.fromTo(fig, { opacity: 0, y: 40, filter: "blur(12px)" }, { opacity: 1, y: 0, filter: "blur(0px)", duration: 0.6, ease: "power4.out" }, 0.1)
+        .fromTo(root.querySelector(".head"), { opacity: 0, x: -24 }, { opacity: 1, x: 0, duration: 0.5, ease: "expo.out" }, 0.3);
+      if (shot) {
+        const box = mark.textContent.split(",").map(Number);
+        mark.textContent = "";
+        tl.fromTo(browser, { opacity: 0, y: 32, scale: 0.98 }, { opacity: 1, y: 0, scale: 1, duration: 0.7, ease: "power3.out" }, 0.25);
+        if (box.length === 4 && box.every(Number.isFinite)) {
+          const [x, y, w, h] = box;
+          Object.assign(mark.style, { left: `${x * 100}%`, top: `${y * 100}%`, width: `${w * 100}%`, height: `${h * 100}%` });
+          const t = at(mark, 1.2);
+          // the camera moves to the phrase, then the highlight sweeps over it. The zoomed window (1/s of the page) keeps
+          // the phrase centred but never cuts its start, and stays inside the page; the origin that gives that window is L/(1-1/s).
+          const s = Math.max(1.2, Math.min(1.7, 0.5 / Math.max(w, 0.05))), win = 1 / s;
+          const clamp = (v) => Math.max(0, Math.min(1 - win, v));
+          const left = clamp(Math.min(x - 0.04, x + w / 2 - win / 2)), top = clamp(y + h / 2 - win * 0.4);
+          root.querySelector(".zoom").style.transformOrigin = `${(left / (1 - win)) * 100}% ${(top / (1 - win)) * 100}%`;
+          tl.fromTo(root.querySelector(".zoom"), { scale: 1 }, { scale: s, duration: 1.4, ease: "power2.inOut" }, t - 0.6)
+            .fromTo(mark, { scaleX: 0, opacity: 1 }, { scaleX: 1, opacity: 1, duration: 0.6, ease: "power2.out" }, t + 0.5);
+        } else tl.fromTo(root.querySelector(".zoom"), { scale: 1 }, { scale: 1.06, duration: D - 1, ease: "none" }, 0.3);
+      } else if (art.firstElementChild) {
+        // the illustration is drawn line by line, its captions appear after the lines
+        const t = at(art, 0.6);
+        const shapes = [...art.querySelectorAll("path, line, polyline, polygon, circle, rect, ellipse")];
+        const step = Math.min(0.08, 2.2 / Math.max(1, shapes.length));
+        shapes.forEach((s, i) => {
+          const len = Math.ceil(s.getTotalLength ? s.getTotalLength() : 200) + 1;
+          if (getComputedStyle(s).stroke !== "none") { s.style.strokeDasharray = len; tl.fromTo(s, { strokeDashoffset: len }, { strokeDashoffset: 0, duration: 0.9, ease: "power2.inOut" }, t + i * step); }
+          if (getComputedStyle(s).fill !== "none") tl.fromTo(s, { fillOpacity: 0 }, { fillOpacity: 1, duration: 0.5, ease: "sine.inOut" }, t + i * step + 0.3);
+        });
+        const texts = [...art.querySelectorAll("text")];
+        texts.forEach((x, i) => tl.fromTo(x, { opacity: 0 }, { opacity: 1, duration: 0.4, ease: "sine.out" }, t + shapes.length * step * 0.6 + i * 0.12));
+        tl.fromTo(art, { scale: 1 }, { scale: 1.03, duration: Math.max(1, D - 1.5), ease: "none" }, 0.6);
+      }
+      tl.to(fig, { opacity: 0, y: -160, filter: "blur(24px)", duration: 0.3, ease: "power2.in" }, D - 0.299);
+      window.__timelines["stage-figure"] = tl;
+    </script>
+  </body>
+</html>

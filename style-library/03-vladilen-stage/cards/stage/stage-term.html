@@ -1,0 +1,76 @@
+<!doctype html>
+<!--
+  STAGE · term · «словарная статья» на светлой бумаге
+  Слоты: kicker, tag, term, meta, definition, example. Бумага выделяет настоящее определение на тёмной сцене;
+  акцент один: линия под термином (accent-text светлой темы). data-at: линия, определение, пример.
+-->
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="../../tokens.css" />
+    <link rel="stylesheet" href="stage.css" />
+    <style>
+      #stage-term .term { width: 1240px; gap: var(--space-5); }
+      #stage-term .entry { display: flex; flex-direction: column; gap: var(--space-3); }
+      #stage-term .word {
+        margin: 0; text-wrap: balance; color: var(--paper-ink);
+        font-family: var(--font-display); font-weight: var(--wt-headline);
+        font-size: var(--size-headline-lg); line-height: var(--lh-headline-lg); letter-spacing: var(--ls-headline-lg);
+      }
+      #stage-term .word.big { font-size: var(--size-display); line-height: var(--lh-display); letter-spacing: var(--ls-display); font-weight: var(--wt-display); }
+      #stage-term .rule { background: var(--paper-accent); width: 240px; }
+      #stage-term .meta {
+        font-family: var(--font-mono); font-weight: var(--wt-label); font-size: var(--size-label);
+        letter-spacing: var(--ls-label); text-transform: uppercase; color: var(--paper-muted);
+      }
+      #stage-term .def { margin: var(--space-2) 0 0; font-size: var(--size-key); line-height: var(--lh-key); color: var(--paper-ink); }
+      #stage-term .example { margin: 0; font-family: var(--font-display); font-style: italic; font-weight: 300; font-size: var(--size-key); line-height: var(--lh-key); color: var(--paper-muted); }
+    </style>
+  </head>
+  <body>
+    <div id="stage-term" class="stage" data-composition-id="stage-term" data-start="0" data-width="1920" data-height="1080" data-duration="8">
+      <div class="glow"></div>
+      <div class="grid"></div>
+      <div class="dock" data-role="face-dock">лицо</div>
+      <div class="scene-content">
+        <article class="card paper term">
+          <div class="row">
+            <div class="kicker" data-slot="kicker">04 / ТЕРМИН</div>
+            <div class="tag" data-slot="tag"></div>
+          </div>
+          <div class="entry">
+            <h2 class="word" data-slot="term">рамка задачи</h2>
+            <div class="rule" data-at="1.2"></div>
+            <div class="meta" data-slot="meta">сущ. · пример термина</div>
+            <p class="def" data-slot="definition" data-at="1.8">Короткое описание того, что должно получиться, для кого и по каким признакам понятно, что работа готова.</p>
+            <p class="example" data-slot="example" data-at="4.2">«Сделай список из пяти задач на неделю, по одной строке на задачу.»</p>
+          </div>
+        </article>
+      </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <script>
+      window.__timelines = window.__timelines || {};
+      const root = document.getElementById("stage-term");
+      const D = parseFloat(root.dataset.duration) || 8;
+      const at = (el, d) => (el.dataset.at !== undefined ? parseFloat(el.dataset.at) : d);
+      const word = root.querySelector('[data-slot="term"]');
+      if (word.textContent.trim().length <= 16) word.classList.add("big");
+      const card = root.querySelector(".card");
+      const rule = root.querySelector(".rule");
+      const def = root.querySelector('[data-slot="definition"]');
+      const ex = root.querySelector('[data-slot="example"]');
+      const tl = gsap.timeline({ paused: true });
+      tl.fromTo(card, { opacity: 0, y: 40, filter: "blur(12px)" }, { opacity: 1, y: 0, filter: "blur(0px)", duration: 0.6, ease: "power4.out" }, 0.1)
+        .fromTo(root.querySelector(".kicker"), { opacity: 0, y: 24 }, { opacity: 1, y: 0, duration: 0.5, ease: "expo.out" }, 0.3)
+        .fromTo(word, { opacity: 0, y: 24 }, { opacity: 1, y: 0, duration: 0.6, ease: "expo.out" }, 0.4)
+        .fromTo(root.querySelector('[data-slot="meta"]'), { opacity: 0 }, { opacity: 1, duration: 0.5, ease: "sine.inOut" }, 0.8)
+        .fromTo(rule, { scaleX: 0 }, { scaleX: 1, duration: 0.7, ease: "power2.inOut" }, at(rule, 1.2))
+        .fromTo(def, { opacity: 0, y: 24 }, { opacity: 1, y: 0, duration: 0.6, ease: "power3.out" }, at(def, 1.8))
+        .fromTo(ex, { opacity: 0, y: 16 }, { opacity: 1, y: 0, duration: 0.6, ease: "power3.out" }, at(ex, 4.2))
+        .to(card, { opacity: 0, y: -160, filter: "blur(24px)", duration: 0.3, ease: "power2.in" }, D - 0.299);
+      window.__timelines["stage-term"] = tl;
+    </script>
+  </body>
+</html>

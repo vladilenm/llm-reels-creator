@@ -1,0 +1,74 @@
+/* ============================================================================
+   STAGE — общая основа карточек сцены (после ../../tokens.css).
+   Слои: фон-свечение-сетка, плашка лица, область содержимого. Карточка лежит в
+   .scene-content: контейнер занимает весь кадр, отступы (padding) задают рабочую
+   область 1568×888 левее плашки лица, поэтому ничего не уходит под плашку.
+   Ни цвета, ни шрифта, ни кривой здесь нет: всё из tokens.css.
+   ============================================================================ */
+html, body { margin: 0; background: var(--bg); }
+
+.stage {
+  position: absolute; inset: 0; width: var(--frame-w); height: var(--frame-h);
+  background: var(--bg); color: var(--ink); overflow: hidden; font-family: var(--font-body);
+}
+.stage .glow { position: absolute; inset: 0; background: var(--stage-glow); }
+.stage .grid { position: absolute; inset: 0; background-image: var(--stage-grid); background-size: var(--stage-grid-size); }
+
+/* плашка лица: заглушка для просмотра; сборка кладёт на её место кроп записи.
+   В готовом ролике заглушку прячет --dock-display: none у родителя. */
+.stage .dock {
+  position: absolute; left: var(--dock-x); top: var(--dock-y); width: var(--dock-w); height: var(--dock-h);
+  box-sizing: border-box; background: var(--surface-sunken);
+  border: var(--stroke) solid var(--line); border-right: 0;
+  border-radius: var(--radius-xl) 0 0 var(--radius-xl); box-shadow: var(--shadow-3);
+  display: var(--dock-display, flex); align-items: flex-end; justify-content: center; padding-bottom: var(--space-3);
+  font-family: var(--font-mono); font-weight: var(--wt-label); font-size: var(--size-label);
+  letter-spacing: var(--ls-label); text-transform: uppercase; color: var(--ink-subtle);
+}
+
+.stage .scene-content {
+  position: relative; box-sizing: border-box; width: 100%; height: 100%;
+  display: flex; align-items: center; justify-content: center;
+  padding: var(--content-y)
+           calc(var(--frame-w) - var(--content-x) - var(--content-w))
+           calc(var(--frame-h) - var(--content-y) - var(--content-h))
+           var(--content-x);
+}
+
+/* пустой слот не занимает места: сборка гасит ненужное, очистив текст */
+.stage [data-slot]:empty { display: none; }
+
+/* карточка: поверхность, линия, скругление; светлая «бумага» для настоящих документов */
+.stage .card {
+  box-sizing: border-box; max-width: 100%; max-height: 100%;
+  background: var(--surface); border: var(--stroke) solid var(--line); border-radius: var(--radius-lg);
+  padding: var(--space-5); display: flex; flex-direction: column;
+}
+.stage .card.paper { background: var(--paper); border-color: var(--paper-line); color: var(--paper-ink); }
+
+.stage .row { display: flex; justify-content: space-between; align-items: center; gap: var(--space-3); }
+
+/* метка раздела `NN / РАЗДЕЛ` и нейтральная метка «ИЛЛЮСТРАЦИЯ» (не отбирает акцент) */
+.stage .kicker, .stage .tag {
+  font-family: var(--font-mono); font-weight: var(--wt-label); font-size: var(--size-label);
+  line-height: var(--lh-label); letter-spacing: var(--ls-label); text-transform: uppercase;
+}
+.stage .kicker { color: var(--ink-subtle); }
+.stage .tag { color: var(--ink-muted); background: var(--surface-sunken); border-radius: var(--radius-sm); padding: 6px var(--space-2); }
+.stage .paper .kicker { color: var(--paper-muted); }
+.stage .paper .tag { color: var(--paper-muted); background: var(--paper-line); }
+
+.stage .headline {
+  margin: 0; text-wrap: balance; color: var(--ink);
+  font-family: var(--font-display); font-weight: var(--wt-headline);
+  font-size: var(--size-headline-md); line-height: var(--lh-headline-md); letter-spacing: var(--ls-headline-md);
+}
+.stage .note { margin: 0; font-size: var(--size-body); line-height: var(--lh-body); color: var(--ink-muted); }
+
+/* иконка: имя в тексте элемента .ic, svg рисует icons/icons.js; пустая не занимает места */
+.stage .ic svg { display: block; width: 100%; height: 100%; }
+.stage .ic:empty { display: none; }
+.stage .ic img { display: block; width: 100%; height: 100%; object-fit: contain; }
+
+/* структурная линия: рисуется масштабом по X; не тоньше линии схем */
+.stage .rule { height: var(--stroke-diagram); background: var(--line-strong); transform-origin: left center; }

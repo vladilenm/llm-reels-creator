@@ -1,0 +1,62 @@
+<!doctype html>
+<!--
+  STAGE · base · оболочка сцены для YouTube 16:9
+  Фон (база, фирменное свечение, тонкая сетка), плашка лица справа и одна образцовая карточка.
+  Плашка здесь заглушка: в сборке на её место ставится кроп записи (геометрия в style.json → layout).
+  Договорённости всех карточек сцены (см. DESIGN.md → «Карточки сцены»):
+    · длительность слота берётся из data-duration корня; последний твин (выход) заканчивается не раньше неё;
+    · всё, что появляется на слове, помечено data-at (секунды от начала карточки); сборка подставляет
+      времена из расшифровки, без атрибута берётся значение по умолчанию из кода карточки;
+    · вход 0,6 с, выход 0,3 с с размытием в движении, без пружин; только opacity, не visibility.
+-->
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="../../tokens.css" />
+    <link rel="stylesheet" href="stage.css" />
+    <style>
+      #stage-base .card { width: 1280px; height: 720px; }
+      #stage-base .body { flex: 1; display: flex; flex-direction: column; justify-content: center; }
+      #stage-base .headline { max-width: 1100px; font-size: var(--size-headline-lg); line-height: var(--lh-headline-lg); letter-spacing: var(--ls-headline-lg); }
+      #stage-base .headline em { font-style: italic; font-weight: 300; color: var(--accent-text); }
+      #stage-base .note { margin-top: var(--space-5); max-width: 980px; font-size: var(--size-body-lg); line-height: var(--lh-body-lg); }
+    </style>
+  </head>
+  <body>
+    <div id="stage-base" class="stage" data-composition-id="stage-base" data-start="0" data-width="1920" data-height="1080" data-duration="6">
+      <div class="glow"></div>
+      <div class="grid"></div>
+      <div class="dock" data-role="face-dock">лицо</div>
+      <div class="scene-content">
+        <section class="card">
+          <div class="row">
+            <div class="kicker" data-slot="kicker">02 / ШАГ ПЕРВЫЙ</div>
+            <div class="tag" data-slot="tag">ИЛЛЮСТРАЦИЯ</div>
+          </div>
+          <div class="body">
+            <h2 class="headline" data-slot="headline">Дай цель, а не <em>формулировку</em></h2>
+            <p class="note" data-slot="note">Одна мысль на карточку. Текст читается за секунду, остальное делает картинка.</p>
+          </div>
+        </section>
+      </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <script>
+      window.__timelines = window.__timelines || {};
+      const root = document.getElementById("stage-base");
+      const D = parseFloat(root.dataset.duration) || 6;
+      const card = root.querySelector(".card");
+      const tl = gsap.timeline({ paused: true });
+      // вход карточки 0,6 с, затем элементы один за другим
+      tl.fromTo(card, { opacity: 0, y: 40, filter: "blur(12px)" }, { opacity: 1, y: 0, filter: "blur(0px)", duration: 0.6, ease: "power4.out" }, 0.1)
+        .fromTo(root.querySelector(".kicker"), { opacity: 0, y: 24 }, { opacity: 1, y: 0, duration: 0.5, ease: "expo.out" }, 0.3)
+        .fromTo(root.querySelector(".headline"), { opacity: 0, y: 24 }, { opacity: 1, y: 0, duration: 0.5, ease: "expo.out" }, 0.42)
+        .fromTo(root.querySelector(".note"), { opacity: 0, y: 24 }, { opacity: 1, y: 0, duration: 0.5, ease: "power3.out" }, 0.54)
+        .fromTo(root.querySelector(".tag"), { opacity: 0, y: 24 }, { opacity: 1, y: 0, duration: 0.5, ease: "power3.out" }, 0.66)
+        // выход 0,3 с: уход вверх с размытием в движении; кончается на 0,001 с позже слота
+        .to(card, { opacity: 0, y: -160, filter: "blur(24px)", duration: 0.3, ease: "power2.in" }, D - 0.299);
+      window.__timelines["stage-base"] = tl;
+    </script>
+  </body>
+</html>

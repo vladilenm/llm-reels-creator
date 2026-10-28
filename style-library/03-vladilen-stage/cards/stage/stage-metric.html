@@ -1,0 +1,91 @@
+<!doctype html>
+<!--
+  STAGE · metric · одна большая цифра с подписью
+  Слоты: kicker, tag, value (до 8 знаков: число с приставкой или единицей, считается от нуля), label, note, source.
+  Цифра только настоящая: она звучит в речи или стоит в фактах проекта; источник подписывается в source.
+  Если цифра условная, в tag ставится «ИЛЛЮСТРАЦИЯ». Акцент один: цифра.
+-->
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="../../tokens.css" />
+    <link rel="stylesheet" href="stage.css" />
+    <style>
+      #stage-metric .metric { width: 1400px; height: 760px; justify-content: space-between; }
+      #stage-metric .figure { flex: 1; display: flex; flex-direction: column; justify-content: center; gap: var(--space-3); min-width: 0; }
+      #stage-metric .value {
+        display: block; white-space: nowrap;
+        font-family: var(--font-mono); font-weight: var(--wt-label); font-variant-numeric: tabular-nums;
+        font-size: calc(var(--size-display) * 2); line-height: 1.25; letter-spacing: -0.02em; word-spacing: -0.4em; color: var(--accent-text);
+      }
+      #stage-metric .figure .rule { width: 100%; }
+      #stage-metric .label { font-size: var(--size-key); font-weight: var(--wt-title); line-height: var(--lh-key); color: var(--ink); }
+      #stage-metric .figure .note { font-size: var(--size-body); }
+      #stage-metric .source {
+        font-family: var(--font-mono); font-weight: var(--wt-label); font-size: var(--size-label); line-height: var(--lh-label);
+        letter-spacing: var(--ls-label); text-transform: uppercase; color: var(--ink-subtle);
+      }
+    </style>
+  </head>
+  <body>
+    <div id="stage-metric" class="stage" data-composition-id="stage-metric" data-start="0" data-width="1920" data-height="1080" data-duration="8">
+      <div class="glow"></div>
+      <div class="grid"></div>
+      <div class="dock" data-role="face-dock">лицо</div>
+      <div class="scene-content">
+        <section class="card metric">
+          <div class="row">
+            <div class="kicker" data-slot="kicker">09 / ЦИФРА</div>
+            <div class="tag" data-slot="tag">ИЛЛЮСТРАЦИЯ</div>
+          </div>
+          <div class="figure">
+            <div class="value" data-slot="value" data-at="0.6">12 %</div>
+            <div class="rule"></div>
+            <div class="label" data-slot="label" data-at="1.6">Подпись к цифре: что именно измерили</div>
+            <p class="note" data-slot="note" data-at="2.6">За какой период и по каким данным</p>
+          </div>
+          <div class="source" data-slot="source">Источник: подпись</div>
+        </section>
+      </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <script>
+      window.__timelines = window.__timelines || {};
+      const root = document.getElementById("stage-metric");
+      const D = parseFloat(root.dataset.duration) || 8;
+      const at = (el, d) => (el.dataset.at !== undefined ? parseFloat(el.dataset.at) : d);
+      const card = root.querySelector(".card");
+      const value = root.querySelector('[data-slot="value"]');
+      const label = root.querySelector('[data-slot="label"]');
+      const note = root.querySelector('[data-slot="note"]');
+      const source = root.querySelector('[data-slot="source"]');
+      const rule = root.querySelector(".rule");
+      // длинное значение ужимается по шагам, пока не поместится в строку (результат один и тот же при каждом запуске)
+      const finalText = value.textContent.trim();
+      let size = parseFloat(getComputedStyle(value).fontSize);
+      while (value.scrollWidth > value.clientWidth + 1 && size > 96) { size -= 8; value.style.fontSize = size + "px"; }
+      // число считается от нуля до значения; без числа в тексте цифра просто появляется
+      const m = finalText.match(/^([^\d]*)(\d+(?:[.,]\d+)?)([\s\S]*)$/);
+      const tl = gsap.timeline({ paused: true });
+      tl.fromTo(card, { opacity: 0, y: 40, filter: "blur(12px)" }, { opacity: 1, y: 0, filter: "blur(0px)", duration: 0.6, ease: "power4.out" }, 0.1)
+        .fromTo(root.querySelector(".kicker"), { opacity: 0, y: 24 }, { opacity: 1, y: 0, duration: 0.5, ease: "expo.out" }, 0.3)
+        .fromTo(value, { opacity: 0, y: 24 }, { opacity: 1, y: 0, duration: 0.6, ease: "expo.out" }, at(value, 0.6))
+        .fromTo(rule, { scaleX: 0 }, { scaleX: 1, duration: 0.8, ease: "power2.inOut" }, at(value, 0.6) + 0.2)
+        .fromTo(label, { opacity: 0, y: 24 }, { opacity: 1, y: 0, duration: 0.6, ease: "power3.out" }, at(label, 1.6))
+        .fromTo(note, { opacity: 0, y: 16 }, { opacity: 1, y: 0, duration: 0.5, ease: "sine.inOut" }, at(note, 2.6))
+        .fromTo(source, { opacity: 0 }, { opacity: 1, duration: 0.5, ease: "sine.inOut" }, at(note, 2.6) + 0.3);
+      if (m) {
+        const target = parseFloat(m[2].replace(",", "."));
+        const dec = (m[2].split(/[.,]/)[1] || "").length;
+        const sep = m[2].includes(",") ? "," : ".";
+        const obj = { v: 0 };
+        const render = () => { value.textContent = m[1] + obj.v.toFixed(dec).replace(".", sep) + m[3]; };
+        render();
+        tl.to(obj, { v: target, duration: 1.4, ease: "power3.out", onUpdate: render }, at(value, 0.6));
+      }
+      tl.to(card, { opacity: 0, y: -160, filter: "blur(24px)", duration: 0.3, ease: "power2.in" }, D - 0.299);
+      window.__timelines["stage-metric"] = tl;
+    </script>
+  </body>
+</html>
