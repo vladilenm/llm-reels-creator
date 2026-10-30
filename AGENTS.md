@@ -162,6 +162,9 @@ No ГЕЙТ A or B; scripts in `scripts/ru/wide/`.
 по принципам») checks the script against `reel-remake/references/script-principles.md`:
 a verdict per principle (уместно / спорно / не здесь) and numbered edits in `PRINCIPLES.md`.
 Apply only the edits the customer picks; never invent a number to make a line specific.
+`--audiences "<group>; <group>"` (on `/remake-fast`; off by default, or «под несколько аудиторий») makes one
+reel per target group from one take: an opening per audience over one shared body, reel projects
+`<date>-<slug>-a|b|c`. The groups and angles come from the customer; not every reel gets variants.
 
 - Before creative work read `brand/brand.md`, `lessons.md`, `refs/NOTES.md`,
   `MOTION_PHILOSOPHY.md`.

@@ -36,6 +36,7 @@ GRID_STEP, GRID_A, DRIFT = 84, 0.10, 6.0         # шаг сетки, её не�
 GRAIN, HALO = 2.5, 0.55                          # зерно (σ, уровни), сила контрового света
 INK_DARK = np.array((0x17, 0x14, 0x1C), np.float32)
 SHADOW, MISS_MAX, REACH = 0.35, 0.05, 3           # тень на светлом акценте; доля кадров без маски до стопа; поиск соседа ±3
+TOP_ROWS = 4                                     # верхние ряды маски, где Vision метит кромку карточки (everything-claude, free-llm-apis)
 PW, PH = round(CW * S), round(CH * S)
 PX, PY = round(540 + S * (CX0 - 540)), round(1920 + S * (CY0 - 1920))
 
@@ -241,6 +242,10 @@ def prep(P, F):
     subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", str(clean), "-vf", f"fps={F:g},crop={CW}:{CH}:{CX0}:{CY0}",
                     "-start_number", "0", str(fr / "%05d.png")], check=True)
     subprocess.run(["swift", str(ROOT / "scripts/ru/fx/person-mask.swift"), str(fr), str(out)], check=True)
+    for f in out.glob("*.png"):                     # Vision берёт светлую верхнюю кромку карточки за человека: на ночном фоне это
+        m = np.asarray(Image.open(f).convert("L")).copy()   # линия во всю ширину над головой. Верхние ряды — не выше пятого:
+        m[:TOP_ROWS] = np.minimum(m[:TOP_ROWS], m[TOP_ROWS + 1][None, :])   # волосы у края остаются, кромка уходит
+        Image.fromarray(m).save(f)
     got, total = len(list(out.glob("*.png"))), len(list(fr.glob("*.png")))
     print(f"→ {out.relative_to(P.parents[1])}: {got} масок из {total} кадров" + (f" · ⚠ без маски {total - got}: там спикера не будет" if got < total else ""))
 

@@ -1,6 +1,6 @@
 ---
 name: remake-fast
-description: Use for /remake-fast and whenever Vladilen drops someone else's reel and wants the short cycle — «закину рилс, сразу дай что говорить и что доснять», «сделай превью», «ускорить цикл ремейка». Also when he says he has shot the lines and recordings for a fast remake («снял», «закинул ролики»), or answers «да» / «ок» / правки on a fast-remake preview.
+description: Use for /remake-fast and whenever Vladilen drops someone else's reel and wants the short cycle — «закину рилс, сразу дай что говорить и что доснять», «сделай превью», «ускорить цикл ремейка». Also when he says he has shot the lines and recordings for a fast remake («снял», «закинул ролики»), or answers «да» / «ок» / правки on a fast-remake preview. Also for one reel's content shot for several target groups («под три аудитории», «варианты для маркетологов и предпринимателей», --audiences).
 ---
 
 # remake-fast
@@ -11,10 +11,12 @@ decided by Claude under the usual rules. The only other reason to stop is a bloc
 nothing can work around: an unusable transcript, a missing API key, no take in the footage.
 
 ```
-/remake-fast <reference> [— brief] [--principles]  → F1: text to say + what to record → stop «снимай»
+/remake-fast <reference> [— brief] [--principles] [--audiences "<group>; <group>"]  → F1: text to say + what to record → stop «снимай»
 /remake-fast <remake project>                       → F2: footage → preview → stop «ок или правки?»
 «ок» / «да» on the preview                          → F3: final + ×F + Instagram caption
 ```
+
+`--audiences` (off by default) makes one reel per target group from one take — see «Several audiences» below.
 
 Engines: `reel-remake` (R0–R3) and `vladilen-reels` (S0–S8). Read both SKILL.md files and run
 their commands; this skill decides where they stop. Rule priority is unchanged (customer's
@@ -139,6 +141,40 @@ answer. Only true facts. Then `vladilen-reels` S8 (lessons, `log-run.mjs`); its 
 into the final report and do not hold the final.
 
 CC BY music: `node scripts/ru/music-pick.mjs <reel> --credit` appends the author line to `CAPTION.md` (CC0 adds nothing).
+
+## Several audiences (`--audiences`, off by default)
+
+Customer, 2026-10-30: «Мы не будем это делать для всех роликов, но мне нужно иметь опцию, что мы будем делать один
+и тот же контент под разные целевые группы». On with the flag or when he asks in words («под три аудитории», «сделай
+варианты для маркетологов и предпринимателей»). The groups and the angle for each come from him (flag, brief or
+message); an opening he dictates is his text, edited only for facts. No groups named → propose 2–3 for the topic in
+the F1 hand-over, marked as a proposal, with openings written for them; he changes them before shooting.
+Reference run: free-llm-apis v2 (remake `2026-10-26-remake-free-llm-apis`, reels `2026-10-30-free-llm-apis-a|b|c`).
+
+**F1.** One shared body, one opening per audience; the rest of F1 is unchanged.
+- `SAY.md` gets `## Начала` above `## Тело`: one opening per audience, letters A, B, C… in his order, each with its
+  frame-0 title («Кадр 0, титр: …»). An opening is one or two sentences: the audience call-out («Если ты маркетолог
+  и …»), that group's pain made sharper («при этом каждый сценарий жрёт токены, а …»), the hook «я нашёл, как …, а в
+  конце скажу …». The pain must be true for that group; no invented numbers.
+- The body never names an audience, and its ending pays off every opening's promise (one CTA for all). A promise
+  that needs its own ending means the body is not shared — say so in the hand-over.
+- `SHOOT.md`: one take — all openings in a row with a 2 s pause between them (a slip → that opening again), then the
+  body once.
+
+**F2.** One reel project per audience from the same take: `intake.mjs <take> --slug <slug>-a …`, `-b`, `-c`
+(transcription is cached by SHA-256 — paid once). Each project's `work/cuts.manual.json` keeps its own opening (the
+last complete take) and cuts the other openings; the body cuts are the same in every project — decide them once and
+copy. One generator for all: `<project a>/broll/gen.mjs`, run as `node <it> <project> <letter>`; the variant config
+holds only what differs (title, hero object, pain objects and their words), and body scenes look their words up after
+the first body word, so each project's own whisper times fit. Night base, sound and captions run per project; the
+same music track, SFX events and speed F in every variant — the test compares openings, nothing else. S6 checks every
+opening and its join into the body; the body once.
+The preview stop shows all variants at once: a table (variant · audience · ×F length · length) with the paths, what
+differs in each opening, the first variant's `MOTION.md` table plus the opening rows of the others, one sound line.
+Corrections may name a variant («в B поменяй …»); a body correction goes into every project.
+
+**F3.** Final and ×F for every variant; a `CAPTION.md` per variant — the same CTA line and facts, the first paragraph
+for that audience, its own closing question. S8: one `lessons.md` entry for the run, one `log-run.mjs` line per variant.
 
 ## Report lines
 

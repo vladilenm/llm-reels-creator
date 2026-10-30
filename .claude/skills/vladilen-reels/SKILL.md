@@ -140,6 +140,10 @@ With `--review-cuts`: show `CUTS.md` and wait before building. Check: no kept
 gap > 0.6 s, no cut inside a word, the first word survives, and **frame 0 is the first word** with the
 eyes open — no silent lead-in (youtube-skills, geo-sleuth, voice-studio). Read the envelope around every
 manual cut (`work/env10ms.npy`) before trusting a word edge.
+**Sibilant tails** (folded 2026-10-30 from free-llm-apis v1 and v2: «остановились» → «остановили», «месяц» →
+«меся»): the envelope hears a quiet с / сь / ц / ч / ш / щ / ть as silence, so `env-cuts.py` starts the cut inside the
+word. After `env-cuts.py`, check every cut that starts right after such an ending by high-frequency energy (above
+4 kHz, 10 ms steps) and move its start past the tail in `work/cuts.approved.json` before `build-edl.mjs`.
 
 ### S3 Драматургия — ГЕЙТ B, always stop
 
@@ -203,7 +207,8 @@ and accents: `OK.run` (`scripts/ru/broll/object-scene.js`, schema in its header)
 from `OK.box/cyl/disc/face/plate/circ` in the same style; reusable → add it to `object-kit.js` with a `checkObjects`
 test. Accents are full `OK.run` layers listed in `work/accents.json` (`kind: night | light`; schema in the header of `night_base.py`), not in `broll/plan.json`;
 a light full insert carries `theme: "light"` in `broll/plan.json`. Joins: full clips and panels butt (out = the next
-in); a full clip that follows a frame with the speaker starts its entry 0.08–0.1 s before the cut. Lines ≥ 3 px,
+in); `assemble.mjs` shows each clip on [in, out), so a butt join never shows two clips on one frame and generators need
+no −4 ms trim (folded 2026-10-30 from fake-customers and free-llm-apis); a full clip that follows a frame with the speaker starts its entry 0.08–0.1 s before the cut. Lines ≥ 3 px,
 labels ≥ 30 px, entries expo-out 0.6–0.9 s, exits 0.3–0.4 s, no bouncing springs.
 
 - `full` → opaque clip, render to `.mp4`.
@@ -305,7 +310,7 @@ location change. Propose them in the S3 plan as `fx` events.
 **OBS-template takes** (1080×1920 from his OBS scene: placeholders on top, the camera as a rounded card
 from y 1098). The base is `python3 scripts/ru/wide/obs_base.py $P [--mix]` — brand canvas, the card as
 recorded, punch-ins 1.00 ↔ 1.07 on the joins — not `fx_picture.py`.
-With `look: "night"` the base is `python3 scripts/ru/wide/night_base.py $P --prep` (Vision masks for the whole reel; chair or clutter at the shoulder: skip `--prep`, use `--card`; `--allow-missing` only when you know why masks are missing) →
+With `look: "night"` the base is `python3 scripts/ru/wide/night_base.py $P --prep` (Vision masks for the whole reel; chair or clutter at the shoulder: skip `--prep`, use `--card`; `--allow-missing` only when you know why masks are missing; `--prep` clamps the top 4 mask rows to the 5th, because Vision takes the card's light top edge for the person and it shows as a line over the head — folded 2026-10-30 from everything-claude and free-llm-apis, no hand fix needed) →
 `--stills <t,…>` (check the mask edges, the halo, every accent) → `--mix`: the night background drawn in code, the
 speaker by the mask ×1.1 from the bottom with a halo (a soft shadow on light accents), punch-ins 1.00 ↔ 1.05 on the
 joins, accents from `work/accents.json` under him — the word is always behind the head. `obs_base.py` and `obs_swaps.py`

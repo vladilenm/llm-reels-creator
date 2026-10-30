@@ -14,8 +14,8 @@
 //                     (file paths relative to broll/; missing plan = no B-roll)
 //   renders/kit/captions.mov  (optional; ProRes 4444 with alpha from make-captions.mjs)
 //
-// Full-frame clips replace the picture for [in, out]; panels and captions are
-// alpha overlays. Hard cuts, original audio, the clip holds its last frame if
+// Full-frame clips replace the picture for [in, out) — a clip that ends where the next
+// begins never shares a frame with it; panels and captions are alpha overlays. Hard cuts, original audio, the clip holds its last frame if
 // its slot is longer (same contract as motion-broll's composite.py).
 
 import { spawnSync } from "node:child_process";
@@ -61,7 +61,7 @@ export function composite(project, out, { scale = 1, video } = {}) {
   plan.clips.forEach((c, i) => {
     const k = i + 1;
     f.push(`[${k}:v]scale=${W}:${H},format=yuva444p,tpad=stop_mode=clone:stop_duration=30,setpts=PTS-STARTPTS+${c.in}/TB[c${k}]`);
-    f.push(`[${last}][c${k}]overlay=0:0:enable='between(t,${c.in},${c.out})':eof_action=pass[b${k}]`);
+    f.push(`[${last}][c${k}]overlay=0:0:enable='gte(t,${c.in})*lt(t,${c.out})':eof_action=pass[b${k}]`);
     last = `b${k}`;
   });
   if (existsSync(captions)) {
