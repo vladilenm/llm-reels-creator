@@ -7,20 +7,26 @@
 
   python3 scripts/ru/wide/night_base.py <project> --prep            кадры карточки → fx/masks (Vision)
   python3 scripts/ru/wide/night_base.py <project> --stills 0.5,6.2  → review/night-<t>.png
-  python3 scripts/ru/wide/night_base.py <project> [--card] [--mix]  → renders/picture.base.mp4 [+ renders/picture.mp4 со звуком fx/mix.wav]
+  python3 scripts/ru/wide/night_base.py <project> [--card] [--mix] [--until 20.66]  → renders/picture.base.mp4 [+ renders/picture.mp4 со звуком fx/mix.wav]
+  --until: база только до этого времени чистого таймлайна (кусок ролика)
   --card: без маски — карточка камеры на ночном фоне с тонкой светлой рамкой (кресло или мебель у плеча)
   --tag v2: вариант рядом с утверждённым — renders/picture.base.v2.mp4, picture.v2.mp4 (звук fx/mix.v2.wav)
   --allow-missing: не останавливаться, если больше 5 % кадров без своей маски (по умолчанию это стоп: маски от другой версии ролика)
 
 work/accents.json: {"accents": [{"id", "in", "out", "kind": "night" | "light", "file"}]} — время чистого таймлайна,
 kind "light" — светлый акцент: за спикером мягкая нейтральная тень вместо фиолетового ореола.
-file — полный слой .mp4 (OK.run mode 'full') от корня проекта; в broll/plan.json эти клипы не попадают."""
+file — полный слой .mp4 (OK.run mode 'full') от корня проекта; в broll/plan.json эти клипы не попадают.
+
+fx/fx.json "cine": true (только с маской; дизайн docs/superpowers/specs/2026-10-26-night-cine-slice-design.md) — кино-слой
+scripts/ru/wide/cine.py: планы спикера из work/shots.json со смазом на проездах, наезды только в mid, грейд, свет фона на
+краях, свет за плечами едет со спикером, ключ со стороны графики, вспышка ореола на ночных акцентах; зерна в базе нет — его даёт финиш assemble.mjs."""
 import json, os, shutil, subprocess, sys, pathlib, tempfile
 import numpy as np
 from PIL import Image, ImageDraw, ImageFilter
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 from common import project, fps, joins, CARD
+import cine
 
 ROOT = pathlib.Path(__file__).resolve().parents[3]
 W, H = 1080, 1920
@@ -55,16 +61,43 @@ def grid_alpha():
     return a
 
 
+def glow_top():
+    """свечение сверху (g2 из glow()) поверх тёмного фона — без пятна за плечами: оно в кино-режиме ездит за спикером"""
+    yy, xx = np.mgrid[0:H, 0:W].astype(np.float32)
+    g2 = np.exp(-(((xx - 540) / 700) ** 2 + ((yy + 120) / 520) ** 2)) * .35
+    return DARK[None, None] + g2[..., None] * (ACCENT_L - DARK) * .16
+
+
 GLOW, GRID = glow(), grid_alpha()
+GLOW_TOP = glow_top()
+G1_COL = np.exp(-(((np.arange(H, dtype=np.float32) - 1900) / 700) ** 2))[:, None]     # g1 по y: одна колонка на все кадры
+G1_K = (ACCENT - DARK) * .55                                                          # сила пятна за плечами по каналам
+X_AXIS = np.arange(W, dtype=np.float32)
 
 
-def night_bg(f, fps_):
-    """ночной фон кадра f: свечение, сетка с плавным дрейфом вверх (доли пикселя — смесь соседних сдвигов), зерно"""
+def grid_over(glow_, f, fps_):
+    """сетка с плавным дрейфом вверх (доли пикселя — смесь соседних сдвигов) поверх свечения glow_ (H×W×3);
+    общая для night_bg и night_bg_at, чтобы сетка у них не разошлась"""
     off = f / fps_ * DRIFT
     o0, fr = int(off) % GRID_STEP, off - int(off)
     a = (GRID[o0:o0 + H] * (1 - fr) + GRID[o0 + 1:o0 + 1 + H] * fr)[..., None]
-    bg = GLOW * (1 - a) + ACCENT_L[None, None] * a
-    return bg + np.random.default_rng(f).normal(0, GRAIN, (H, W, 1)).astype(np.float32)
+    return glow_ * (1 - a) + ACCENT_L[None, None] * a
+
+
+def night_bg(f, fps_, grain=True):
+    """ночной фон кадра f: свечение, сетка с плавным дрейфом вверх, зерно
+    (grain=False — без зерна: в кино-режиме его даёт финиш кадра)"""
+    bg = grid_over(GLOW, f, fps_)
+    return bg + np.random.default_rng(f).normal(0, GRAIN, (H, W, 1)).astype(np.float32) if grain else bg
+
+
+def night_bg_at(f, fps_, dx):
+    """ночной фон кино-режима, без зерна: как night_bg(grain=False), но свет «за плечами» (g1) стоит в x = 540 + dx —
+    там, где сейчас спикер (dx — сдвиг плана, cine.state(...)[1]); свечение сверху и сетка на месте. g1 — внешнее
+    произведение готовой колонки по y и строки по x, поэтому кадр стоит несколько мс"""
+    row = np.exp(-(((X_AXIS - np.float32(540 + dx)) / 620) ** 2))
+    g1 = G1_COL * row[None, :]
+    return grid_over(GLOW_TOP + g1[..., None] * G1_K, f, fps_)
 
 
 def halo(m):
@@ -127,8 +160,10 @@ def card_over(bg, fr):
 
 
 def compose(fr, f, ctx):
+    if ctx.get("cine"): return compose_cine(fr, f, ctx)
     acc, kind = ctx["accent"](f)
     bg = acc.astype(np.float32) if acc is not None else night_bg(f, ctx["fps"])
+    bg = ctx["back"](f, bg)
     if ctx["card"]: return card_over(bg, fr)
     seg = sum(1 for r in ctx["toggles"] if f >= r)
     sc = 1.0 if (ctx["toggles"] and f >= ctx["toggles"][-1]) else (1.0, PUNCH)[seg % 2]
@@ -146,6 +181,63 @@ def compose(fr, f, ctx):
     else:
         h = halo(m)[..., None]; bg = bg * (1 - h) + ACCENT_L[None, None] * h
     out = bg * (1 - m[..., None]) + np.asarray(lay, np.float32) * m[..., None]
+    return np.clip(out, 0, 255).astype(np.uint8)
+
+
+def mid_punch(f, ctx):
+    """наезд в mid на кадре f: чётность склеек с конца последнего завершённого проезда (в mid входим без наезда);
+    после последней склейки — 1,0, как в compose"""
+    F, sh, tg = ctx["fps"], ctx["shots"], ctx["toggles"]
+    if tg and f >= tg[-1]: return 1.0
+    since = max([round((at + dur) * F) for at, _, dur in sh if round((at + dur) * F) <= f] or [0])
+    return (1.0, PUNCH)[sum(1 for r in tg if since <= r <= f) % 2]
+
+
+def punch_cine(f, ctx):
+    """наезд в кино-режиме: в mid — по склейкам (mid_punch); на проезде из mid наезд уходит в 1,0 вместе с проездом
+    (expo-out), без скачка на первом кадре; в остальных планах — 1,0"""
+    F, sh = ctx["fps"], ctx["shots"]; t = f / F
+    for at, _, dur in sh:
+        if dur > 0 and at <= t < at + dur:
+            s0, dx0, _ = cine.state(sh, at - 1e-6)
+            if abs(s0 - 1) > 1e-6 or abs(dx0) > 1e-6: return 1.0
+            p0 = mid_punch(round(at * F) - 1, ctx)
+            return 1 + (p0 - 1) * (1 - cine.ex((t - at) / dur))
+    s, dx, _ = cine.state(sh, t)
+    if abs(s - 1) > 1e-6 or abs(dx) > 1e-6: return 1.0
+    return mid_punch(f, ctx)
+
+
+def compose_cine(fr, f, ctx):
+    """кадр кино-режима: фон (акцент или ночь без зерна, свет за плечами — в x спикера) и back-клипы; спикер в плане work/shots.json — на проезде
+    среднее 4 положений затвора; грейд на карточке до трансформации, края карточки в ноль, свет фона на краях, ключ,
+    ореол со вспышкой (на светлом акценте — тень)"""
+    F, sh = ctx["fps"], ctx["shots"]; t = f / F
+    acc, kind = ctx["accent"](f)
+    bg = acc.astype(np.float32) if acc is not None else night_bg_at(f, F, cine.state(sh, t)[1])   # свет за плечами едет со спикером
+    bg = ctx["back"](f, bg)
+    pr = Image.fromarray(cine.grade(np.asarray(person_rgb(fr), np.float32)).astype(np.uint8)).resize((PW, PH), Image.BICUBIC)
+    pm = mask_at(ctx["masks"], f, ctx["cuts"]).resize((PW, PH), Image.BICUBIC)
+    lay, lm = Image.new("RGB", (W, H)), Image.new("L", (W, H), 0)
+    lay.paste(pr, (PX, PY)); lm.paste(pm, (PX, PY))
+    sc = punch_cine(f, ctx)
+    ts = [t + d for d in cine.shutter(F)] if cine.moving(sh, t) else [t]
+    acc_rgb, acc_m = np.zeros((H, W, 3), np.float32), np.zeros((H, W), np.float32)
+    for ti in ts:
+        s, dx, _ = cine.state(sh, ti)
+        A = cine.affine(s, dx, sc, ANCHOR)
+        mi = np.asarray(lm.transform((W, H), Image.AFFINE, A, resample=Image.BICUBIC), np.float32) / 255
+        mi = cine.feather(mi, *cine.card_edges(s, dx, PX, PW))
+        acc_rgb += np.asarray(lay.transform((W, H), Image.AFFINE, A, resample=Image.BICUBIC), np.float32) * mi[..., None]
+        acc_m += mi
+    m = acc_m / len(ts)
+    rgb = acc_rgb / len(ts) / np.maximum(m, 1e-4)[..., None]
+    rgb = cine.key(cine.wrap(rgb, m, bg), m, cine.state(sh, t)[2])
+    if kind == "light":
+        h = shadow(m)[..., None]; bg = bg * (1 - h) + INK_DARK[None, None] * h
+    else:
+        h = np.clip(halo(m) * cine.pulse(t, ctx["night_starts"]), 0, 1)[..., None]; bg = bg * (1 - h) + ACCENT_L[None, None] * h
+    out = bg * (1 - m[..., None]) + rgb * m[..., None]
     return np.clip(out, 0, 255).astype(np.uint8)
 
 
@@ -175,32 +267,32 @@ def frame_count(path, fps_):
     raise SystemExit(f"ffprobe не назвал длительность видеопотока {path}")
 
 
-def frames(path, fps_):
+def frames(path, fps_, ch=3):
     """кадры файла по одному; ffmpeg завершился с ошибкой — SystemExit с его последними строками (обрезанный дубль не
-    молчит). Читатель, которого бросили, не дочитав, убивается."""
+    молчит). Читатель, которого бросили, не дочитав, убивается. ch 4 — RGBA (слои с альфой)."""
     err = tempfile.TemporaryFile()
     p = subprocess.Popen(["ffmpeg", "-v", "error", "-i", str(path), "-vf", f"fps={fps_:g},scale={W}:{H}", "-f", "rawvideo",
-                          "-pix_fmt", "rgb24", "-"], stdout=subprocess.PIPE, stderr=err)
-    n, ended = W * H * 3, False
+                          "-pix_fmt", "rgba" if ch == 4 else "rgb24", "-"], stdout=subprocess.PIPE, stderr=err)
+    n, ended = W * H * ch, False
     try:
         while True:
             b = p.stdout.read(n)
             if len(b) < n: ended = True; break
-            yield np.frombuffer(b, np.uint8).reshape(H, W, 3)
+            yield np.frombuffer(b, np.uint8).reshape(H, W, ch)
     finally:
         if not ended: p.kill()
         p.stdout.close(); rc = p.wait()
     if rc != 0: raise SystemExit(f"ffmpeg не смог прочитать {path} (код {rc}):\n{tail(err)}")
 
 
-def grab(path, t, last=False):
+def grab(path, t, last=False, ch=3):
     """кадр файла в момент t; last — последний кадр файла (клип короче окна); None — кадра нет"""
     seek = ["-sseof", "-0.3"] if last else ["-ss", f"{max(0.0, t):.4f}"]
     b = subprocess.run(["ffmpeg", "-v", "error", *seek, "-i", str(path), *([] if last else ["-frames:v", "1"]), "-vf", f"scale={W}:{H}",
-                        "-f", "rawvideo", "-pix_fmt", "rgb24", "-"], capture_output=True, check=True).stdout
-    n = W * H * 3
+                        "-f", "rawvideo", "-pix_fmt", "rgba" if ch == 4 else "rgb24", "-"], capture_output=True, check=True).stdout
+    n = W * H * ch
     if len(b) < n: return None
-    return np.frombuffer(b[-n:] if last else b[:n], np.uint8).reshape(H, W, 3)
+    return np.frombuffer(b[-n:] if last else b[:n], np.uint8).reshape(H, W, ch)
 
 
 def accents(P, fps_):
@@ -223,6 +315,42 @@ def accents(P, fps_):
                 return last[i], kind                # клип короче окна — держим его последний кадр
         return None, None
     return at, win
+
+
+def back_clips(P, fps_):
+    """клипы broll/plan.json с "layer": "back" — [(f0, f1, путь)]: они ложатся за спикера (слой .mov с альфой);
+    assemble.mjs их пропускает. Нет файла клипа — SystemExit"""
+    p = P / "broll" / "plan.json"
+    if not p.is_file(): return []
+    raw = [c for c in json.loads(p.read_text()).get("clips", []) if c.get("layer") == "back"]
+    win = [(round(c["in"] * fps_), round(c["out"] * fps_), P / "broll" / c["file"]) for c in raw]
+    gone = sorted({rel(P, path) for _, _, path in win if not path.is_file()})
+    if gone: raise SystemExit("broll/plan.json: нет файлов back-клипов: " + ", ".join(gone))
+    return win
+
+
+def backs(P, fps_, seq=True):
+    """(функция (f, фон) → фон с back-клипами кадра f поверх по альфе, окна). seq — читать кадры по порядку (проход),
+    иначе брать кадр по времени (--stills). Клип короче окна держит последний кадр; back-клипов нет — фон как есть"""
+    win = back_clips(P, fps_)
+    if not win: return (lambda f, bg: bg), win
+    its, last = {}, {}
+    def over(f, bg):
+        for i, (f0, f1, path) in enumerate(win):
+            if not f0 <= f < f1: continue
+            if seq:
+                if i not in its: its[i] = frames(path, fps_, 4)
+                fr = next(its[i], None)
+                if fr is not None: last[i] = fr
+            else:
+                fr = grab(path, (f - f0) / fps_, ch=4)
+                if fr is None: fr = grab(path, 0, last=True, ch=4)
+                if fr is not None: last[i] = fr
+            if i not in last: raise SystemExit(f"{rel(P, path)}: в back-клипе нет кадров")
+            a = last[i][..., 3:4].astype(np.float32) / 255
+            bg = bg * (1 - a) + last[i][..., :3].astype(np.float32) * a
+        return bg
+    return over, win
 
 
 def fresh_dir(d):
@@ -258,15 +386,32 @@ def main():
     clean = P / "renders" / "clean.mp4"
     if not clean.is_file(): raise SystemExit(f"нет {rel(P, clean)}: сначала чистый ролик (S2)")
     card = "--card" in a
+    fxp = P / "fx" / "fx.json"
+    try: fxj = json.loads(fxp.read_text()) if fxp.is_file() else {}
+    except ValueError as e: raise SystemExit(f"fx/fx.json: {e}")
+    if not isinstance(fxj, dict): raise SystemExit("fx/fx.json: нужен объект {…}")
+    cin = fxj.get("cine") is True and fxj.get("look") == "night"   # как readCine в assemble.mjs: нужны "cine": true и "look": "night" (не 1, не "true", без look — выкл)
+    if cin and card: print("⚠ cine работает только с маской: --card собирается как раньше"); cin = False
+    until = None
+    if "--until" in a:
+        try: until = round(float(a[a.index("--until") + 1]) * F)
+        except (IndexError, ValueError): raise SystemExit("--until: нужно время в секундах, например --until 20.66")
+        if until <= 0: raise SystemExit("--until: время должно быть больше нуля")
     masks = {} if card else {int(m.stem): m for m in (P / "fx" / "masks").glob("*.png") if m.stem.isdigit()}
     if not card and not masks: raise SystemExit("нет fx/masks/*.png: запусти --prep или выбери --card")
     accent, win = accents(P, F)
+    shots = cine.load_shots(P / "work" / "shots.json", [(f0 / F, f1 / F) for f0, f1, _, _ in win]) if cin else []
     toggles = []
     for j in joins(P):
         fj = round(j * F)
         if any(f0 / F - 0.3 <= j <= f1 / F + 0.3 for f0, f1, _, _ in win): continue
+        if cin:                                     # наезды — только в mid и не ближе 0,3 с к проезду
+            s, dx, _ = cine.state(shots, j)
+            if abs(s - 1) > 1e-6 or abs(dx) > 1e-6 or cine.moving(shots, j, 0.3): continue
         if not toggles or fj - toggles[-1] >= F: toggles.append(fj)
-    ctx = {"fps": F, "card": card, "masks": masks, "cuts": {round(j * F) for j in joins(P)}, "toggles": toggles, "accent": accent}
+    back, bwin = backs(P, F, seq="--stills" not in a)
+    ctx = {"fps": F, "card": card, "masks": masks, "cuts": {round(j * F) for j in joins(P)}, "toggles": toggles, "accent": accent,
+           "back": back, "cine": cin, "shots": shots, "night_starts": [f0 / F for f0, _, _, k in win if k == "night"]}
     cuts = ctx["cuts"]
     if not card:
         total = frame_count(clean, F)
@@ -301,6 +446,7 @@ def main():
     n, missing = 0, []
     try:
         for f, fr in enumerate(frames(clean, F)):
+            if until is not None and f >= until: break
             if masks and f not in masks: missing.append(f)
             enc.stdin.write(compose(fr, f, ctx).tobytes()); n += 1
             if f % 250 == 0: print(f"  {f}", flush=True)
@@ -316,7 +462,8 @@ def main():
         empty = [f for f in missing if mask_src(masks, f, cuts) is None]
         print(f"⚠ кадров без своей маски: {len(missing)} (первые: {', '.join(map(str, missing[:5]))}) · взяты у соседей: "
               f"{len(missing) - len(empty)} · пустых: {len(empty)}" + (" — на пустых спикера нет, проверь fx/masks" if empty else ""))
-    print(f"→ {base.relative_to(P.parents[1])} · кадров {n} · {'карточка' if card else 'маска'} · наезды {'—' if card else toggles} · акцентов {len(win)}")
+    print(f"→ {base.relative_to(P.parents[1])} · кадров {n} · {'карточка' if card else 'маска'} · наезды {'—' if card else toggles} · "
+          f"акцентов {len(win)} · back-клипов {len(bwin)} · кино {'вкл' if cin else 'выкл'}" + (f" · планов {len(shots)}" if cin else ""))
     if "--mix" in a:
         pic = P / "renders" / f"picture{tag}.mp4"
         subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", str(base), "-i", str(P / "fx" / f"mix{tag}.wav"), "-map", "0:v", "-map", "1:a",
