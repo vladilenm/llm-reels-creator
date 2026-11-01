@@ -67,12 +67,19 @@
 #       for cards. in_from/out_to "face": the shift springs from / back to the normal frame. Keep the
 #       windows clear of titles and world swaps (their masks assume the unmoved speaker).
 #       Masks: --prep-relocate (Apple Vision on full-size frames).
+#   skin: {deshine: 0.8, masks?: "fx/masks/<dir>"}   oily shine on the skin pulled down before anything else
+#       (scripts/ru/fx/deshine.py: only patches brighter AND paler than the skin around; light, shade and
+#       texture stay; 0.8 approved on voice-studio, stronger looks plastic). Kept to the person: `masks`
+#       when given (any person-mask dir, e.g. the relocate one), else an ellipse around the face track,
+#       else the whole frame. Skipped when renders/clean.obs.json says obs_relocate.py already baked it.
 import json, os, subprocess, sys
 import numpy as np
 from PIL import Image, ImageDraw, ImageFilter
 
 W, H, FPS = 1080, 1920, 30
 ROOT = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", ".."))
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from deshine import deshine                                   # noqa: E402
 
 
 def load_brand():
@@ -315,10 +322,21 @@ def load_config(project):
     for R in cfg.get("relocate", []):
         if any(R["t0"] < T["reveal"][1] and T["t0"] < R["t1"] for T in cfg.get("titles", [])):
             errs.append(f"relocate {R['t0']}–{R['t1']} overlaps a title moment")
+    sk = cfg.get("skin") or {}
+    if not 0 <= float(sk.get("deshine", 0) or 0) <= 1: errs.append(f"skin.deshine {sk.get('deshine')}: 0…1 (0.8 approved)")
+    if sk.get("masks") and not os.path.isdir(os.path.join(project, sk["masks"])): errs.append(f"skin.masks: no dir {sk['masks']}")
     for T in cfg.get("titles", []):
         if not (T["t0"] <= T["reveal"][0] < T["reveal"][1]): errs.append(f"title at {T['t0']}: t0 ≤ r0 < r1")
         if not os.path.exists(os.path.join(project, T["layer"])): errs.append(f"missing layer {T['layer']}")
     return cfg, joins, errs
+
+
+def deshine_baked(project):
+    """obs_relocate.py applies fx.json skin.deshine to the card before the cut-out and stamps clean.mp4"""
+    p, clean = os.path.join(project, "renders", "clean.obs.json"), os.path.join(project, "renders", "clean.mp4")
+    if not os.path.exists(p) or not os.path.exists(clean): return False
+    st = json.load(open(p))
+    return float(st.get("deshine", 0) or 0) > 0 and st.get("out_size") == os.path.getsize(clean)
 
 
 # ---------- readers ----------
@@ -457,6 +475,13 @@ class Picture:
         self.blurs = cfg.get("blurs", [])
         self.looks = cfg.get("looks", [])
         self.film_cache = {}
+        sk = cfg.get("skin") or {}
+        self.deshine = float(sk.get("deshine", 0) or 0)
+        self.skin_dir = os.path.join(project, sk["masks"]) if sk.get("masks") else None
+        if self.deshine and deshine_baked(project):
+            print("skin: deshine already baked into renders/clean.mp4 by obs_relocate.py"); self.deshine = 0
+        elif self.deshine and not self.skin_dir and self.face is None:
+            print("skin: no masks and no face track — deshine looks at the whole frame")
         self.relocs = []
         for R in cfg.get("relocate", []):
             d = os.path.join(project, R.get("masks", "fx/masks/relocate"))
@@ -484,6 +509,17 @@ class Picture:
             acc = m * w if acc is None else acc + m * w; wsum += w
         if acc is None: return None
         return Image.fromarray(np.clip(acc / wsum, 0, 255).astype(np.uint8)).filter(ImageFilter.GaussianBlur(1.6))
+
+    # --- skin shine, before the grade and every cut-out ---
+    def skin(self, img, f, t):
+        person = None
+        p = os.path.join(self.skin_dir, f"{f:05d}.png") if self.skin_dir else None
+        if p and os.path.exists(p):
+            person = np.asarray(Image.open(p).convert("L").resize((W, H), Image.BILINEAR), np.float32) / 255
+        elif self.face is not None:                                      # face, forehead and neck
+            fx, fy, fw = self.face_at(t)
+            person = (((self.xx - fx) / (0.9 * fw)) ** 2 + ((self.yy - fy - 0.1 * fw) / (1.3 * fw)) ** 2 < 1).astype(np.float32)
+        return deshine(img, person, self.deshine)
 
     # --- live looks («сделай мрачнее» / «кинематографичнее» / ч/б) ---
     def look_k(self, L, t):
@@ -850,6 +886,7 @@ class Picture:
         return img
 
     def frame(self, img, f, t):
+        if self.deshine: img = self.skin(img, f, t)
         if self.grade: img = self.grade.apply(img, f)
         tm = next((T for T in self.tmasks if T["t0"] <= t < T["t1"]), None)
         if tm:

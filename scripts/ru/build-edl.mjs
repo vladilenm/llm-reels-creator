@@ -12,6 +12,17 @@
 //   --video        assets/raw.mov
 //   --project      video-projects/<slug>   (outputs: EDL.json, CUTS.md,
 //                  transcript.clean.json, renders/clean.mp4, work/cuts.merged.json)
+//   --envelope DB  pauses by the audio envelope of --video, not by whisper words (whisper stretches
+//                  words into silence): 10 ms windows below DB are silence (Vladilen: −55; quiet word
+//                  ends sit at −45…−53). Word edges inside a silence move to it; every pause of at
+//                  least --env-min S (0.12) inside or around a kept piece is cut down to --env-keep S
+//                  (0.05) of silence on each side of speech; an approved cut that enters a word only
+//                  where it is quieter than speech (−35 dB: breaths, clicks, fading tails) trims the
+//                  word instead of snapping back to it (otherwise the snap would return the pause).
+//                  The adjusted words go to work/transcript.words.env.json; the pauses still audible
+//                  at --env-check DB (−42) are listed in work/pauses.remaining.md (+ .json) with ready
+//                  source-time cuts, together with the cut words that never reach speech level
+//                  (whisper put them on a breath or in silence: check them, or the caption loses them).
 //   --no-render    write EDL/CUTS/transcript only
 //   --max-pause S  widen silence cuts so at most S seconds of pause stay between
 //                  two words (55 % after the word, 45 % before the next; head/tail trims untouched)
@@ -82,6 +93,125 @@ export function tightenPauses(cuts, words, maxPause) {
   });
 }
 
+export const SPEECH_DB = -35;   // Vladilen's syllables sit at −18…−31 dB; breaths, clicks and word tails below
+
+// Audio envelope: RMS dB per 10 ms window of 16 kHz mono; silences are runs below thr of ≥ 0.06 s.
+export function envelopeOf(video, thr, win = 0.01) {
+  const r = spawnSync("ffmpeg", ["-v", "error", "-i", video, "-vn", "-ac", "1", "-ar", "16000", "-f", "s16le", "-"], { maxBuffer: 1 << 30 });
+  if (r.status !== 0) throw new Error(`ffmpeg could not decode ${video}`);
+  const b = r.stdout, n = Math.round(16000 * win), count = Math.floor(b.length / 2 / n);
+  const db = new Float32Array(count);
+  for (let k = 0; k < count; k++) {
+    let s = 0;
+    for (let i = k * n; i < (k + 1) * n; i++) { const v = b.readInt16LE(i * 2) / 32768; s += v * v; }
+    db[k] = 10 * Math.log10(s / n + 1e-12);
+  }
+  const sil = [];
+  let st = null;
+  for (let k = 0; k <= count; k++) {
+    const q = k < count && db[k] < thr;
+    if (q && st === null) st = k;
+    if (!q && st !== null) { if ((k - st) * win >= 0.06) sil.push([st * win, k * win]); st = null; }
+  }
+  const maxDb = (a, z) => { let m = -200; for (let k = Math.max(0, Math.floor(a / win)); k < Math.min(count, Math.ceil(z / win)); k++) m = Math.max(m, db[k]); return m; };
+  return { db, win, sil, maxDb };
+}
+
+// Whisper words end or start inside silence: pull those edges to the silence (moves words in place).
+export function pullEdgesToSilence(words, sil) {
+  const inSil = (t) => sil.find(([a, z]) => t > a && t < z);
+  let moved = 0;
+  for (const w of words) {
+    const se = inSil(w.end); if (se && se[0] > w.start) { w.end = +(se[0] + 0.01).toFixed(3); moved++; }
+    const ss = inSil(w.start); if (ss && ss[1] < w.end) { w.start = +(ss[1] - 0.01).toFixed(3); moved++; }
+  }
+  return moved;
+}
+
+// An approved cut that enters a word only where the word is quiet (a breath, a fading tail) trims the
+// word instead of letting snapCutToWords move the cut out of it.
+export function trimQuietEdges(cut, words, quiet) {
+  for (const w of words) {
+    if (cut.start > w.start && cut.start < w.end && quiet(cut.start, w.end)) w.end = cut.start;
+    if (cut.end > w.start && cut.end < w.end && quiet(w.start, cut.end)) w.start = cut.end;
+  }
+  return cut;
+}
+
+// Pauses by the envelope inside the pieces that the other cuts keep: a silence of ≥ min inside a piece
+// keeps `keep` s next to speech on each side; silence at the start or end of a piece (next to a join)
+// is trimmed to `keep`; a piece that is silence only goes. Silence before the first word and after the
+// last one stays with cut-silences and the approved cuts (the head and the tail of the reel).
+export function envelopeCuts(deletes, duration, sil, { min = 0.12, keep = 0.05, first = 0, last = Infinity } = {}) {
+  const keepRanges = [];
+  let cur = 0;
+  for (const d of deletes) { if (d.start > cur) keepRanges.push([cur, d.start]); cur = Math.max(cur, d.end); }
+  if (cur < duration) keepRanges.push([cur, duration]);
+  const out = [], f2 = (x) => x.toFixed(2);
+  for (const [ks, ke] of keepRanges) {
+    for (const [a, z] of sil) {
+      const s = Math.max(a, ks), e = Math.min(z, ke);
+      if (e <= s) continue;
+      const atStart = s <= ks + 1e-6 && ks > 0, atEnd = e >= ke - 1e-6 && ke < duration;
+      if (!(atStart && atEnd) && (e <= first + 0.01 || s >= last - 0.01)) continue;
+      if (atStart && atEnd) out.push({ start: ks, end: ke, reasons: [`огибающая: кусок без речи ${f2(e - s)} с`] });
+      else if (atStart && e - s > keep + 0.02) out.push({ start: ks, end: e - keep, reasons: [`огибающая: тишина после склейки ${f2(e - s)} с → ${f2(keep)} с`] });
+      else if (atEnd && e - s > keep + 0.02) out.push({ start: s + keep, end: ke, reasons: [`огибающая: тишина до склейки ${f2(e - s)} с → ${f2(keep)} с`] });
+      else if (!atStart && !atEnd && s > ks && e < ke && e - s >= min) out.push({ start: s + keep, end: e - keep, reasons: [`огибающая: пауза ${f2(e - s)} с → ${f2(2 * keep)} с`] });
+    }
+  }
+  return out;
+}
+
+// Words never straddle an envelope cut: a start inside it moves after it, an end inside it (or a word
+// spanning it) moves before it. Words left with no length are silence-only and drop out.
+export function fitWordsToCuts(words, cuts) {
+  const dropped = [];
+  for (const w of words) {
+    for (const c of cuts) {
+      if (w.start >= c.start && w.start < c.end) w.start = +c.end.toFixed(3);
+      if (w.end > c.start && w.end <= c.end) w.end = +c.start.toFixed(3);
+      if (w.start < c.start && w.end > c.end) w.end = +c.start.toFixed(3);
+    }
+    if (w.end <= w.start) dropped.push(w.text);
+  }
+  return dropped;
+}
+
+// Pauses still audible at `thr` after the cut (quiet tails and breaths at −46…−53 dB read as a pause):
+// runs ≥ min on the clean timeline, with the source pieces they come from and a cut that keeps `keep`.
+export function remainingPauses(keepRanges, env, words, { thr = -42, min = 0.12, keep = 0.05 } = {}) {
+  const k0 = (t) => Math.round(t / env.win);
+  const rows = [];
+  let clean = 0;
+  for (const { start, end } of keepRanges) {
+    for (let k = k0(start); k < k0(end) && k < env.db.length; k++) rows.push({ src: k * env.win, clean: clean + (k * env.win - start), q: env.db[k] < thr });
+    clean += end - start;
+  }
+  const first = words[0]?.start ?? 0, last = words.at(-1)?.end ?? Infinity;
+  const out = [];
+  for (let i = 0; i < rows.length;) {
+    if (!rows[i].q) { i++; continue; }
+    let j = i;
+    while (j < rows.length && rows[j].q) j++;
+    const a = rows[i], z = rows[j - 1], len = (j - i) * env.win;
+    if (len >= min && a.src > first && z.src + env.win < last) {
+      const pieces = [];
+      for (let k = i; k < j; k++) {
+        if (!pieces.length || Math.abs(rows[k].src - rows[k - 1].src - env.win) > 1e-6) pieces.push({ start: rows[k].src, end: rows[k].src + env.win });
+        else pieces.at(-1).end = rows[k].src + env.win;
+      }
+      const before = [...words].reverse().find((w) => w.end <= a.src + 0.02)?.text ?? "";
+      const after = words.find((w) => w.start >= z.src + env.win - 0.02)?.text ?? "";
+      const r3 = (x) => Math.round(x * 1000) / 1000;
+      const cut = pieces.length === 1 && len - 2 * keep > 0.02 ? { start: r3(pieces[0].start + keep), end: r3(pieces[0].end - keep) } : null;
+      out.push({ clean_start: r3(a.clean), clean_end: r3(z.clean + env.win), len: r3(len), between: `${before} | ${after}`, source: pieces.map((p) => [r3(p.start), r3(p.end)]), cut });
+    }
+    i = j;
+  }
+  return out;
+}
+
 // Sentence case after cuts: «…агентов. агенты берут…» → «…агентов. Агенты берут…».
 export function sentenceCase(words) {
   return words.map((w, i) => {
@@ -116,6 +246,10 @@ function main() {
   const transcript = JSON.parse(readFileSync(resolve(o.transcript), "utf8"));
   const words = transcript.words.filter((w) => (w.type ? w.type === "word" : true));
   const duration = Number(transcript.audio_duration_secs);
+  if (o.envelope && !o.video) throw new Error("--envelope needs --video (the audio is measured there)");
+  const env = o.envelope ? envelopeOf(resolve(o.video), Number(o.envelope)) : null;
+  const envMoved = env ? pullEdgesToSilence(words, env.sil) : 0;
+  const envOpt = { thr: Number(o.envCheck ?? -42), min: Number(o.envMin ?? 0.12), keep: Number(o.envKeep ?? 0.05) };
 
   const silence = o.silenceEdl ? JSON.parse(readFileSync(resolve(o.silenceEdl), "utf8")) : { delete_ranges: [] };
   const silenceCuts = tightenPauses((silence.delete_ranges ?? []).map((d) => ({ start: d.start, end: d.end, reasons: d.reasons ?? [d.reason ?? "silence"] })), words, Number(o.maxPause));
@@ -125,8 +259,12 @@ function main() {
   else if (o.accept === "recommended") approved = acceptedFromCandidates(JSON.parse(readFileSync(resolve(o.candidates), "utf8")));
   else throw new Error("--candidates needs --accept recommended");
 
+  if (env) for (const c of approved) trimQuietEdges(c, words, (x, y) => env.maxDb(x, y) < SPEECH_DB);
   approved = approved.map((c) => snapCutToWords(c, words));
-  const deletes = mergeDeletes([...silenceCuts, ...approved.map((c) => ({ start: c.start, end: c.end, reasons: [c.reason ?? "approved cut"] }))])
+  const asRanges = (cuts) => cuts.map((c) => ({ start: c.start, end: c.end, reasons: [c.reason ?? "approved cut"] }));
+  const envCuts = env ? envelopeCuts(mergeDeletes([...silenceCuts, ...asRanges(approved)]), duration, env.sil, { ...envOpt, first: words[0].start, last: words.at(-1).end }) : [];
+  const envDropped = env ? fitWordsToCuts(words, envCuts) : [];
+  const deletes = mergeDeletes([...silenceCuts, ...envCuts, ...asRanges(approved)])
     .map((d) => ({ ...d, start: Math.max(0, d.start), end: Math.min(duration, d.end) }))
     .filter((d) => d.end > d.start);
   if (o.snapFps) {
@@ -167,9 +305,37 @@ function main() {
     "",
   ].join("\n"));
 
+  let source = resolve(o.transcript), remaining = [], quietCut = [];
+  if (env) {
+    source = join(work, "transcript.words.env.json");
+    writeFileSync(source, JSON.stringify({ ...transcript, envelope: { silence_db: Number(o.envelope), ...envOpt, edges_moved: envMoved, dropped: envDropped } }, null, 1));
+    remaining = remainingPauses(keep, env, words.filter((w) => w.end > w.start), envOpt);
+    quietCut = words.filter((w) => deletes.some((d) => w.start < d.end && d.start < w.end) && env.maxDb(w.start, Math.max(w.end, w.start + 0.01)) < SPEECH_DB)
+      .map((w) => ({ text: w.text, start: w.start, end: w.end, max_db: Math.round(env.maxDb(w.start, Math.max(w.end, w.start + 0.01))) }));
+    writeFileSync(join(work, "pauses.remaining.json"), JSON.stringify({ check_db: envOpt.thr, min: envOpt.min, pauses: remaining, quiet_words_cut: quietCut }, null, 1));
+    writeFileSync(join(work, "pauses.remaining.md"), [
+      `# Паузы после чистки, слышные при ${envOpt.thr} дБ (≥ ${envOpt.min} с)`,
+      "",
+      `Тишина ниже ${o.envelope} дБ уже ужата до ${envOpt.keep} с у речи. Здесь — тихие хвосты и вдохи, которые читаются как пауза.`,
+      "Решение за Claude: резать — добавить `cut` в work/cuts.approved.json (секунды исходника) и пересобрать.",
+      "",
+      "| Чистое время | Длина | Между словами | Исходник | Рез (исходник) |",
+      "|---|---|---|---|---|",
+      ...remaining.map((p) => `| ${p.clean_start.toFixed(2)}–${p.clean_end.toFixed(2)} | ${p.len.toFixed(2)} | ${p.between.replaceAll("|", "/")} | ${p.source.map(([x, y]) => `${x}–${y}`).join(", ")} | ${p.cut ? `${p.cut.start}–${p.cut.end}` : "через склейку: подрезать края"} |`),
+      "",
+      ...(quietCut.length ? [
+        `## Тихие слова в резах (тише ${SPEECH_DB} дБ)`,
+        "",
+        "Whisper поставил их на вдох или в тишину: если слово сказано, поправь его время в transcript.words.json, иначе оно выпадет из субтитров.",
+        "",
+        ...quietCut.map((w) => `- «${w.text}» ${w.start}–${w.end} (макс. ${w.max_db} дБ)`),
+        "",
+      ] : []),
+    ].join("\n"));
+  }
   const merged = join(work, "cuts.merged.json");
   writeFileSync(merged, JSON.stringify({ cuts: edl.delete_ranges.map((d) => ({ start: d.start, end: d.end, reason: d.reasons.join("; ") })) }, null, 2));
-  const args = [APPLY, resolve(o.transcript), "--cuts", merged, "--out-dir", work];
+  const args = [APPLY, source, "--cuts", merged, "--out-dir", work];
   if (o.video) args.push("--video", resolve(o.video), "--output", join(project, "renders/clean.mp4"));
   if (o.video && o.render) args.push("--apply");
   const r = spawnSync(process.execPath, args, { encoding: "utf8" });
@@ -185,7 +351,8 @@ function main() {
     words: sentenceCase(mt.words).map((w) => ({ ...w, type: "word", key: normKey(w.text) })),
   };
   writeFileSync(join(project, "transcript.clean.json"), JSON.stringify(clean, null, 2) + "\n");
-  console.log(JSON.stringify({ cuts: deletes.length, removed: r3(removed), clean_duration: edl.clean_duration, clean_words: clean.words.length, rendered: Boolean(o.video && o.render) }, null, 2));
+  const envReport = env ? { envelope: { silence_db: Number(o.envelope), pause_cuts: envCuts.length, edges_moved: envMoved, dropped_words: envDropped, remaining_pauses: remaining.length, quiet_words_cut: quietCut.map((w) => w.text) } } : {};
+  console.log(JSON.stringify({ cuts: deletes.length, removed: r3(removed), clean_duration: edl.clean_duration, clean_words: clean.words.length, rendered: Boolean(o.video && o.render), ...envReport }, null, 2));
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) main();

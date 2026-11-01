@@ -650,3 +650,126 @@ test("intake --remake refuses a remake without an approved SCRIPT.md", () => {
   assert.match(r.stderr, /no SCRIPT\.md/);
   assert.ok(!existsSync(join(ROOT, "video-projects/1999-01-01-never-created")));
 });
+
+test("build-edl --envelope: pauses cut to the kept silence, word edges pulled, head and tail left alone", async () => {
+  const { envelopeCuts, pullEdgesToSilence, fitWordsToCuts, trimQuietEdges } = await import("../scripts/ru/build-edl.mjs");
+  const words = [{ text: "а", start: 0.5, end: 1.3 }, { text: "б", start: 1.45, end: 2.0 }, { text: "в", start: 3.3, end: 4.0 }];
+  const sil = [[0.0, 0.48], [1.0, 1.5], [2.0, 2.05], [2.6, 3.4], [4.0, 5.0]];
+  assert.equal(pullEdgesToSilence(words, sil), 3);
+  assert.deepEqual(words.map((w) => [w.start, w.end]), [[0.5, 1.01], [1.49, 2.0], [3.39, 4.0]], "ends and starts inside silence move to it");
+  const cuts = envelopeCuts([{ start: 0, end: 0.4 }, { start: 2.5, end: 3.0 }], 5, sil, { min: 0.12, keep: 0.05, first: 0.5, last: 4.0 });
+  assert.deepEqual(cuts.map((c) => [+c.start.toFixed(3), +c.end.toFixed(3)]), [[1.05, 1.45], [3, 3.35]],
+    "inside a piece: keep 0.05 s each side; after a join: trimmed to 0.05 s; short pause, head and tail stay");
+  const w2 = [{ text: "x", start: 1.0, end: 1.2 }, { text: "y", start: 1.3, end: 2.0 }, { text: "z", start: 2.1, end: 2.2 }];
+  assert.deepEqual(fitWordsToCuts(w2, [{ start: 1.1, end: 1.4 }, { start: 2.05, end: 2.3 }]), ["z"], "a word only inside a cut is reported");
+  assert.deepEqual([w2[0].end, w2[1].start], [1.1, 1.4]);
+  const w3 = [{ text: "тихо", start: 5.0, end: 5.6 }, { text: "громко", start: 7.0, end: 7.6 }];
+  trimQuietEdges({ start: 5.4, end: 7.2 }, w3, (a, z) => a >= 5.4 && z <= 5.6);
+  assert.deepEqual([w3[0].end, w3[1].start], [5.4, 7.0], "a quiet tail is trimmed to the cut; a loud head is not");
+});
+
+test("build-edl --envelope: remaining pauses at the check level, with the source pieces and a ready cut", async () => {
+  const { remainingPauses } = await import("../scripts/ru/build-edl.mjs");
+  const db = new Float32Array(500).fill(-25);
+  for (let k = 120; k < 140; k++) db[k] = -48;             // 1.20–1.40: a breath, audible as a pause
+  for (let k = 290; k < 300; k++) db[k] = -50;             // 2.90–3.00 + 4.00–4.05 across a join
+  for (let k = 400; k < 405; k++) db[k] = -50;
+  const env = { db, win: 0.01 };
+  const words = [{ text: "раз", start: 0.1, end: 1.2 }, { text: "два", start: 1.4, end: 2.9 }, { text: "три", start: 4.05, end: 4.9 }];
+  const p = remainingPauses([{ start: 0, end: 3.0 }, { start: 4.0, end: 5.0 }], env, words, { thr: -42, min: 0.12, keep: 0.05 });
+  assert.equal(p.length, 2);
+  assert.deepEqual(p[0].cut, { start: 1.25, end: 1.35 });
+  assert.equal(p[0].between, "раз | два");
+  assert.deepEqual(p[1].source, [[2.9, 3], [4, 4.05]]);
+  assert.equal(p[1].cut, null, "a pause across a join is trimmed at its edges, not with one cut");
+});
+
+test("obs_relocate --detect finds the rounded camera card on a flat canvas, and nothing in a room", { timeout: 120000 }, () => {
+  const d = tmp();
+  const py = `
+import sys, numpy as np
+from PIL import Image, ImageDraw
+d, kind = sys.argv[1], sys.argv[2]
+rng = np.random.default_rng(1)
+for i in range(8):
+    if kind == "obs":
+        im = Image.new("RGB", (1080, 1920), (0xF3, 0xF0, 0xED)); dr = ImageDraw.Draw(im)
+        dr.text((60, 200), "Zagolovok", fill=(20, 20, 20)); dr.rectangle([226, 282, 855, 410], fill=(60, 140, 240))
+        cam = Image.fromarray(rng.integers(20, 120, (825, 989, 3), dtype=np.uint8))
+        m = Image.new("L", (989, 825), 0); ImageDraw.Draw(m).rounded_rectangle([0, 0, 988, 824], radius=79, fill=255)
+        im.paste(cam, (46, 1098), m)
+    else:
+        im = Image.fromarray(rng.integers(40, 200, (1920, 1080, 3), dtype=np.uint8))
+    im.save(f"{d}/{i:03d}.png")
+`;
+  const out = {};
+  for (const kind of ["obs", "room"]) {
+    const fr = join(d, kind); mkdirSync(fr);
+    assert.equal(spawnSync("python3", ["-c", py, fr, kind]).status, 0);
+    const v = join(d, `${kind}.mp4`);
+    assert.equal(spawnSync("ffmpeg", ["-v", "error", "-y", "-framerate", "2", "-i", join(fr, "%03d.png"), "-pix_fmt", "yuv420p", v]).status, 0);
+    const r = spawnSync("python3", [join(ROOT, "scripts/ru/fx/obs_relocate.py"), "--detect", v], { encoding: "utf8" });
+    assert.equal(r.status, 0, r.stderr);
+    out[kind] = JSON.parse(r.stdout);
+  }
+  assert.equal(out.obs.obs, true, JSON.stringify(out.obs));
+  const [x0, y0, x1, y1] = out.obs.card;
+  assert.ok(Math.abs(x0 - 46) <= 1 && Math.abs(y0 - 1098) <= 1 && Math.abs(x1 - 1035) <= 1 && y1 >= 1920, JSON.stringify(out.obs));
+  assert.ok(Math.abs(out.obs.r - 79) <= 3, `r ${out.obs.r}`);
+  assert.equal(out.room.obs, false);
+});
+
+test("deshine pulls a pale bright spot on the skin down and leaves even skin alone", () => {
+  const py = `
+import sys, numpy as np
+sys.path.insert(0, sys.argv[1])
+from PIL import Image
+from deshine import deshine
+ycc = np.zeros((300, 300, 3), np.uint8); ycc[...] = (150, 112, 152)          # warm skin
+yy, xx = np.mgrid[0:300, 0:300]; spot = (yy - 150) ** 2 + (xx - 150) ** 2 < 20 ** 2
+ycc[spot] = (205, 122, 138)                                                   # brighter and paler: shine
+img = Image.fromarray(ycc, "YCbCr").convert("RGB")
+out = np.asarray(deshine(img).convert("YCbCr"), np.float32); src = np.asarray(img.convert("YCbCr"), np.float32)
+print(src[150, 150, 0] - out[150, 150, 0], abs(src[20, 20] - out[20, 20]).max())
+`;
+  const r = spawnSync("python3", ["-c", py, join(ROOT, "scripts/ru/fx")], { encoding: "utf8" });
+  assert.equal(r.status, 0, r.stderr);
+  const [drop, even] = r.stdout.trim().split(/\s+/).map(Number);
+  assert.ok(drop > 15, `the shine is pulled down by ${drop}`);
+  assert.ok(even <= 1, `even skin changes by ${even}`);
+});
+
+test("obs_relocate card look: the build-edl render becomes the source, the canvas covers the template, the card stays", { timeout: 180000 }, () => {
+  const P = tmp();
+  mkdirSync(join(P, "renders")); const fr = join(P, "frames"); mkdirSync(fr);
+  const py = `
+import sys, numpy as np
+from PIL import Image, ImageDraw
+rng = np.random.default_rng(2)
+for i in range(60):
+    im = Image.new("RGB", (1080, 1920), (0xF3, 0xF0, 0xED)); dr = ImageDraw.Draw(im)
+    dr.rectangle([226, 282, 855, 410], fill=(60, 140, 240))
+    cam = Image.fromarray(rng.integers(20, 120, (825, 989, 3), dtype=np.uint8))
+    m = Image.new("L", (989, 825), 0); ImageDraw.Draw(m).rounded_rectangle([0, 0, 988, 824], radius=79, fill=255)
+    im.paste(cam, (46, 1098), m); im.save(f"{sys.argv[1]}/{i:03d}.png")
+`;
+  assert.equal(spawnSync("python3", ["-c", py, fr]).status, 0);
+  const clean = join(P, "renders/clean.mp4");
+  assert.equal(spawnSync("ffmpeg", ["-v", "error", "-y", "-framerate", "30", "-i", join(fr, "%03d.png"), "-f", "lavfi", "-i", "anullsrc=r=48000:cl=mono",
+    "-shortest", "-pix_fmt", "yuv420p", "-c:a", "aac", clean]).status, 0);
+  writeFileSync(join(P, "EDL.json"), JSON.stringify({ source_duration: 3, delete_ranges: [{ start: 1.0, end: 1.2 }] }));
+  const r = spawnSync("python3", [join(ROOT, "scripts/ru/fx/obs_relocate.py"), P, "--jobs", "1"], { encoding: "utf8" });
+  assert.equal(r.status, 0, r.stderr + r.stdout);
+  assert.ok(existsSync(join(P, "renders/clean.source.mp4")), "build-edl's render kept as the source");
+  const st = JSON.parse(readFileSync(join(P, "renders/clean.obs.json"), "utf8"));
+  assert.equal(st.look, "card");
+  assert.deepEqual(st.zoom, [1, 1.07]);
+  const px = spawnSync("python3", ["-c", `
+import subprocess, numpy as np
+b = subprocess.run(["ffmpeg", "-v", "error", "-i", "${clean}", "-frames:v", "1", "-f", "rawvideo", "-pix_fmt", "rgb24", "-"], capture_output=True).stdout
+a = np.frombuffer(b, np.uint8).reshape(1920, 1080, 3).astype(int)
+print(*a[340, 540], *a[1500, 540])`], { encoding: "utf8" });
+  const v = px.stdout.trim().split(/\s+/).map(Number);
+  assert.ok(Math.abs(v[0] - 0xef) < 6 && Math.abs(v[1] - 0xed) < 6 && Math.abs(v[2] - 0xf4) < 6, `template box covered by the canvas: ${v.slice(0, 3)}`);
+  assert.ok(v[3] < 140, `the camera stays in the card: ${v.slice(3)}`);
+});

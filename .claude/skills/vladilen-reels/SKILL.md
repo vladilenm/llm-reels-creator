@@ -79,6 +79,9 @@ Creates the project via `new-video`, copies the source to `assets/raw.*` (the
 original is never touched), writes `PROBE.json`, `BRIEF.md`, `STATUS.md`. Then
 append to `BRIEF.md` 3–6 bullets of what matters from brand/lessons/refs for this
 reel. Deal with PROBE warnings (rotation, VFR, HEVC/HDR) in the plan.
+Check the layout: `python3 scripts/ru/fx/obs_relocate.py --detect <project>/assets/raw.<ext>` — `obs: true`
+means the take was recorded through his OBS scene (flat canvas, rounded camera card at the bottom,
+template placeholders above); note the card in STATUS and plan the OBS pass of S2 (card on canvas).
 
 ### S1 Транскрипция — stop only if the transcript is garbage
 
@@ -145,6 +148,45 @@ manual cut (`work/env10ms.npy`) before trusting a word edge.
 word. After `env-cuts.py`, check every cut that starts right after such an ending by high-frequency energy (above
 4 kHz, 10 ms steps) and move its start past the tail in `work/cuts.approved.json` before `build-edl.mjs`.
 
+**Optional legacy envelope pass in `build-edl` (for projects already using it).**
+The default remains `env-cuts.py` above; do not run both automatic pause passes on the same edit.
+Whisper stretches words into silence, so pauses measured by words stay 0.15–0.6 s. `--envelope -55`
+measures them on the sound: below −55 dB is silence (his quiet word ends are −45…−53 dB, the room
+≈ −60), word edges inside silence move to it, and every pause of ≥ 0.12 s — inside a phrase or at a
+join — keeps 0.05 s of silence on each side of speech. Head and tail stay with cut-silences and your
+decisions (the first frame: eyes open, looking into the lens). Then read `work/pauses.remaining.md`:
+pauses still audible at −42 dB (quiet tails, breaths −46…−53 dB) with a ready source-time cut each —
+cut the ones that read as a pause by adding them to `cuts.approved.json` (reason `вручную: …`) and
+build again; the script trims a word's quiet edge to such a cut instead of snapping back to it.
+«Тихие слова в резах» are words whisper put on a breath or in silence: fix their times in
+`transcript.words.json` if they are said, or they drop out of the captions. Without `--envelope`
+the old word-based pace applies (`--max-pause` only).
+
+**Light-style OBS take** (S0 `obs: true`, or `take.layout: "obs"` from `footage-check.mjs`).
+Night-style remakes keep the `night_base.py` flow in S4b. For the light OBS pass, the default is the card on
+the brand canvas: the placeholders of the OBS template disappear under `canvas`, the camera card stays
+where OBS put it (customer, 2026-10-21, on two reels in a row: «маска работает плохо, она стул мигает,
+очень некрасиво выглядит», «уже больно лагающе выглядит» — the cut-out went back to the card).
+After build-edl:
+
+```bash
+python3 scripts/ru/fx/obs_relocate.py $P --stills 1.0,4.5,10.0   # review/obs-card-*.png first
+python3 scripts/ru/fx/obs_relocate.py $P                         # → renders/clean.mp4 (~1–3 min)
+```
+
+It moves build-edl's `renders/clean.mp4` to `renders/clean.source.mp4`, finds the card on the frames,
+covers everything around it with the canvas, and on every join alternates 1.00/1.07 inside the card
+about a point above the face (the head does not jump on a jump cut; `--zoom-gap 1` for at most one
+change per second when the joins are a few frames apart); the last piece has no zoom. Skin shine: put
+`"skin": {"deshine": 0.8}` into `fx/fx.json` before this pass (see S4b) — the card is then masked with
+Apple Vision (cached in `work/obs/`). What it used is in `renders/clean.obs.json`.
+
+`--look relocate` (him cut out, stretched ×1.1 to the full width, head top at ≈ 59 %, his own room
+blurred and lifted behind him, the top of the head rebuilt where the hair touches the card edge) only
+when the masks hold **in motion**: watch a moving stretch of `--stills` neighbours or a short render —
+no chair back, armrest or other furniture flickering at the shoulders. Even then it is a choice to
+offer on the preview next to the card, never a silent switch.
+
 ### S3 Драматургия — ГЕЙТ B, always stop
 
 Follow `short-form-edit`'s opening rules on the clean transcript:
@@ -198,7 +240,8 @@ cut recordings with `node scripts/ru/broll/screen-frames.mjs <rec> $P/screens/<n
 Light clips are panels (`.mov`), dark ones are `full`. Then render with the engine as usual.
 If the head sits high in the raw (no room above it), put the window phrases into `fx.json`
 `relocate` windows (customer, 2026-10-19: speaker cut out and moved down over his own blurred, lifted
-room) and run `fx_picture.py $P --prep-relocate` first; close-ups stay the plain frame.
+room) and run `fx_picture.py $P --prep-relocate` first; close-ups stay the plain frame. An OBS take is
+prepared whole in S2 (`obs_relocate.py`): no `relocate` windows on top of it.
 
 **Night look** (`look: "night"`): windows `SK.run({theme: 'night', …})` — public pages screenshotted headless with
 Playwright `colorScheme: 'dark'`; glass list and night card; `pull`, `enter: 'grid'`, `layers`, `lens`. Object scenes
@@ -291,6 +334,21 @@ Keep skin natural (`brand.md`): if a shot looks off, lower `match` or `tint`, ne
 the defaults without the customer. `fx_picture.py` prints the per-shot gains and shifts —
 check them. A new look next to an approved one: `fx_picture.py $P --out renders/picture.v2.mp4`,
 then `assemble.mjs $P --final --tag v2` → `renders/final.v2.mp4`; the approved files stay.
+
+**Skin shine (customer, 2026-10-21: «такие блики как-то можно убрать?»).** `"skin": {"deshine": 0.8}`
+pulls down only the patches that are brighter than the skin around them AND paler; light, shade and
+skin texture stay (`scripts/ru/fx/deshine.py`, numpy only). Turn it on when the forehead or nose
+shines or the customer asks; 0.8 is the approved strength — stronger made the face flat and grey.
+`fx_picture.py` applies it first, before the grade and every cut-out, kept to the person by
+`"masks"` (any person-mask dir) or an ellipse around the face track — keep `face.track` on: without
+masks or a track it searches the whole frame (~1 s per frame; with them only the face). On an OBS take `obs_relocate.py`
+already applied it to the card (`renders/clean.obs.json` says so) and
+`fx_picture.py` skips it. Check a still against the raw frame: shine softer, face not plastic.
+
+**OBS take in S4b.** Title masks come from the OBS pass, not from Vision on `clean.mp4`: after adding
+`titles` with `"masks"` to `fx.json`, run `python3 scripts/ru/fx/obs_relocate.py $P --masks` (add
+`--look relocate` if the reel is relocated; there the last piece is always in `fx/masks/cta`). The
+same mask flicker that rules out relocate shows in a title with text behind the head — check it in motion.
 
 **World swap and impact (default since 2026-10-13).** `"world_swap": {"joins": "all", "dur": 0.32}`:
 on each location change (not next to a title moment) the speaker is cut out and stays while
