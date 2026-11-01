@@ -765,10 +765,11 @@ for i in range(60):
   assert.equal(st.look, "card");
   assert.deepEqual(st.zoom, [1, 1.07]);
   const px = spawnSync("python3", ["-c", `
-import subprocess, numpy as np
-b = subprocess.run(["ffmpeg", "-v", "error", "-i", "${clean}", "-frames:v", "1", "-f", "rawvideo", "-pix_fmt", "rgb24", "-"], capture_output=True).stdout
+import sys, subprocess, numpy as np
+b = subprocess.run(["ffmpeg", "-v", "error", "-i", sys.argv[1], "-frames:v", "1", "-f", "rawvideo", "-pix_fmt", "rgb24", "-"], capture_output=True).stdout
 a = np.frombuffer(b, np.uint8).reshape(1920, 1080, 3).astype(int)
-print(*a[340, 540], *a[1500, 540])`], { encoding: "utf8" });
+print(*a[340, 540], *a[1500, 540])`, clean], { encoding: "utf8" });
+  assert.equal(px.status, 0, px.stderr);
   const v = px.stdout.trim().split(/\s+/).map(Number);
   assert.ok(Math.abs(v[0] - 0xef) < 6 && Math.abs(v[1] - 0xed) < 6 && Math.abs(v[2] - 0xf4) < 6, `template box covered by the canvas: ${v.slice(0, 3)}`);
   assert.ok(v[3] < 140, `the camera stays in the card: ${v.slice(3)}`);
