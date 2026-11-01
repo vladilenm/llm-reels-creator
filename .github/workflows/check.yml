@@ -24,7 +24,10 @@ jobs:
         run: python -m pip install numpy pillow
       - name: Install FFmpeg on Linux
         if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+        run: |
+          curl -fsSL https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-n8.1-latest-linux64-gpl-8.1.tar.xz -o "$RUNNER_TEMP/ffmpeg.tar.xz"
+          tar -xJf "$RUNNER_TEMP/ffmpeg.tar.xz" -C "$RUNNER_TEMP"
+          echo "$RUNNER_TEMP/ffmpeg-n8.1-latest-linux64-gpl-8.1/bin" >> "$GITHUB_PATH"
       - name: Install FFmpeg on macOS
         if: runner.os == 'macOS'
         run: command -v ffmpeg || brew install ffmpeg

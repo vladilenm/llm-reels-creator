@@ -874,7 +874,7 @@ print(json.dumps({
   });
 });
 
-test("night_base --prep: stale frames and masks are cleared, a symlinked fx/masks is unlinked and its target is never touched", { timeout: 120000 }, () => {
+test("night_base --prep: stale frames and masks are cleared, a symlinked fx/masks is unlinked and its target is never touched", { skip: process.platform !== "darwin" && "Apple Vision requires macOS", timeout: 120000 }, () => {
   const P = tmp("nb3-");
   for (const d of ["assets", "renders", "work", "fx"]) mkdirSync(join(P, d), { recursive: true });
   writeFileSync(join(P, "PROBE.json"), JSON.stringify({ summary: { fps: 25 } }));
