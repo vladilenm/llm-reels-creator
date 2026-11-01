@@ -10,12 +10,20 @@ import { loadStyle, findChrome } from "../scripts/long/check-stage-cards.mjs";
 import { norm, findPhrase, resolvePlan, validatePlan, sanitizeInline } from "../scripts/long/lib/plan.mjs";
 import { frameWindows, enableExpr, frameEnabled, intersect, fitCrop, buildStageGraph } from "../scripts/long/lib/filter.mjs";
 import { snapFps } from "../scripts/long/lib/verify.mjs";
-import { reviewTimes } from "../scripts/long/stage-assemble.mjs";
+import { reviewTimes, filterFileOption } from "../scripts/long/stage-assemble.mjs";
 import { C, svg, text, icon, W, H } from "../scripts/long/lib/ill.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const STYLE = loadStyle("03-vladilen-stage");
 const FPS = 30;
+
+test("filter files use the current FFmpeg option while supporting older system releases", () => {
+  assert.equal(filterFileOption("ffmpeg version 6.1.1 Copyright"), "-filter_complex_script");
+  assert.equal(filterFileOption("ffmpeg version 7.1 Copyright"), "-/filter_complex");
+  assert.equal(filterFileOption("ffmpeg version 8.1.1 Copyright"), "-/filter_complex");
+  assert.equal(filterFileOption("ffmpeg version 9.0.1 Copyright"), "-/filter_complex");
+  assert.equal(filterFileOption("ffmpeg version N-125000-gabcdef Copyright"), "-/filter_complex");
+});
 
 // 0.3 s per word, 0.3 s between sentences
 function speech(sentences) {

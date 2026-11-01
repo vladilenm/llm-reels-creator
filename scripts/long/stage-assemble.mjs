@@ -29,6 +29,12 @@ import { reviewSheets } from "./lib/review.mjs";
 
 const fmt = (t) => `${Math.floor(t / 60)}:${(t % 60).toFixed(1).padStart(4, "0")}`;
 
+// File arguments use -/ from FFmpeg 7; the old spelling was removed in FFmpeg 9.
+export function filterFileOption(version) {
+  const major = Number(version.match(/^ffmpeg version n?(\d+)\./)?.[1]);
+  return major > 0 && major < 7 ? "-filter_complex_script" : "-/filter_complex";
+}
+
 function parseArgs(argv) {
   const a = { _: [] };
   for (let k = 0; k < argv.length; k++) {
@@ -150,7 +156,9 @@ async function main() {
   // aq-mode=3 gives the dark areas more bits: the stage is a dark radial glow, the case where 8-bit H.264 shows rings
   const enc = mode === "final" ? ["-crf", "17", "-preset", "medium", "-x264-params", "aq-mode=3"] : ["-crf", "26", "-preset", "veryfast"];
   const audio = a.loudnorm ? ["-af", "loudnorm=I=-14:TP=-1.5:LRA=11"] : [];
-  const args = ["-y", "-hide_banner", "-v", "error", "-stats", ...inputs, "-filter_complex_script", script, "-map", "[out]", "-map", "0:a?",
+  const version = spawnSync("ffmpeg", ["-version"], { encoding: "utf8" });
+  if (version.status !== 0) throw new Error(`ffmpeg -version failed: ${version.stderr || version.error?.message}`);
+  const args = ["-y", "-hide_banner", "-v", "error", "-stats", ...inputs, filterFileOption(version.stdout), script, "-map", "[out]", "-map", "0:a?",
     "-c:v", "libx264", ...enc, "-pix_fmt", "yuv420p", "-r", String(fps), "-c:a", "aac", "-b:a", "192k", ...audio, "-t", duration.toFixed(3), "-movflags", "+faststart", outFile];
   console.log(`assembling ${mode} ${out.w}×${out.h}: dock crop ${crop.w}×${crop.h} at ${crop.x},${crop.y}`);
   const t0 = Date.now();
