@@ -48,6 +48,9 @@ Shared constants live in `scripts/ru/wide/common.py`.
 - **Layout** (as approved on `replica` and `anatomy-llm`): light brand canvas; title at y 200 (Golos 56 +
   Spectral italic on the accent plate); window x 540, y 380, w 900, h 480 (canvas 900×428); kinetic
   captions at y 985; the camera card as recorded below — **no person mask** (he rejected masks twice).
+- **Take at a plain wall** (nothing by the shoulder — claude-sfx, he asked for the mask): `obs_base.py --mask`
+  cuts him out onto the canvas without the card (×1.1, shoulders past the edges); swaps go into
+  `fx/swaps.json` (text behind the head, `references/config.md`), not `broll/clips.json`; punch-ins 1.00 ↔ 1.05.
 - **Hook**: the result is on screen at frame 0 (the finished demo, the generated file, the chart),
   title = what was made in plain words from the payoff («Claude нарисовал, / как LLM пишет текст»),
   his first words over it. The payoff phrase later repeats the hook title («В итоге — демка: / как LLM
@@ -130,6 +133,7 @@ layout — end typing shots before it; `SCREEN.md` small events ~2 are sends).
 python3 scripts/ru/fx/sfx.py $P                            # fx/fx.json "sfx" (by t), must print no WARN
 python3 scripts/ru/fx/sound.py $P                          # voice polish + SFX + music → fx/mix.wav
 python3 scripts/ru/wide/obs_base.py $P --mix               # canvas + card + punch-ins → renders/picture.mp4
+python3 scripts/ru/wide/obs_base.py $P --mask --stills 3,7  # plain-wall take: check stills, then --mask --mix
 ```
 **W6 · captions** — `node scripts/ru/make-captions.mjs $P --render`.
 

@@ -56,6 +56,39 @@ A long agent log: `{"at": …, "speed": 3–3.5}` on a wide camera — reads as 
   15–17 characters, `ln` 50–66 px. Item `t` = the start of the word it shows.
 - `plan.json` is written with swaps last (on top). Render: `scripts/ru/wide/render-clips.sh $P [names]`.
 
+## `fx/swaps.json` — swaps in the masked base (`scripts/ru/wide/obs_base.py --mask`)
+
+For a take at a plain wall with nothing by the shoulder (claude-sfx). The speaker is cut out of the wall
+and stands on the canvas without the card; a swap is drawn into the base: dark #0E0B14 + purple glow,
+big text BEHIND the head, the speaker on top. Such swaps stay out of `broll/clips.json` (its card-shaped
+hole would cover the speaker); captions are hidden over them as usual.
+
+```json
+{"swaps": [
+  {"name": "S1-не-слышит", "in": 5.52, "out": 8.97, "note": "«не слышит звук, и эффекты ставит вслепую»",
+   "items": [{"text": "не слышит", "font": "display", "size": 150, "y": 1000, "t": 5.80, "kind": "pop"},
+             {"text": "звук", "font": "italic", "size": 112, "y": 830, "t": 6.40, "kind": "line", "color": "#B79CFF"}]}]}
+```
+
+| field | meaning |
+|---|---|
+| `in`, `out` | clean seconds; the dark background fades in over 0.25 s from `in`, out over the last 0.3 s (`fade_out: false` holds it to `out`) |
+| `items[].text`, `size` | one line of text; size in px |
+| `items[].font` | `display` Spectral ExtraBold (default) · `italic` Spectral SemiBold Italic · `mono` IBM Plex Mono · `golos` Golos 700 |
+| `items[].y` | centre of the line in the frame; x is always the frame centre |
+| `items[].t` | the start of the word it shows; the item comes in over 0.42 s out of a blur and stays to the swap's end |
+| `items[].kind` | `pop` — spring scale 0.86 → 1; `line` (default) — rises 26 px |
+| `items[].color` | `#RRGGBB`, default `#F5F3FA`; the accent line `#B79CFF` |
+| `name`, `note` | labels only |
+
+The head top sits around y 1020–1090 (×1.1 from the frame bottom): as approved, the big word 150–172 px
+(≤ 820 px wide) is centred at y 950–1000 and tucks behind the head, the small line (`italic` 112 px or
+`mono` 60 px) at y 790–830. Joins inside a swap (±0.3 s) do not change the punch-in (1.00 ↔ 1.05).
+Masks: `fx/masks/<frame>.png`, Apple Vision on every card frame (989×822) of `renders/clean.mp4`; the
+script makes them when the folder is empty and stops when their count differs from the video's frames —
+after re-cutting `clean.mp4`, delete `fx/masks`. Check: `obs_base.py $P --mask --stills <t,…>` →
+`review/base-<t>.png` (one still per swap and one between swaps).
+
 ## `PLAN.json` → `captions`
 
 ```json

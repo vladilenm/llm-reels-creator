@@ -32,4 +32,4 @@ The orchestrator's scripts live in the repo at `scripts/ru/` (one copy, tested b
 | W1 | `scripts/ru/wide/scan.py` (source sheets, screen events, speech without words: f0 + re-transcription) |
 | W2 | `scripts/ru/wide/env-cuts.py`, `scripts/ru/wide/clean-words.py`, `scripts/ru/wide/tmap.py` |
 | W4 | `scripts/ru/wide/native.py`, `scripts/ru/wide/render_screen.py`, `scripts/ru/wide/make_clips.py`, `scripts/ru/wide/render-clips.sh` |
-| W5 | `scripts/ru/wide/obs_base.py` (canvas + camera card + punch-ins, `--mix`) |
+| W5 | `scripts/ru/wide/obs_base.py` (canvas + camera card + punch-ins, `--mix`; `--mask` — speaker cut out of a plain wall, swaps from `fx/swaps.json`), `scripts/ru/fx/person-mask.swift` |
