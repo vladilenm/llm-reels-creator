@@ -119,6 +119,7 @@ validators. Structural checks supplement rendered video and audio review.
 | Fast remake cycle: text to say → shoot → preview → final, fewest stops | `remake-fast` |
 | Wide OBS recording (layout + screen 1:1) → reel: all speech, screen matched to words | `reel-wide` |
 | Real recorded SFX on a finished render, placed on the exact frame (library `brand/sfx/library`) | `real-sfx` |
+| Instagram caption and cover for a finished reel (`/reel-package`: his frame, slanted plate, 3D object via Higgsfield after «да») | `reel-package` |
 
 `object-separation` is optional and heavy: it needs a Python venv with torch and
 a 150–900 MB SAM 2 model, installed on first use only. Never run it in a reel

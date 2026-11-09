@@ -44,6 +44,7 @@ export function captionCues(transcript, brand) {
 }
 
 // Optional per-reel overrides from PLAN.json `captions`:
+//   color, active_color               text and active-word colours for this reel (anchor rail)
 //   hide: [{ in, out }]               no captions in these clean-timeline windows
 //   baseline_keys: [{ at, baseline_y }] baseline over time, linear between keys,
 //                                     brand baseline before the first key
@@ -76,7 +77,9 @@ export function baselineAt(keys = [], t, base) {
 }
 
 export function captionsHtml(cues, { duration, brand, fontUrl, fps = 30, overrides = {} }) {
-  const c = brand.captions;
+  // PLAN.json captions.color / active_color recolour one reel without touching brand.md
+  const c = { ...brand.captions, ...(overrides.color ? { color: overrides.color } : {}),
+    ...(overrides.active_color ? { active_color: overrides.active_color } : {}) };
   const lineH = Math.round(c.font_px * 1.3);
   const keys = [...(overrides.baseline_keys ?? [])].sort((a, b) => a.at - b.at);
   const base = (t) => baselineAt(keys, t, c.baseline_y);
